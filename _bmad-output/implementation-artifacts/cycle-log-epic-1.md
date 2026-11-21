@@ -30,3 +30,5 @@
 2026-11-21T23:19:11Z	Story 1.1	ledger_adjudicated	owned=0 resolved=0 reowned=0 terminal=0
 2026-11-21T23:25:19Z	Story 1.1	smoke_complete	method=browser result=pass iterations=2 defects_caught=1 evidence=_bmad-output/implementation-artifacts/evidence/story-1-1-smoke.png ruling=decide favicon-404-browser-initiated fixed-in-index.html
 2026-11-21T23:29:49Z	Story 1.1	fresh_check	env=clean-checkout-node-26.13.1 tests=15 result=pass order=forward,reverse
+2026-11-21T23:30:50Z	Story 1.1	committed	sha=5aebb03 submodules= ci=none
+2026-11-21T23:30:50Z	Story 1.1	story_cycle	plan_to_commit_min=1065 implement_passes=1 reviews=1 rework=0 first_ci=none
