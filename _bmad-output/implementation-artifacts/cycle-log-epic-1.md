@@ -14,5 +14,6 @@
 2026-11-21T05:33:56Z	Epic 1	unattended_started	run=20261121T0537Z-1-7 policy=cc3dfe318c687a5f4549d7b653ec4a5278cbb9f7 doctrine=1ac9e3987fa47aeddd6db0265385923232cbe42e range=1-7 ci=local_green visibility=PUBLIC notify=inbox-only lock_token=1795239200-6850
 2026-11-21T05:42:49Z	Epic 1	epic_context_compiled	sha=d1682b8 reason=initial
 2026-11-21T05:44:58Z	Story 1.1	stage_spawned	stage=plan spawn_at=2026-11-21T05:44:58Z agent_name=1-1-bootstrap-plan-1 cycle_iteration=1
-2026-11-21T06:08:43Z	Story 1.1	story_created	spawn_at=2026-11-21T06:06:21Z path=_bmad-output/implementation-artifacts/spec-1-1-project-bootstrap-and-the-deterministic-kernel-core.md build_status=ready-for-dev spec_tokens=2200 epic_context=compiled
-2026-11-21T06:08:43Z	Story 1.1	spec_validated	spawn_at=2026-11-21T06:06:21Z service_introducing=true integration_ac=present adr_constrained_acs=ac3,ac4,ac5,ac6,ac7 decision_dependency=none sections_created=none owned_ledger=none addressed=0 declined=0 mutates_shared_runtime=false cycle_iteration=1
+2026-11-21T06:08:43Z	Story 1.1	story_created	spawn_at=2026-11-21T05:44:58Z path=_bmad-output/implementation-artifacts/spec-1-1-project-bootstrap-and-the-deterministic-kernel-core.md build_status=ready-for-dev spec_tokens=2200 epic_context=compiled
+2026-11-21T06:08:43Z	Story 1.1	spec_validated	spawn_at=2026-11-21T05:44:58Z service_introducing=true integration_ac=present adr_constrained_acs=ac3,ac4,ac5,ac6,ac7 decision_dependency=none sections_created=none owned_ledger=none addressed=0 declined=0 mutates_shared_runtime=false cycle_iteration=1
+2026-11-21T06:09:27Z	Story 1.1	stage_spawned	stage=implement spawn_at=2026-11-21T06:09:27Z agent_name=1-1-bootstrap-implement-1 cycle_iteration=1 story_base=de1223d
