@@ -22,3 +22,5 @@
 2026-11-21T12:03:25Z	Story 1.1	ledger_routed_planned	story=1-7-fault-containment-a-broken-game-never-kills-the-room entries=3 excess=0 by=harvest
 2026-11-21T12:11:09Z	Story 1.1	adr_verifications_complete	tool=node_cli acs=ac3,ac4,ac5,ac6,ac7 result=pass evidence=inline mutations=ac3:tick-threshold-x2,ac4:fnv-offset-lsb,ac5:supervisor-rethrow,ac6:planted-core-games-import,ac7:planted-math-random
 2026-11-21T12:11:11Z	Story 1.1	stage_spawned	stage=qa spawn_at=2026-11-21T12:11:11Z agent_name=1-1-bootstrap-qa-1 cycle_iteration=1
+2026-11-21T13:09:00Z	Story 1.1	qa_complete	spawn_at=2026-11-21T12:11:11Z tests_added=3 mutations_demonstrated=3 first_run_failures=0 clarifications=0 closing_sections_present=true cycle_iteration=1
+2026-11-21T13:09:00Z	Story 1.1	stage_spawned	stage=code-review spawn_at=2026-11-21T13:09:00Z agent_name=1-1-bootstrap-cr-1 cycle_iteration=1
