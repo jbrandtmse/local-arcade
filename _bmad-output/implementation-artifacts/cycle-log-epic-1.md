@@ -28,3 +28,4 @@
 2026-11-21T20:33:20Z	Story 1.1	stage_api_error	stage=code-review error=other wait_min=0 detail=network_restart_during_cr2 tree=unchanged_from_cr1_partial respawn=1-1-bootstrap-cr-3
 2026-11-21T23:19:11Z	Story 1.1	cr_complete	spawn_at=2026-11-21T17:56:02Z resolved=5 fixed_at_source=5 by_design=0 wontfix_theoretical=1 routed=1 escalated=1 decision_pending=0 deferred=0 high=0 med=3 low=2 rows=35 unresolved_high_med=0 clarifications=0 closing_sections_present=true cycle_iteration=1 respawn=3
 2026-11-21T23:19:11Z	Story 1.1	ledger_adjudicated	owned=0 resolved=0 reowned=0 terminal=0
+2026-11-21T23:25:19Z	Story 1.1	smoke_complete	method=browser result=pass iterations=2 defects_caught=1 evidence=_bmad-output/implementation-artifacts/evidence/story-1-1-smoke.png ruling=decide favicon-404-browser-initiated fixed-in-index.html
