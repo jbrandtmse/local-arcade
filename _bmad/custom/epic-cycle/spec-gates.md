@@ -1,0 +1,49 @@
+> Section file of `/epic-cycle`. It is part of the command and binds you as the command does. A quoted section name, or a `Rule SC-n`, that is not in this file is found through the Section Index in `.claude/commands/epic-cycle.md`.
+
+### Lead Validates the Story Spec (Critical Gate)
+
+Story creation is the **plan** spawn of `bmad-build-auto` (`<story-key> Halt after planning.`). The gate is what happens between that spawn and the implement spawn: the lead reads the spec it produced (`spec-<key>.md` — capture the path from the agent's `SPEC:` line and confirm by globbing `spec-<epic>-<story>-*.md`) and validates it before any code exists. This replaces the pre-6.11 "lead creates the story file" gate; the race-ahead concern is gone (build-auto never advances to another story), the validation is not.
+
+**Integration AC validation.** Read the spec's Tasks & Acceptance, I/O & Edge-Case Matrix, and Design Notes: does this story introduce a service, module, or component that later stories will consume? Indicators: a new file under `services/` or `lib/`; a new exported class/factory/module; a `Consumed-by:` list; an AC describing a public surface other stories will call.
+
+If yes — the story is service-introducing — it MUST EITHER (a) contain at least one Integration AC of the form "consumer X reads from this service and produces observable effect Y," OR (b) carry an explicit note under `## Design Notes` stating "No consumers in this story; the first consumer will be Story X.Y." (the Rule 1 escape clause for services with no consumers yet in the epic). If neither is present, pause for the user (*Unattended:* option (a) once, then (b) only with a named consumer, else stop the story — U5; never (c)):
+
+> "Story <id> introduces <service-name>. No Integration AC and no 'no consumers yet' declaration found. Choose: (a) re-plan — the lead adds the Integration-AC requirement inside the spec's `<intent-contract>` block, sets frontmatter `status: draft`, commits, and re-spawns the plan stage on the spec path with `Halt after planning.` (re-dispatch protocol — re-spawn on the spec path: a story-key re-spawn resumes a `draft` spec in place but creates `spec-<key>-2.md` at any other status); (b) name the future consumer story and add the 'No consumers in this story; the first consumer will be Story X.Y.' note to Design Notes (lead edit; commit); (c) proceed without (producer-consumer wire-up defects can ship green)."
+
+**AD mapping.** Note which ACs are AD-constrained (Rule 6 — an `AD-n` in the spine binds this story's area) and which are AD-tooled (an AD commits to a tool stack for the verification — lead-executed later); confirm the spec's Design Notes name the governing `AD-n` ids — add them if the plan missed any (lead edit, non-frozen section). **Sections the template may have deleted:** the spec template tells the planner to remove `## Design Notes` and `## Verification` when trivial; if either is absent, the lead creates it now (empty heading + one line) so Rules 1/2/6/19 and QA's file-list rule have somewhere to write — log `sections_created=<csv|none>` on `spec_validated`.
+
+**Spec sanity.** Frontmatter `status: ready-for-dev`; `## Auto Run Result` present; no `blocked`. A spec the READY-FOR-DEVELOPMENT standard rejected arrives as `blocked` / `spec failed ready-for-development standard` — clarification path, not a gate pass.
+
+**Decision dependency.** `LEDGER slice all | grep decision-pending`: if the spec's Design Notes, Tasks, or I/O matrix cite one of those entries, or build on a value the ledger records as undecided (a rate, a threshold, a ratification), the story is about to be built on a question nobody has answered — an `intent gap` for the user NOW, not at the merge gate (field case 2026-08-29: a tick-rate ratification sat `decision-pending` for seven stories). Surface it with `LEDGER show DW-n`, record the answer as a trailer line (`by=spec_gate`) and in the spec's `## Spec Change Log`, and log `decision_dependency=<DW-n csv>` on `spec_validated`.
+
+**Shared-runtime mutation.** Does any AC, I/O row, or `## Verification` command mutate system-level state on a runtime other stories or the lead also use — databases, namespaces, security objects, scheduled tasks, web applications, OS services, a shared dev server? If yes, the spec's `## Verification` must name a **throwaway environment** (a fresh container, a scratch namespace or database, a disposable instance) for its destructive checks, and every test-running party for this story (build-auto's handoff, QA, the review layers, the lead's smoke) runs stateful classes one at a time (Rule 18 (3)). A spec that names none: the lead adds the environment (lead edit, non-frozen section) or raises an `intent gap` if the project has nowhere disposable to run it (*Unattended:* stop the story — U5). Log `mutates_shared_runtime=true|false` on `spec_validated`. (Field report 2026-09-11: an installer story verified against the one long-lived instance; a rework's concurrent test runs left it with a database mounted over a deleted directory and the story blocked on a human restart.)
+
+**Ledger inbox (Rule 17 (1b)).** `LEDGER slice <key>` again: every entry the story owns must be either cited in Tasks & Acceptance / the I/O matrix or listed as `Declined DW-n: <reason>` under Design Notes. An entry the plan ignored → the lead adds it as a Tasks & Acceptance item (lead edit, non-frozen section) or, if the plan's intent genuinely excludes it, re-owns or closes it now (`by=spec_gate` — the lead has the authority and the vocabulary here; adjudication after `done` does not). A declined entry is dispositioned the same way in the same commit. Log `owned_ledger=<DW-n csv|none> addressed=N declined=N` on `spec_validated`.
+
+If NOT service-introducing (refactor, doc-only, internal cleanup, defect-fix), proceed. Then: log `spec_validated service_introducing=<bool> integration_ac=<present|declared-none|user-waived> adr_constrained_acs=<csv-or-empty> decision_dependency=<csv-or-none> mutates_shared_runtime=<bool>`; `SPRINT_PLAN generate --set <key>=ready-for-dev`; bookkeeping commit (everything under `implementation-artifacts`). This workflow gate is the binding enforcement.
+
+### AD-Aware Execution (Required — the architecture spine)
+
+The project's architecture decisions live in its spine — the `AD-n` blocks of `ARCHITECTURE-SPINE.md` (Rule 6), resolved once per epic and logged `spine_resolved`. ADs commit the project to specific tooling, methodology, and architectural patterns; an AC satisfied by the wrong tool stack is equivalent to a HIGH-severity defect. BMAD itself enforces none of this at build time (no Phase-4 skill reads the spine directly — it reaches `bmad-build-auto` only through the compiled epic context), so this gate and Rule 6 are the enforcement. The spine is also **written** by the pipeline: Rule 20 puts every decision with architectural weight into it at the moment it is made, so the next epic's plan stage sees it. A project with no spine (`spine_resolved path=none`) runs this section as `none_required` — and should get one from `bmad-architecture` before its next epic.
+
+**Layer 1 — Lead-executed AD-tooling gate (between `dev_complete` and the QA spawn).**
+
+After dev returns and before QA is spawned, the lead inspects the story's ACs for any that map to AD-committed agent-time tooling (visual verification, performance profiling, audits, etc.). For each matched AC, the lead drives the verification using its own tool inventory.
+
+This gate exists because MCP tool inventories may not propagate reliably to spawned subagents. The lead always has the MCP servers at session level.
+
+**Mechanics:**
+
+1. Read the spec (path captured at `story_created`).
+2. For each AC, consult the spine's ADs (Design Notes ids first, then any AD whose `Binds:` covers the area). If an AD's Rule commits to a specific tool stack for that AC, it's "AD-tooled."
+3. Drive each AD-tooled AC verification using the relevant MCP / tool; record pass/fail + evidence paths. **Rule 19 applies to this gate most of all** — it is lead-executed and therefore trusted: for each AD-tooled AC name the mutation that would flip the result, apply it, observe the failure, revert, and confirm the tree is byte-identical (`git status --short` / `git diff --stat`). A `pass` with no named mutation is recorded `result=unverified`, not `pass` (field case: `pass_commands_empty` recorded against a value typed `readonly never[]`).
+4. Append one cycle-log entry per story: `<UTC> TAB Story <id> TAB adr_verifications_complete TAB <metadata>` — including `mutations=<ac:what,…|none>`.
+5. On failure, surface to user before spawning QA (*Unattended:* the rework path — U5).
+6. Pass results to code reviewer's spawn-prompt context.
+7. If no AD-tooled ACs, emit `adr_verifications_complete result=none_required` and proceed. (The stage name keeps its historical `adr_` spelling — see Rule 6.)
+
+**Layer 2 — the spine path in every spawn prompt.**
+
+The lead resolves the spine once per epic (`spine_resolved`) and includes its path in every agent spawn prompt as factual context. Agents must consult the ADs for architectural and methodology decisions referenced in their ACs — the plan stage records the governing ids under `## Design Notes`; the code reviewer verifies implementations match each AD's Rule — violations are HIGH (Rule 6).
+
+**Layer 3 — decisions flow back (Rule 20).** Clarification answers, Rule 5 amendments, and decision-sheet calls with architectural weight are written into the spine by the lead (light path: new/amended AD, Conventions or Stack row, `memlog.py append`, `lint_spine.py`, commit; a conflict with an existing AD → `bmad-architecture` Update intent, interactive). The pre-warm then recompiles the epic context, so the decision reaches the next plan spawn. Logged `spine_updated`.
