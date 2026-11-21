@@ -12,4 +12,5 @@
 2026-11-21T05:33:02Z	Epic 1	sprint_planning_complete	gate=CONCERNS findings=l3_human_walk_story_2.6,owner_taste_decisions_epic3_7,outward_infra_3.15_park,milestones_none
 2026-11-21T05:33:02Z	Epic 1	retro_review_skipped	reason=no_retro_no_open_ledger_no_open_action_items
 2026-11-21T05:33:56Z	Epic 1	unattended_started	run=20261121T0537Z-1-7 policy=cc3dfe318c687a5f4549d7b653ec4a5278cbb9f7 doctrine=1ac9e3987fa47aeddd6db0265385923232cbe42e range=1-7 ci=local_green visibility=PUBLIC notify=inbox-only lock_token=1795239200-6850
-2026-11-21T05:42:49Z	Epic 1	epic_context_compiled	sha=49ab772 reason=initial
+2026-11-21T05:42:49Z	Epic 1	epic_context_compiled	sha=d1682b8 reason=initial
+2026-11-21T05:44:58Z	Story 1.1	stage_spawned	stage=plan spawn_at=2026-11-21T05:44:58Z agent_name=1-1-bootstrap-plan-1 cycle_iteration=1
