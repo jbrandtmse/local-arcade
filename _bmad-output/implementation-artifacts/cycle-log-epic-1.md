@@ -11,3 +11,4 @@
 2026-11-21T05:33:02Z	Epic 1	ledger_load	total=0 open=0 routed=0 escalated=0 decision_pending=0 terminal=0 status_unknown=0 owner_unknown=0 burndown=0 reowned_none=0
 2026-11-21T05:33:02Z	Epic 1	sprint_planning_complete	gate=CONCERNS findings=l3_human_walk_story_2.6,owner_taste_decisions_epic3_7,outward_infra_3.15_park,milestones_none
 2026-11-21T05:33:02Z	Epic 1	retro_review_skipped	reason=no_retro_no_open_ledger_no_open_action_items
+2026-11-21T05:33:56Z	Epic 1	unattended_started	run=20261121T0537Z-1-7 policy=cc3dfe318c687a5f4549d7b653ec4a5278cbb9f7 doctrine=1ac9e3987fa47aeddd6db0265385923232cbe42e range=1-7 ci=local_green visibility=PUBLIC notify=inbox-only lock_token=1795239200-6850
