@@ -48,7 +48,13 @@ export function createSupervisor(onFault?: (entry: FaultEntry) => void): Supervi
           message: err instanceof Error ? err.message : String(err),
         };
         faults.push(entry);
-        onFault?.(entry);
+        // A crashing fault consumer must not take the room down either —
+        // containment is the supervisor's whole point (AD-15).
+        try {
+          onFault?.(entry);
+        } catch {
+          /* the fault record already exists; the consumer is broken, not the room */
+        }
         return { ok: false, fault: entry };
       }
     },

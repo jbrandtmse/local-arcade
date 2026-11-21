@@ -86,6 +86,19 @@ test("throwing sim inside tick(): supervisor logs {tick, errorId}, loop keeps ti
   assert.match(loop.supervisor.faults[0]?.message as string, /sim exploded/);
 });
 
+test("a throwing onFault consumer is contained: the fault is recorded, invoke still returns", () => {
+  const sup = createSupervisor(() => {
+    throw new Error("fault consumer down");
+  });
+  const bad = sup.invoke({ tick: 2, gameId: "g1", hook: "tick", call: () => { throw new Error("sim"); } });
+  assert.equal(bad.ok, false);
+  assert.equal(bad.fault?.message, "sim"); // the sim fault survives the consumer crash
+  assert.equal(bad.fault?.errorId, "g1.tick#1");
+  assert.equal(sup.faults.length, 1);
+  const ok = sup.invoke({ tick: 3, gameId: "g1", hook: "tick", call: () => 7 });
+  assert.equal(ok.value, 7); // and the call sites keep working afterwards
+});
+
 test("events() call site is also wrapped: a fault there is logged, loop alive", () => {
   let wall = 0;
   const loop = createKernelLoop({ now: () => wall });

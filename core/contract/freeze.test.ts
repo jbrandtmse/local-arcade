@@ -35,6 +35,7 @@ test("out-of-window writes throw TypeError: set, nested, push, delete, define", 
     delete state.items[0];
   }, TypeError);
   assert.throws(() => Object.defineProperty(state, "z", { value: 1 }), TypeError);
+  assert.throws(() => Object.setPrototypeOf(state, null), TypeError); // prototype trap closes the class-instance bypass
   assert.throws(
     () => {
       state.x = 1;
@@ -85,4 +86,11 @@ test("toPlain rejects cycles but still clones diamonds", () => {
   const cloned = toPlain({ a: shared, b: shared }); // diamond, not a cycle
   assert.deepEqual(cloned, { a: { v: 1 }, b: { v: 1 } });
   assert.notEqual(cloned.a, shared);
+});
+
+test("toPlain rejects sparse arrays and symbol-keyed objects", () => {
+  const holey: unknown[] = [1];
+  holey.length = 3; // holes would silently clone to null members
+  assert.throws(() => toPlain(holey), /sparse/);
+  assert.throws(() => toPlain({ [Symbol.for("mode")]: 1, a: 1 }), /symbol keys/);
 });

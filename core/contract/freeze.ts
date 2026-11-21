@@ -102,11 +102,19 @@ export function toPlain<T>(value: T, path = "$", ancestors: Set<object> = new Se
   ancestors.add(value as object);
   try {
     if (Array.isArray(value)) {
+      for (let i = 0; i < value.length; i++) {
+        if (!(i in value)) {
+          throw new TypeError(`snapshot value at ${path} is a sparse array; plain-serializable data only`);
+        }
+      }
       return value.map((item, i) => toPlain(item, `${path}[${i}]`, ancestors)) as unknown as T;
     }
     const proto = Object.getPrototypeOf(value);
     if (proto !== Object.prototype && proto !== null) {
       throw new TypeError(`snapshot value at ${path} is a class instance; plain-serializable data only`);
+    }
+    if (Object.getOwnPropertySymbols(value).length > 0) {
+      throw new TypeError(`snapshot value at ${path} has symbol keys; plain-serializable data only`);
     }
     const out: Record<string, unknown> = {};
     for (const key of Object.keys(value)) {

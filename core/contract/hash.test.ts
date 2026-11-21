@@ -40,3 +40,21 @@ test("non-plain state is rejected (snapshot contract)", () => {
   assert.throws(() => canonicalSerialize({ a: 1, b: undefined }), TypeError); // not silently dropped
   assert.throws(() => canonicalSerialize([undefined]), TypeError);
 });
+
+test("cycles and sparse arrays throw instead of serializing to malformed JSON", () => {
+  const cyclic: Record<string, unknown> = { n: 1 };
+  cyclic.self = cyclic;
+  assert.throws(() => canonicalSerialize(cyclic), /cyclic/);
+  const arr: unknown[] = [1];
+  arr.push(arr);
+  assert.throws(() => canonicalSerialize(arr), /cyclic/);
+  const shared = { v: 1 }; // diamond is not a cycle: clones fine
+  assert.equal(canonicalSerialize({ a: shared, b: shared }), '{"a":{"v":1},"b":{"v":1}}');
+  const holey: unknown[] = [1];
+  holey.length = 3; // holes at 1 and 2 — map() would emit "null", corrupting the hash's input shape
+  assert.throws(() => canonicalSerialize(holey), /sparse/);
+});
+
+test("symbol keys are rejected, not silently dropped from the hash", () => {
+  assert.throws(() => canonicalSerialize({ [Symbol.iterator]: 1, a: 1 }), /symbol keys/);
+});

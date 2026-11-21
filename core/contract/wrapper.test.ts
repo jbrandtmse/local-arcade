@@ -4,6 +4,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createGameInstance, type SimContext, type SimHooks } from "./wrapper.ts";
+import { math as contractMath } from "./index.ts";
 import { createRng } from "./rng.ts";
 
 /** Fixture sim: pushes one rng roll per tick into history; plain snapshot. */
@@ -206,6 +207,48 @@ test("mode switches: attract() and autoplay(seed) are kernel-driven one-shots", 
   assert.equal(a.mode(), "autoplay");
   a.tick(1 / 60, { controls: {} });
   assert.equal(lastDraw, createRng(4242).uniform()); // autoplay re-seeded the instance rng
+});
+
+test("ctx.math seam: the wrapper injects the Core math module at instantiation (AD-4)", () => {
+  // The sim never imports core/contract (spine diagram: no SIM→CONTRACT edge);
+  // ctx.math is the sanctioned channel for the deterministic transcendentals.
+  const a = createGameInstance((ctx) => {
+    const state = ctx.gated({ s: 0 });
+    return {
+      tick: () => {
+        state.s = ctx.math.sin(0.5);
+      },
+      events: () => [],
+      snapshot: () => ({ s: state.s }),
+    };
+  }, 1);
+  a.tick(1 / 60, { controls: {} });
+  assert.equal((a.snapshot() as { s: number }).s, 0.479425538604203); // same golden math.test.ts pins
+  assert.equal(contractMath.sin(0.5), 0.479425538604203); // and it is the same module the goldens pin
+});
+
+test("the per-tick input view is frozen: a write back into controls throws (AD-16 kernel-owned input)", () => {
+  const a = createGameInstance(() => ({
+    tick(_dt, input) {
+      (input.controls as { axis: number }).axis = 99; // the sim may not write kernel-owned input
+    },
+    events: () => [],
+    snapshot: () => ({}),
+  }), 1);
+  const kernelInput = { controls: { axis: 0.5 } };
+  assert.throws(() => a.tick(1 / 60, kernelInput), TypeError);
+  assert.deepEqual(kernelInput, { controls: { axis: 0.5 } }); // the clone insulated the kernel's object
+  let secondAxis = Number.NaN;
+  const b = createGameInstance(() => ({
+    tick(_dt, input) {
+      secondAxis = input.controls.axis as number;
+    },
+    events: () => [],
+    snapshot: () => ({}),
+  }), 1);
+  b.tick(1 / 60, kernelInput);
+  b.tick(1 / 60, kernelInput); // the same kernel object is legal twice: fresh view per tick
+  assert.equal(secondAxis, 0.5);
 });
 
 test("stateHash() is wrapper-computed, never the game's own value", () => {

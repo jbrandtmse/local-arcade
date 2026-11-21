@@ -51,6 +51,13 @@ for (const [i, entry] of list.entries()) {
   if (entry.seed !== undefined && !Number.isFinite(entry.seed)) {
     fail(`entry ${i} (${entry.id}): seed must be a finite number when present`);
   }
+  // Strict schema: a typo like "seeds" would silently drop the seed and the
+  // entry would still emit — fail loudly instead.
+  for (const key of Object.keys(entry)) {
+    if (key !== "id" && key !== "simPath" && key !== "seed") {
+      fail(`entry ${i} (${entry.id}): unknown field ${JSON.stringify(key)} (known: id, simPath, seed)`);
+    }
+  }
   entries.push(entry);
 }
 entries.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));

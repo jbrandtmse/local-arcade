@@ -1,7 +1,8 @@
 // Seeded RNG injected by the Core wrapper (AD-4). xorshift128+ over four
-// unsigned 32-bit words: the state advance is the Marsaglia xorshift128 step
-// and the output is the "+" sum (s2 + s3) mod 2^32. The cursor is exposed as
-// a plain array of four numbers via getState() so it can live inside
+// 32-bit state words (stored signed in an Int32Array; the "+" output sums
+// them unsigned): the state advance is the Marsaglia xorshift128 step and
+// the output is the "+" sum (s2 + s3) mod 2^32. The cursor is exposed as a
+// plain array of four numbers via getState() so it can live inside
 // snapshot() and replay/stateHash cover rng advancement exactly (AD-4).
 // All ops here are pure integer arithmetic — identical results on any engine.
 
@@ -16,7 +17,7 @@ export interface Rng {
   pick<T>(items: readonly T[]): T;
   /** Element chosen with probability proportional to weights. */
   weighted<T>(items: readonly T[], weights: readonly number[]): T;
-  /** Plain-number cursor: four unsigned 32-bit words. Safe for snapshot(). */
+  /** Plain-number cursor: four signed 32-bit integers (Int32 range). Safe for snapshot(). */
   getState(): number[];
   /** Restore the cursor from a getState() array taken from the same generator kind. */
   restore(state: readonly number[]): void;
@@ -100,8 +101,14 @@ export function createRng(seed: number): Rng {
       return [s[0] as number, s[1] as number, s[2] as number, s[3] as number];
     },
     restore(state) {
-      if (state.length !== 4 || state.some((w) => !Number.isFinite(w))) {
-        throw new RangeError("rng.restore: cursor must be four finite numbers");
+      // Hand-authored or replay-fed cursors must be exact signed-int32 words;
+      // a fractional or out-of-range value would silently wrap through the
+      // Int32Array and fork the stream (AD-4 determinism).
+      if (
+        state.length !== 4 ||
+        state.some((w) => !Number.isInteger(w) || w < -2147483648 || w > 2147483647)
+      ) {
+        throw new RangeError("rng.restore: cursor must be four signed 32-bit integers");
       }
       s[0] = state[0] as number;
       s[1] = state[1] as number;

@@ -1,10 +1,12 @@
 // The contract wrapper (AD-2, AD-5, AD-8): the one sanctioned shared seam.
-// The wrapper instantiates a sim factory with an injected seeded rng and the
-// write-gated state surface, opens the tick window only around sim.tick()
-// (AD-15), pulls the per-tick event list, and computes stateHash() itself — a
-// game's own stateHash is lint-red; here the wrapper is the only hasher.
+// The wrapper instantiates a sim factory with an injected seeded rng, the
+// deterministic math module (AD-4), and the write-gated state surface, opens
+// the tick window only around sim.tick() (AD-15), pulls the per-tick event
+// list, and computes stateHash() itself — a game's own stateHash is lint-red
+// at L0 (Epic 3); here the wrapper is the only hasher.
 
 import { createRng, type Rng } from "./rng.ts";
+import * as mathModule from "./math.ts";
 import { createGate, gateDeep, toPlain } from "./freeze.ts";
 import { stateHashOf } from "./hash.ts";
 
@@ -21,6 +23,8 @@ export interface SimEvent {
 /** Context the wrapper injects at instantiation — the sim never seeds itself. */
 export interface SimContext {
   rng: Rng;
+  /** Core deterministic math module (AD-4): the sim imports no engine transcendentals. */
+  math: typeof mathModule;
   /** Create gate-checked state: every mutation goes through the tick window. */
   gated<T extends object>(state: T): T;
 }
@@ -43,6 +47,8 @@ export interface GameRegistryEntry {
   createSim: SimFactory;
 }
 
+/** Kernel-owned instance modes; "play" (visitor-seated, AD-23) is reserved for
+ * the 1.6 scheduler — no wrapper surface sets it this story. */
 export type InstanceMode = "attract" | "autoplay" | "play";
 
 export interface GameInstance {
@@ -56,11 +62,23 @@ export interface GameInstance {
   mode(): InstanceMode;
 }
 
+// Per-tick immutable view of the kernel's input: the sim receives a deep-
+// frozen plain clone, so a write back into controls throws TypeError instead
+// of silently persisting into the next tick (AD-16: input is kernel-owned).
+function deepFreezePlain(value: unknown): unknown {
+  if (typeof value === "object" && value !== null) {
+    for (const v of Object.values(value)) deepFreezePlain(v);
+    Object.freeze(value);
+  }
+  return value;
+}
+
 export function createGameInstance(createSim: SimFactory, seed: number): GameInstance {
   const gate = createGate();
   const rng = createRng(seed);
   const sim = createSim({
     rng,
+    math: mathModule,
     // Clone at the seam: the sim's own raw reference must not alias the gated
     // target, or out-of-window writes through it would bypass the gate (AD-15).
     gated: <T extends object>(state: T): T => gateDeep(structuredClone(state), gate),
@@ -108,7 +126,7 @@ export function createGameInstance(createSim: SimFactory, seed: number): GameIns
       ) {
         throw new TypeError("tick input must carry exactly one field: controls");
       }
-      kernelWindow(() => sim.tick(dt, input));
+      kernelWindow(() => sim.tick(dt, deepFreezePlain(structuredClone(input)) as TickInput));
     },
     events() {
       // Gate stays closed: pulling events is never a mutation window (AD-15);

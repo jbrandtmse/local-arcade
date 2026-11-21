@@ -12,8 +12,10 @@ function utf8Bytes(text: string): Uint8Array {
  * Canonical JSON: sorted object keys, array order preserved, numbers via
  * ECMAScript Number::toString (shortest round-trip), strings via JSON escape.
  * Only plain-serializable data is accepted (see toPlain / snapshot rules).
+ * Cyclic structures are rejected (same ancestor discipline as toPlain);
+ * shared non-cyclic references are fine — diamonds, not cycles.
  */
-export function canonicalSerialize(value: unknown): string {
+export function canonicalSerialize(value: unknown, ancestors: Set<object> = new Set()): string {
   if (value === null) return "null";
   const t = typeof value;
   if (t === "boolean") return value ? "true" : "false";
@@ -28,23 +30,47 @@ export function canonicalSerialize(value: unknown): string {
     throw new TypeError(`canonicalSerialize: unsupported value of type ${t}`);
   }
   if (Array.isArray(value)) {
-    return `[${value.map((item) => canonicalSerialize(item)).join(",")}]`;
+    if (ancestors.has(value)) {
+      throw new TypeError("canonicalSerialize: cyclic state is not plain-serializable");
+    }
+    for (let i = 0; i < value.length; i++) {
+      if (!(i in value)) {
+        throw new TypeError("canonicalSerialize: sparse arrays are not plain-serializable");
+      }
+    }
+    ancestors.add(value);
+    try {
+      return `[${value.map((item) => canonicalSerialize(item, ancestors)).join(",")}]`;
+    } finally {
+      ancestors.delete(value);
+    }
   }
   const proto = Object.getPrototypeOf(value);
   if (proto !== Object.prototype && proto !== null) {
     throw new TypeError("canonicalSerialize: class instances are not plain-serializable");
   }
+  if (ancestors.has(value as object)) {
+    throw new TypeError("canonicalSerialize: cyclic state is not plain-serializable");
+  }
   const obj = value as Record<string, unknown>;
+  if (Object.getOwnPropertySymbols(obj).length > 0) {
+    throw new TypeError("canonicalSerialize: symbol keys are not plain-serializable");
+  }
   const keys = Object.keys(obj).sort();
   const parts: string[] = [];
-  for (const key of keys) {
-    const v = obj[key];
-    if (v === undefined) {
-      // Strict, not JSON-lax: an `undefined` member means the state shape is
-      // ambiguous (it would vanish through a JSON round-trip) — reject it.
-      throw new TypeError(`canonicalSerialize: object member ${JSON.stringify(key)} is undefined`);
+  ancestors.add(value as object);
+  try {
+    for (const key of keys) {
+      const v = obj[key];
+      if (v === undefined) {
+        // Strict, not JSON-lax: an `undefined` member means the state shape is
+        // ambiguous (it would vanish through a JSON round-trip) — reject it.
+        throw new TypeError(`canonicalSerialize: object member ${JSON.stringify(key)} is undefined`);
+      }
+      parts.push(`${JSON.stringify(key)}:${canonicalSerialize(v, ancestors)}`);
     }
-    parts.push(`${JSON.stringify(key)}:${canonicalSerialize(v)}`);
+  } finally {
+    ancestors.delete(value as object);
   }
   return `{${parts.join(",")}}`;
 }

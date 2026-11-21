@@ -1,1 +1,4 @@
 _bmad/scripts/*.sh text eol=lf
+# TypeScript sources are LF in index and worktree: generated/game-registry.ts
+# is byte-compared by the registry drift pin, so its checkout must not convert.
+*.ts text eol=lf

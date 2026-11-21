@@ -76,6 +76,18 @@ test("restore rejects malformed cursors and never re-admits the all-zero fixed p
   for (let i = 0; i < 10; i++) assert.equal(r.uniform(), other.uniform()); // deterministic, same both
 });
 
+test("restore enforces exact signed-int32 words (fractional/out-of-range cursors would fork the stream)", () => {
+  const r = createRng(8);
+  assert.throws(() => r.restore([0.5, 1, 2, 3]), RangeError);
+  assert.throws(() => r.restore([2147483648, 0, 0, 0]), RangeError);
+  assert.throws(() => r.restore([-2147483649, 0, 0, 0]), RangeError);
+  assert.throws(() => r.restore([NaN, 0, 0, 0]), RangeError);
+  const cur = createRng(17).getState();
+  assert.ok(cur.some((w) => w < 0)); // getState words are signed int32 (documented contract)
+  r.restore(cur);
+  assert.deepEqual(r.getState(), cur); // and the boundary-exact round-trip works
+});
+
 test("reseed reproduces a fresh stream from the same seed", () => {
   const r = createRng(1);
   for (let i = 0; i < 7; i++) r.uniform();

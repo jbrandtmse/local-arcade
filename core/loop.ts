@@ -75,9 +75,23 @@ export function createKernelLoop(config: LoopConfig): KernelLoop {
         hook: "events",
         call: () => reg.instance.events(),
       });
-      if (result.ok && Array.isArray(result.value)) {
-        for (const event of result.value as SimEvent[]) {
-          eventQueue.push({ gameId: reg.id, tick: tickCount, event });
+      if (result.ok) {
+        if (Array.isArray(result.value)) {
+          for (const event of result.value as SimEvent[]) {
+            eventQueue.push({ gameId: reg.id, tick: tickCount, event });
+          }
+        } else {
+          // Containment must not depend on how the instance was built: an
+          // unwrapped instance whose events() returns a non-array violates
+          // AD-6/AD-15 and surfaces as a fault, not a silent drop.
+          supervisor.invoke({
+            tick: tickCount,
+            gameId: reg.id,
+            hook: "events",
+            call: () => {
+              throw new TypeError("events() must return an array of {type, payload} (AD-6)");
+            },
+          });
         }
       }
     }
@@ -112,8 +126,13 @@ export function createKernelLoop(config: LoopConfig): KernelLoop {
         throw new TypeError("loop.start() requires a schedule pump (rAF in the browser)");
       }
       const pump = (): void => {
-        stepOnce();
-        config.schedule!(pump);
+        try {
+          stepOnce();
+        } finally {
+          // The fixed tick must survive a throw outside the supervisor-wrapped
+          // sim calls (e.g. the injected clock): re-arm before the throw spreads.
+          config.schedule!(pump);
+        }
       };
       config.schedule(pump);
     },

@@ -100,6 +100,12 @@ test("invalid entries fail nonzero with a message", () => {
     ]),
   );
   expectFailure(dir, "collision"); // a1 and a-1 both map to gA1
+
+  writeFileSync(
+    path.join(dir, "list.json"),
+    JSON.stringify([{ id: "alpha", simPath: "sims/alpha/sim.js", seeds: 7 }]),
+  );
+  expectFailure(dir, "unknown field"); // a "seeds" typo must not silently drop the seed
 });
 
 test("the repo's own list regenerates the committed registry byte-identically", () => {

@@ -8,6 +8,10 @@
 // The coefficient set below is FIXED; changing any coefficient changes every
 // pinned output vector (see math.test.ts) — the outputs are deterministic
 // approximations, not nearest-double library values.
+// Known exactness boundaries (deterministic on every conforming engine, just
+// not nearest-double): sin/cos/tan argument reduction loses accuracy beyond
+// |x| ~ 1e15 — keep angles wrapped; atan2's signed-zero branches follow the
+// code's branch table, not Math.atan2's (±0 parity is not promised).
 
 export const PI = 3.141592653589793;
 export const HALF_PI = 1.5707963267948966;
@@ -155,7 +159,7 @@ export function exp(x: number): number {
                       (0.008333333333333333 +
                         r *
                           (0.001388888888888889 +
-                            r * (0.0001984126984126984 + r * (2.48015873015873e-5 + r * 2.755731922398589e-7))))))));
+                            r * (0.0001984126984126984 + r * (2.48015873015873e-5 + r * 2.7557319223985893e-6))))))));
   return k >= 0 ? p * pow2(k) : p / pow2(-k);
 }
 

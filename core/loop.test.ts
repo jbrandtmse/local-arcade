@@ -72,6 +72,29 @@ test("backgrounded-tab resume: 10s gap -> MAX_CATCHUP_STEPS ticks, leftover drop
   assert.equal(h.loop.tickCount, 2 + MAX_CATCHUP_STEPS);
 });
 
+test("non-array events() return surfaces as a supervisor fault, not a silent drop", () => {
+  let wall = 0;
+  const loop = createKernelLoop({ now: () => wall });
+  loop.addInstance("bad-return", {
+    tick: () => {},
+    events: () => null as never,
+    snapshot: () => ({}),
+    stateHash: () => "0".repeat(16),
+    attract: () => {},
+    autoplay: () => {},
+    mode: () => "attract" as const,
+  });
+  for (let i = 0; i < 3; i++) {
+    wall += 17;
+    assert.doesNotThrow(() => loop.step());
+  }
+  assert.equal(loop.tickCount, 3); // the loop stayed alive
+  assert.equal(loop.supervisor.faults.length, 3); // one fault per tick, not silence
+  assert.equal(loop.supervisor.faults[0]?.hook, "events");
+  assert.match(loop.supervisor.faults[0]?.message as string, /must return an array/);
+  assert.deepEqual(loop.drainEvents(), []); // nothing queued from a broken events()
+});
+
 test("start() without a schedule pump throws TypeError", () => {
   let wall = 0;
   const loop = createKernelLoop({ now: () => wall });
@@ -111,6 +134,45 @@ test("start() pumps step() through the injected schedule and re-arms each frame"
   assert.equal(loop.tickCount, 10);
   assert.equal(dts.length, 10);
   for (const dt of dts) assert.equal(dt, TICK_DT);
+});
+
+test("the start() pump re-arms after a throw outside the supervisor-wrapped calls", () => {
+  let wall = 0;
+  let pending: (() => void) | undefined;
+  let clockCalls = 0;
+  const loop = createKernelLoop({
+    now: () => {
+      clockCalls += 1;
+      if (clockCalls === 2) throw new Error("clock glitch");
+      wall += 17;
+      return wall;
+    },
+    schedule: (cb) => {
+      pending = cb;
+    },
+  });
+  loop.addInstance("stub", {
+    tick: () => {},
+    events: () => [],
+    snapshot: () => ({}),
+    stateHash: () => "0".repeat(16),
+    attract: () => {},
+    autoplay: () => {},
+    mode: () => "attract" as const,
+  });
+  loop.start();
+  assert.ok(pending, "start() arms the first frame");
+  for (let i = 0; i < 4; i++) {
+    const cb = pending as () => void;
+    pending = undefined;
+    try {
+      cb(); // frame 2's clock glitch spreads to the scheduler host...
+    } catch {
+      /* ...but the pump must have re-armed before it did */
+    }
+    assert.ok(pending, `frame ${i}: pump re-armed despite the throw`);
+  }
+  assert.equal(loop.tickCount, 3); // frames 1, 3, 4 ticked; the clock fault cost one frame, not the clock
 });
 
 test("sim time = tick count: sim's own tick count always equals loop.tickCount", () => {

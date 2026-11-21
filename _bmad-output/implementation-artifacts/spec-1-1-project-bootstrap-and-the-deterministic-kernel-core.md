@@ -94,6 +94,36 @@ Greenfield — these are the files the story creates (investigation evidence: re
 - Given the provisional list, then `tools/` emits the game registry; Core contains no `games/**` imports and `ci/depcheck` fails any planted violation (AC6; AD-1)
 - Given fixture sim paths, then lint bans for `Math.random`/`Date.now`/`performance.now` and engine-variable transcendentals fail those fixtures and pass clean sources (AC7; full L0 is Epic 3)
 
+### Review Findings — 2026-11-21 code-review pass 2 (re-spawn 3; layers: blind-hunter, edge-case-hunter, verification-gap, acceptance-auditor; rows=35, HIGH=0)
+
+Scope: `git diff 22602bc` + the uncommitted patches the two interrupted reviewers left in the tree + the three untracked QA tests. This is the story's first full review of the patched tree (no rework block), so every in-story MED was patched, not routed. Verdict: **done** — no HIGH; all MEDs patched in-story or dispositioned with an owner.
+
+**Preserved-tree adjudication (prior reviewer's uncommitted hunks): all 8 kept, zero reverted; each re-checked against the governing ADs, every hunk finished with its pinning test/docs.** `.gitattributes` `*.ts text eol=lf` (kept; comment narrowed to the registry byte-comparison reason — the hunk does not promise a repo-wide EOL policy); `hash.ts` cycle guard (kept, M5); `index.ts` `export * as math` (kept — the spine diagram has no SIM→CONTRACT import edge, so `ctx.math` injection is the only sanctioned math channel); `rng.ts` signed-int32 restore guard (kept, M4); `wrapper.ts` `math` in SimContext + injection (kept, M6); `loop.ts` non-array-events synthetic fault (kept, M1); `supervisor.ts` guarded `onFault` consumer (kept, M3); `gen-registry.mjs` unknown-field strict loop (kept, M12).
+
+| sev | finding (grouped) | disposition |
+|-----|-------------------|-------------|
+| med | `math.ts` `exp` 1/9! coefficient typo (`2.755731922398589e-7`) biased every `exp`/`pow`-composed result ~1e-10 | patched: coefficient fixed to `2.7557319223985893e-6`, six goldens re-pinned from the fixed module (M8 red) |
+| med | wrapper handed the kernel's live input object to `sim.tick()` — a sim write into `input.controls` persisted into the next tick (AD-16) | patched: per-tick `structuredClone` + deep-freeze; write throws, kernel object insulated (M7 red) |
+| med | non-array `events()` return from an unwrapped instance was silently dropped — containment depended on how the instance was built (AD-6/AD-15) | patched: loop call site raises a synthetic supervisor fault (M1 red) |
+| med | rng `restore()` admitted fractional/out-of-int32 cursors that wrap silently through the Int32Array and fork the stream (AD-4) | patched: exact signed-int32 guard (M4 red) |
+| med (re-sights) | lint-bans depth evasion (Math["random"]/destructure/`new Date`); `supervisor.faults` uncapped + `eventQueue` undrained | existing root causes: `occurrence=` trailers on DW-1 and DW-3, no new entries |
+| med | lint-bans ban set covers only the nine spine-named transcendentals; ECMA implementation-approximated fns (atan, log2, log10, hypot, cbrt, expm1, log1p, sinh/cosh/tanh) and `**` pass — widening changes AD-4 scope | escalated: DW-8 owner=burndown (architecture-amendment category, owner-only unattended — decision sheet) |
+| low | sparse arrays hashed/cloned to malformed `[1,null,…]` — overturns pass-1 edge-9 "unreachable": holes are constructible in gated state | patched: guards in `canonicalSerialize` (M9 red) and `toPlain` (pinned in `freeze.test.ts`) |
+| low | symbol keys silently dropped from snapshot/hash | patched: guards in `canonicalSerialize` + `toPlain` (M10 red) |
+| low | `canonicalSerialize` had no cycle guard where `toPlain` did — stack overflow instead of TypeError | patched: ancestor guard, diamonds still clone (M5 red) |
+| low | a throwing `onFault` consumer escaped `invoke()` and could take the call site down (AD-15 containment) | patched: guarded consumer call, fault record survives (M3 red) |
+| low | `loop.start()` pump died on a throw outside the supervisor-wrapped calls (e.g. injected clock) — the fixed tick stopped | patched: `try/finally` re-arms before the throw spreads (M2 red) |
+| low | `gateDeep` missed the `setPrototypeOf` trap — prototype swap out of window was legal | patched: trap denies (M11 red) |
+| low | gen-registry accepted unknown fields — a `seeds` typo silently dropped a seed | patched: strict schema loop (M12 red) |
+| low | `registry-e2e` transcript compare was order-dependent (drained order follows registration order, which differs registry-path vs direct-path) | patched: drained events sorted by gameId |
+| low | math fixed-coefficient exactness boundaries undocumented (sin/cos reduction exact to ~1e15; atan2 signed-zero branches not promised) | documented in `math.ts` header; terminal `wontfix-theoretical` DW-9 |
+| low | `ci/depcheck` sees literal specifiers only — computed/variable specifiers bypass the AD-1 gate | terminal `wontfix-accepted` DW-10 (`reopen_if=` in note; real static analysis is the Epic 3 L0 gate) |
+| low | `docs/game-authoring.md` never said math arrives via the `ctx.math` injection seam | patched: §2 sentence added |
+| — | acceptance-auditor: AD-9 provisional-list `seed` field stands in for ledger-derived seeds until Epic 3 — correctly provisional, no action | Epic 3 (3.3) watch note, not ledger work |
+| — | re-affirmed pass-1 rejections: tsc-excludes-tests (blind-8/intent-8), NaN clock (edge-14), Infinity weight (edge-12), rangeInt bounds (edge-11), autoplay reseed rollback (edge-13), CLI flag crashes (edge-1/2/18) | rejected — adjudications stand, re-tested against the patched tree |
+
+**Verification after this pass:** `npm run typecheck` 0; `npm test` 75/75 (66 + 9 new pinning tests); `node ci/depcheck.mjs` 0; `node ci/lint-bans.mjs` 0; registry re-emit byte-identical; 12 CR mutation demonstrations below, each reverted and sha256 byte-verified.
+
 ## Spec Change Log
 
 ## Review Triage Log
@@ -192,10 +222,33 @@ Verdicts: total=47 — patch=17, partial=2, defer=9, reject=12, false=7. Layer s
 - AC6 mutation: depcheck GAMES_SPEC pattern `games` -> `gamez` in ci/depcheck.mjs -> ci/depcheck.test.ts planted Core->games import (fixture exits nonzero, cites file:line) went red
 - AC7 mutation: `"sin"` dropped from TRANSCENDENTALS in ci/lint-bans.mjs -> ci/lint-bans.test.ts "all nine engine transcendentals are banned" went red
 - AC6b mutation (patch round): generator template comment line changed in tools/gen-registry.mjs -> tools/gen-registry.test.ts "the repo's own list regenerates the committed registry byte-identically" went red (drift pin, vgap-1); template reverted, generator output sha256 46f38b31… re-verified identical, suite green
+- **Code-review pass-2 mutations (Rule 19; re-spawn 3; all 12 turned their pinning test red, each reverted and sha256 byte-verified, suite 75/75 green after):**
+  - CR-M1 mutation: non-array `events()` else-branch removed from `runGlobalTick()` in core/loop.ts -> core/loop.test.ts "non-array events() return surfaces as a supervisor fault, not a silent drop" went red (silent drop returned; 0 faults instead of 3)
+  - CR-M2 mutation: pump `try/finally` re-arm unwrapped in `start()` in core/loop.ts -> core/loop.test.ts "the start() pump re-arms after a throw outside the supervisor-wrapped calls" went red (schedule never re-armed after the clock glitch)
+  - CR-M3 mutation: `onFault?.(entry)` unguarded in core/supervisor.ts -> core/supervisor.test.ts "a throwing onFault consumer is contained" went red (consumer throw escaped `invoke()`)
+  - CR-M4 mutation: rng restore guard loosened to `Number.isFinite` only in core/contract/rng.ts -> core/contract/rng.test.ts "restore enforces exact signed-int32 words" went red (`[0.5,1,2,3]` accepted, silent wrap)
+  - CR-M5 mutation: both `ancestors.has` cycle guards disabled in core/contract/hash.ts -> core/contract/hash.test.ts "cycles and sparse arrays throw instead of serializing to malformed JSON" went red (RangeError stack overflow, not the `cyclic` TypeError)
+  - CR-M6 mutation: `math: mathModule` injection removed in core/contract/wrapper.ts -> core/contract/wrapper.test.ts "ctx.math seam" went red (TypeError on `ctx.math.sin`)
+  - CR-M7 mutation: `deepFreezePlain(structuredClone(input))` replaced with the raw `input` in core/contract/wrapper.ts -> core/contract/wrapper.test.ts "the per-tick input view is frozen" went red (write succeeded and mutated the kernel's object)
+  - CR-M8 mutation: `exp` 1/9! coefficient reverted to the `2.755731922398589e-7` typo in core/contract/math.ts -> core/contract/math.test.ts pinned goldens went red (2 failures; error ~30x larger)
+  - CR-M9 mutation: sparse-array guard disabled in core/contract/hash.ts -> core/contract/hash.test.ts sparse assertion went red (emitted `[1,null,null]`)
+  - CR-M10 mutation: symbol-key guards disabled in core/contract/hash.ts and freeze.ts -> hash + freeze symbol tests went red (keys silently dropped)
+  - CR-M11 mutation: `setPrototypeOf` trap removed from `gateDeep` in core/contract/freeze.ts -> core/contract/freeze.test.ts out-of-window list went red (prototype swap succeeded silently)
+  - CR-M12 mutation: unknown-field loop disabled in tools/gen-registry.mjs -> tools/gen-registry.test.ts "invalid entries fail nonzero" went red (`seeds` typo accepted with exit 0)
 
 **Coverage notes:** matrix row "Out-of-tick write" is pinned by core/contract/freeze.test.ts and the wrapper.test.ts stolen-ref case (write throws, snapshot unchanged) with fault logging covered by core/supervisor.test.ts. All new code is untracked pre-commit, so each mutation round additionally confirmed the mutated file's sha256 identical to pre-mutation. Environment limitation: the suite runs green on Node v24.16.0 with an EBADENGINE warning against `engines.node >=26` -- pins kept per Stack; `ci/` gates tokenize via `typescript/unstable/ast` (TypeScript 7.0.2's native port has no legacy JS compiler API).
 
 **Shared surfaces:** `games/` roster (empty this story; 1.5 adds moon-patrol), `generated/game-registry.ts` entry count (0), root `package.json` scripts set. Standing criterion: every test added or changed passes on a fresh environment, in either order.
+
+**QA additions (2026-11-21, `bmad-qa-generate-e2e-tests`; uncommitted — lead commits):**
+- `core/e2e-kernel.test.ts` (QA) — composed loop + wrapper + supervisor run wired exactly as `core/main.ts` wires the registry: deterministic twin multi-instance transcripts (event lists + stateHash sequences, seed-bound divergence), `tick()`-throw containment with neighbours performing, `events()`-throw containment per call site, backgrounded-tab burst with per-tick events kept. Pins AC3/AC4/AC5 at the composition level (deferred G27/G31 chains NOT re-exercised — ledger-owned).
+- `tools/registry-e2e.test.ts` (QA) — generator run as a real CLI over a temp repo (never `games/`); emitted module `import()`ed and wired through the kernel; run transcript (events + wrapper hashes per frame) identical to direct construction with the declared seeds; a fresh regeneration replays identically. Pins AC6 for the registry as a consumable artifact.
+- `tools/app-serve.test.ts` (QA) — dev serve over real HTTP against the named target `127.0.0.1:4639` (strictPort): entry script in the page, Room Black envelope, `/core/main.ts` and `/generated/game-registry.ts` resolve through the dev graph; production build into a temp outDir: hashed entry chunk >300 KB with `setClearColor` + `0x15110e`/1380622 in it. Headless half of the "Dev serve" row (AC1); the console/render half stays with the lead's browser smoke.
+- QA mutation demonstrations (Rule 19; one per QA file, each reverted and blob-verified — `git hash-object` equal to the `HEAD` blob / `git diff --stat` empty every round):
+  - AC5-QA mutation: `events()` call site unwrapped from `supervisor.invoke` in `core/loop.ts` `runGlobalTick()` -> `core/e2e-kernel.test.ts` "sim throws inside events() every tick: contained per call site, loop and neighbours alive" went red (fault propagated through `step()`, loop died).
+  - AC6-QA mutation: seed-field emission disabled in `tools/gen-registry.mjs` entry template -> `tools/registry-e2e.test.ts` "generated module is importable and wired: identical run to direct construction" went red (declared seeds 123/9 became undefined).
+  - AC1-QA mutation: `index.html` entry script src broken to `/core/mian.ts` -> `tools/app-serve.test.ts` dev-serve assertion "index.html loads the entry module" went red and the production build failed to resolve the entry.
+- QA re-verification: full `npm test` 66/66 with QA files; `npm run typecheck`, `node ci/depcheck.mjs`, `node ci/lint-bans.mjs`, `node tools/gen-registry.mjs && git diff --exit-code -- generated/` all exit 0; QA files green in one run forward and reverse order.
 
 **Manual checks:**
 - `npm run dev` shows an empty three.js scene with the Room Black envelope and no console errors (the lead's per-story browser smoke runs this on Chrome/Edge).
