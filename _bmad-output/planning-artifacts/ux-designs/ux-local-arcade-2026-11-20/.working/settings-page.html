@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Settings — Local Arcade (key screen mock)</title>
+<style>
+/* DESIGN.md frontmatter tokens, verbatim. Outside-fiction trio + ui-accent only —
+   no room token crosses this boundary (ui-accent borrows glow-cyan #5BC8FF by design).
+   Zero external requests: 'IBM Plex Sans' declared, local sans-serif fallbacks do the work. */
+:root{
+  --ui-surface:#191919;
+  --ui-text:#EDEDED;
+  --ui-muted:#9A9A9A;      /* role: hint and disabled text on ui-surface only, never body or state */
+  --ui-accent:#5BC8FF;     /* = {colors.glow-cyan}; focus/interaction cue; state also changes shape/position */
+  --ui-border:#2E2E2E;
+  --ui-focus:#5BC8FF;      /* ring contrast 9.34:1 against ui-surface — ≥3:1 met */
+  --radius:6px;            /* {rounded.ui-md} — only outside-fiction UI uses this */
+  --gap:32px;              /* spacing '4' — generous gaps between settings groups */
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{color-scheme:dark}
+body{
+  background:var(--ui-surface);
+  color:var(--ui-text);
+  font-family:'IBM Plex Sans','Segoe UI',system-ui,sans-serif; /* ui-body */
+  font-size:16px; font-weight:400; line-height:1.6;
+  padding:48px 24px 96px;
+}
+.page{max-width:1080px;margin:0 auto;display:grid;grid-template-columns:minmax(0,680px) 280px;gap:48px;align-items:start}
+@media (max-width:980px){.page{grid-template-columns:minmax(0,1fr)}aside.notes{position:static}}
+
+/* ui-heading token: IBM Plex Sans 24px / 600 / 1.25 */
+h1{font-size:24px;font-weight:600;line-height:1.25}
+h2{font-size:24px;font-weight:600;line-height:1.25;margin-bottom:8px}
+
+/* Flat surfaces, zero shadows, 1px ui-border borders (DESIGN · Elevation & Depth) */
+.sub{color:var(--ui-muted);margin-top:8px;max-width:56ch} /* ui-muted as hint text */
+.group{margin-top:var(--gap);border-top:1px solid var(--ui-border);padding-top:var(--gap)}
+.row{border-bottom:1px solid var(--ui-border);padding:16px 0;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px 24px;align-items:center}
+.row:last-of-type{border-bottom:0}
+.row .label{font-weight:600}
+.hint{color:var(--ui-muted);font-size:14px;line-height:1.5;margin-top:2px} /* ui-muted = hint only */
+
+/* Back to the arcade — primary link, ui-accent (state also changes shape: underline + fill) */
+a.back{
+  display:inline-block;margin-top:24px;
+  background:var(--ui-accent);color:var(--ui-surface);
+  font-weight:600;text-decoration:none;
+  border:1px solid var(--ui-accent);border-radius:var(--radius);
+  padding:10px 18px;min-height:24px;
+}
+a.back:hover{text-decoration:underline}
+button.secondary{
+  background:transparent;color:var(--ui-text);
+  border:1px solid var(--ui-border);border-radius:var(--radius);
+  font:inherit;padding:8px 14px;min-height:24px;cursor:pointer;
+}
+button.secondary:hover{border-color:var(--ui-accent)}
+button.secondary[disabled]{color:var(--ui-muted);cursor:not-allowed;border-style:dashed} /* ui-muted = disabled */
+
+/* ui-focus-ring: ring #5BC8FF, 2px, offset 2px — 9.34:1 vs surface. Keyboard-visible. */
+:focus-visible{outline:2px solid var(--ui-focus);outline-offset:2px;border-radius:var(--radius)}
+.focus-demo{outline:2px solid var(--ui-focus);outline-offset:2px;border-radius:var(--radius)} /* ring demoed live on this control */
+
+/* ui-control-slider — track ui-border, thumb ui-text, target-min 24px, thumb-vs-track ≥3:1 (#EDEDED on #2E2E2E) */
+.sliderset{display:flex;align-items:center;gap:12px}
+input[type=range]{
+  -webkit-appearance:none;appearance:none;
+  width:220px;height:24px;                /* ≥24px target */
+  background:transparent;cursor:pointer;
+}
+input[type=range]::-webkit-slider-runnable-track{height:4px;background:var(--ui-border);border-radius:var(--radius)}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;
+  width:24px;height:24px;margin-top:-10px;
+  border-radius:50%;background:var(--ui-text);border:1px solid var(--ui-surface);
+}
+input[type=range]::-moz-range-track{height:4px;background:var(--ui-border);border-radius:var(--radius)}
+input[type=range]::-moz-range-thumb{width:24px;height:24px;border-radius:50%;background:var(--ui-text);border:1px solid var(--ui-surface)}
+.val{min-width:52px;text-align:right;font-variant-numeric:tabular-nums}
+
+/* ui-control-toggle — off-track ui-border, on-track ui-accent.
+   State cue = POSITION (left/right) + SHAPE (square=off, round=on) + WORD — never color alone. */
+.switch{
+  position:relative;width:64px;height:28px;min-width:64px;   /* ≥24px target */
+  border-radius:var(--radius);border:1px solid var(--ui-border);
+  background:var(--ui-border);cursor:pointer;padding:0;
+}
+.switch[aria-checked="true"]{background:var(--ui-accent);border-color:var(--ui-accent)}
+.switch .thumb{
+  position:absolute;top:4px;left:4px;width:18px;height:18px;
+  background:var(--ui-text);border-radius:2px;                /* square = OFF */
+  transition:left .12s ease;
+}
+.switch[aria-checked="true"] .thumb{left:40px;border-radius:50%} /* round = ON, moved right */
+.switch .state{position:absolute;top:0;font-size:11px;line-height:28px;font-weight:600;letter-spacing:.04em}
+.switch .state.off{right:8px;color:var(--ui-text)}
+.switch .state.on{left:8px;color:var(--ui-surface);display:none}
+.switch[aria-checked="true"] .state.on{display:block}
+.switch[aria-checked="true"] .state.off{display:none}
+
+/* radio groups (look-source) — state cue is shape (filled dot), not color */
+.radios{display:flex;flex-direction:column;gap:8px}
+.radios label{display:flex;align-items:center;gap:10px;cursor:pointer;min-height:24px}
+input[type=radio]{
+  -webkit-appearance:none;appearance:none;
+  width:18px;height:18px;min-width:18px;border-radius:50%;
+  border:1px solid var(--ui-muted);background:transparent;margin:0;
+}
+input[type=radio]:checked{border:5px solid var(--ui-accent)} /* dot fills: shape cue */
+
+/* comfort preset — segmented tri-state (off / low / full); selection carries a shape marker */
+.seg{display:flex;border:1px solid var(--ui-border);border-radius:var(--radius);overflow:hidden}
+.seg label{min-height:24px;padding:6px 14px;border-right:1px solid var(--ui-border);cursor:pointer;color:var(--ui-text)}
+.seg label:last-child{border-right:0}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg input:focus-visible + span{outline:2px solid var(--ui-focus);outline-offset:2px}
+.seg label.on{border:1px solid var(--ui-accent);border-radius:var(--radius);margin:-1px}
+.seg label.on span::before{content:"▸ "} /* marker glyph = never color alone */
+
+/* key remap list */
+.remappable{list-style:none}
+.remappable li{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--ui-border)}
+.remappable li:last-child{border-bottom:0}
+.keycap{
+  display:inline-block;min-width:28px;text-align:center;
+  border:1px solid var(--ui-border);border-radius:var(--radius);
+  padding:4px 8px;font-variant-numeric:tabular-nums;
+}
+
+/* side-margin annotations — mock chrome only, never product copy */
+aside.notes{border-left:1px dashed var(--ui-border);padding-left:16px}
+.note{font-size:13px;line-height:1.5;color:var(--ui-muted);margin-bottom:20px}
+.note b{color:var(--ui-text);display:block;margin-bottom:4px;font-weight:600}
+.note code{font-size:12px;color:var(--ui-text)}
+.footnote{margin-top:var(--gap);color:var(--ui-muted);font-size:14px}
+.actions{margin-top:var(--gap);display:flex;align-items:center;gap:16px}
+</style>
+</head>
+<body>
+<div class="page">
+  <main>
+    <h1>Settings</h1>
+    <p class="sub">Motion, audio, and input controls. This page sits outside the arcade — plain, functional, workbench voice. Nothing here changes the room's state; input mappings and presentation are device-layer.</p>
+    <a class="back" href="#">Back to the arcade</a>
+
+    <!-- GROUP: Look -->
+    <section class="group" aria-labelledby="g-look">
+      <h2 id="g-look">Look</h2>
+      <div class="row">
+        <div><span class="label" id="l-sens">Mouse sensitivity</span><div class="hint">14px target labels use ui-muted; controls keep 24px hit targets.</div></div>
+        <div class="sliderset">
+          <input type="range" id="sensitivity" min="0" max="100" value="40" step="1" aria-labelledby="l-sens" class="focus-demo">
+          <span class="val" id="sensitivity-out">40</span>
+        </div>
+      </div>
+      <div class="row">
+        <div><span class="label">Look source</span><div class="hint">Pointer-lock denial never dead-ends the visit; fallback is silent in-room and chosen here.</div></div>
+        <div class="radios" role="radiogroup" aria-label="Look source">
+          <label><input type="radio" name="looksource" value="mouse" checked>Mouse-look</label>
+          <label><input type="radio" name="looksource" value="arrows">Arrow keys</label>
+          <label><input type="radio" name="looksource" value="drag">Drag</label>
+        </div>
+      </div>
+      <div class="row" style="grid-template-columns:minmax(0,1fr)">
+        <div>
+          <span class="label">Input remap</span>
+          <div class="hint">Move + the single interact verb. Rebind picks a new key; the room keeps one verb.</div>
+          <ul class="remappable" style="margin-top:12px">
+            <li>Forward <span class="keycap" data-bind="forward">W</span> <button class="secondary" data-rebind="forward">Rebind</button></li>
+            <li>Back <span class="keycap" data-bind="back">S</span> <button class="secondary" data-rebind="back">Rebind</button></li>
+            <li>Left <span class="keycap" data-bind="left">A</span> <button class="secondary" data-rebind="left">Rebind</button></li>
+            <li>Right <span class="keycap" data-bind="right">D</span> <button class="secondary" data-rebind="right">Rebind</button></li>
+            <li>Interact <span class="keycap" data-bind="interact">E</span> <button class="secondary" disabled>Rebind</button> <span class="hint">Interact stays E this release.</span></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- GROUP: Sound -->
+    <section class="group" aria-labelledby="g-sound">
+      <h2 id="g-sound">Sound</h2>
+      <div class="row">
+        <div><span class="label" id="l-master">Master volume</span><div class="hint">Stereo sound is central to finding machines; muting trades that for the graphics rung.</div></div>
+        <div class="sliderset"><input type="range" id="master" min="0" max="100" value="80" aria-labelledby="l-master"><span class="val" id="master-out">80%</span></div>
+      </div>
+      <div class="row">
+        <div><span class="label" id="l-banter">Banter volume</span><div class="hint">Patron speech. Zero mutes banter; it never mutes the room.</div></div>
+        <div class="sliderset"><input type="range" id="banter" min="0" max="100" value="70" aria-labelledby="l-banter"><span class="val" id="banter-out">70%</span></div>
+      </div>
+      <div class="row">
+        <div><span class="label" id="l-focusmix">Focus-mix strength</span><div class="hint">How far the mix collapses around the machine you are at.</div></div>
+        <div class="sliderset"><input type="range" id="focusmix" min="0" max="100" value="50" aria-labelledby="l-focusmix"><span class="val" id="focusmix-out">50%</span></div>
+      </div>
+    </section>
+
+    <!-- GROUP: Comfort -->
+    <section class="group" aria-labelledby="g-comfort">
+      <h2 id="g-comfort">Comfort</h2>
+      <div class="row">
+        <div><span class="label">Comfort preset</span><div class="hint">On at first visit, seeded by your system's reduced-motion setting. Tri-state; the ▸ marker and border show the pick, not color alone.</div></div>
+        <div class="seg" role="radiogroup" aria-label="Comfort preset">
+          <label data-preset="off"><input type="radio" name="preset" value="off"><span>Off</span></label>
+          <label class="on" data-preset="low"><input type="radio" name="preset" value="low" checked><span>Low</span></label>
+          <label data-preset="full"><input type="radio" name="preset" value="full"><span>Full</span></label>
+        </div>
+      </div>
+      <div class="row">
+        <div><span class="label" id="l-fov">Field of view</span></div>
+        <div class="sliderset"><input type="range" id="fov" min="60" max="110" value="75" aria-labelledby="l-fov"><span class="val" id="fov-out">75°</span></div>
+      </div>
+      <div class="row">
+        <div><span class="label">Vignette</span><div class="hint">Darkens the edge of view. Optional.</div></div>
+        <button class="switch" role="switch" aria-checked="false" id="vignette" aria-label="Vignette">
+          <span class="thumb"></span><span class="state off">OFF</span><span class="state on">ON</span>
+        </button>
+      </div>
+      <div class="row">
+        <div><span class="label">Calm cabinets</span><div class="hint">Slows attract tempo. Cabinets keep moving and glowing — liveness survives; only tempo changes.</div></div>
+        <button class="switch" role="switch" aria-checked="false" id="calm" aria-label="Calm cabinets">
+          <span class="thumb"></span><span class="state off">OFF</span><span class="state on">ON</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- GROUP: Room -->
+    <section class="group" aria-labelledby="g-room">
+      <h2 id="g-room">Room</h2>
+      <div class="row">
+        <div><span class="label">Quiet room</span><div class="hint">Banter-density tier. Fewer patrons mid-conversation; the room still runs the same deterministic way.</div></div>
+        <button class="switch" role="switch" aria-checked="false" id="quiet" aria-label="Quiet room">
+          <span class="thumb"></span><span class="state off">OFF</span><span class="state on">ON</span>
+        </button>
+      </div>
+    </section>
+
+    <div class="actions">
+      <button class="secondary" id="reset">Reset to defaults</button>
+      <p class="footnote" style="margin-top:0">Choices persist per browser (localStorage). Nothing is sent anywhere.</p>
+    </div>
+
+    <p class="footnote">The focus ring on “Mouse sensitivity” above is demoed in its focused state — Tab through to see it move. Ring: ui-focus #5BC8FF on ui-surface #191919, 9.34:1.</p>
+  </main>
+
+  <!-- Side-margin annotations: mock chrome, not product copy -->
+  <aside class="notes" aria-hidden="true">
+    <div class="note"><b>Outside-fiction only.</b> No room tokens cross this boundary. The one exception is by design: ui-accent = {colors.glow-cyan} #5BC8FF, borrowed so the plain page still feels related. Flat surfaces, zero shadows, 1px #2E2E2E borders, 6px radius.</div>
+    <div class="note"><b>Sibling pages.</b> The load-failure panel (“The arcade didn't open. Reload.”) and the unsupported-browser panel use this same workbench voice and the same ui-* trio. <code>State Patterns</code></div>
+    <div class="note"><b>Reached from.</b> The site page, and the street-door exit view (walk back out the front door). The mid-session remedy costs queue position, never a forced reload.</div>
+    <div class="note"><b>Accessibility floor.</b> WCAG 2.2 AA on this page: 24px control targets, visible focus ring (≥3:1, demoed), no state-by-color-only — toggles read by position + shape + word. ui-muted #9A9A9A (6.25:1) appears only as hint/disabled text. <code>EXPERIENCE · Accessibility Floor</code></div>
+    <div class="note"><b>Spine counterparts.</b> EXPERIENCE.md · Component Patterns (Settings page) — named rows: look sensitivity · master volume · banter volume · focus-mix strength · comfort preset · FOV · vignette · calm cabinets · quiet room · input remap + look-source · reset to defaults. Plus DESIGN.md frontmatter components: settings-page, ui-control-slider, ui-control-toggle, ui-focus-ring.</div>
+    <div class="note"><b>Deliberately not era-styled.</b> IBM Plex Sans, plain single column, 32px group gaps. The settings page is a workbench, not a set piece.</div>
+  </aside>
+</div>
+
+<script>
+/* Inline, no dependencies. Sliders update readouts; switches toggle aria + shape class;
+   reset restores defaults; choices persist per browser in localStorage (mock honors its own note). */
+(function(){
+  var DEFAULTS = {sensitivity:40, master:80, banter:70, focusmix:50, fov:75};
+  function fmt(id,v){ return id==="fov" ? v+"°" : id==="sensitivity" ? String(v) : v+"%"; }
+  function paint(id){
+    var el=document.getElementById(id);
+    document.getElementById(id+"-out").textContent = fmt(id, el.value);
+  }
+  function save(){
+    try{
+      var s={};
+      ["sensitivity","master","banter","focusmix","fov"].forEach(function(id){s[id]=document.getElementById(id).value;});
+      ["vignette","calm","quiet"].forEach(function(id){s[id]=document.getElementById(id).getAttribute("aria-checked");});
+      s.preset=document.querySelector("input[name=preset]:checked").value;
+      s.looksource=document.querySelector("input[name=looksource]:checked").value;
+      localStorage.setItem("local-arcade-settings", JSON.stringify(s));
+    }catch(e){}
+  }
+  function load(){
+    try{
+      var s=JSON.parse(localStorage.getItem("local-arcade-settings"));
+      if(!s) return;
+      Object.keys(DEFAULTS).forEach(function(id){
+        if(s[id]!=null){document.getElementById(id).value=s[id];paint(id);}
+      });
+      ["vignette","calm","quiet"].forEach(function(id){
+        if(s[id]!=null)document.getElementById(id).setAttribute("aria-checked",s[id]);
+      });
+      if(s.preset){
+        var r=document.querySelector("input[name=preset][value='"+s.preset+"']");
+        if(r){r.checked=true;markSeg();}
+      }
+      if(s.looksource){
+        var l=document.querySelector("input[name=looksource][value='"+s.looksource+"']");
+        if(l)l.checked=true;
+      }
+    }catch(e){}
+  }
+  function markSeg(){
+    document.querySelectorAll(".seg label").forEach(function(lb){
+      lb.classList.toggle("on", lb.querySelector("input").checked);
+    });
+  }
+  ["sensitivity","master","banter","focusmix","fov"].forEach(function(id){
+    var el=document.getElementById(id);
+    el.addEventListener("input",function(){paint(id);save();});
+  });
+  ["vignette","calm","quiet"].forEach(function(id){
+    document.getElementById(id).addEventListener("click",function(){
+      this.setAttribute("aria-checked", this.getAttribute("aria-checked")==="true"?"false":"true");
+      save();
+    });
+  });
+  document.querySelectorAll("input[name=preset], input[name=looksource]").forEach(function(r){
+    r.addEventListener("change",function(){markSeg();save();});
+  });
+  document.querySelectorAll("[data-rebind]").forEach(function(b){
+    b.addEventListener("click",function(){
+      var cap=document.querySelector('.keycap[data-bind="'+b.getAttribute("data-rebind")+'"]');
+      cap.textContent="…"; cap.closest("li").querySelector(".hint"); // mock: real rebind captures a keypress
+    });
+  });
+  document.getElementById("reset").addEventListener("click",function(){
+    Object.keys(DEFAULTS).forEach(function(id){document.getElementById(id).value=DEFAULTS[id];paint(id);});
+    ["vignette","calm","quiet"].forEach(function(id){document.getElementById(id).setAttribute("aria-checked","false");});
+    document.querySelector("input[name=preset][value=low]").checked=true;markSeg();
+    document.querySelector("input[name=looksource][value=mouse]").checked=true;
+    document.querySelectorAll(".keycap").forEach(function(k){
+      k.textContent={forward:"W",back:"S",left:"A",right:"D",interact:"E"}[k.getAttribute("data-bind")];
+    });
+    save();
+  });
+  load();
+})();
+</script>
+</body>
+</html>

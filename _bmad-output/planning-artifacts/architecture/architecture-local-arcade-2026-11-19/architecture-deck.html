@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>Local Arcade — Architecture Walkthrough</title>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#141a22; --line:#2a3542; --ink:#e6edf3; --dim:#9aa7b3;
+    --core:#5cc8ff; --sim:#8ddb8c; --pres:#ffb454; --bad:#ff6b6b; --data:#c792ea; --gate:#5cc8ff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;overflow:hidden}
+  header{position:fixed;top:0;left:0;right:0;height:52px;display:flex;align-items:center;justify-content:space-between;
+    padding:0 28px;border-bottom:1px solid var(--line);background:var(--panel);z-index:5}
+  header .brand{font-weight:600;letter-spacing:.4px}
+  header .brand b{color:var(--core)}
+  header .count{color:var(--dim);font-variant-numeric:tabular-nums}
+  .slide{position:fixed;top:52px;bottom:46px;left:0;right:0;display:none;flex-direction:column;
+    padding:20px 44px 8px;overflow:hidden}
+  .slide.active{display:flex}
+  .slide h2{font-size:clamp(20px,2.4vw,30px);font-weight:600;margin-bottom:4px}
+  .slide .sub{color:var(--dim);font-size:clamp(13px,1.2vw,16px);margin-bottom:10px}
+  .foot{margin-top:auto;color:var(--dim);font-size:12.5px;padding-top:8px;border-top:1px solid var(--line)}
+  .foot .tag{color:var(--core);font-family:ui-monospace,Consolas,monospace;margin-right:6px}
+  svg{flex:1;width:100%;min-height:0}
+  svg text{font-family:inherit}
+  svg .t{fill:var(--ink)} svg .d{fill:var(--dim)} svg .k{fill:var(--core)} svg .g{fill:var(--sim)}
+  svg .a{fill:var(--pres)} svg .r{fill:var(--bad)} svg .p{fill:var(--data)}
+  svg .st{font-size:12px} svg .sm{font-size:11px} svg .lg{font-size:17px;font-weight:600}
+  svg .hd{font-size:14px;font-weight:600}
+  .box{fill:var(--panel);stroke-linejoin:round}
+  /* title slide */
+  .title-wrap{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center}
+  .title-wrap h1{font-size:clamp(30px,5vw,58px);font-weight:700}
+  .title-wrap h1 b{color:var(--core)}
+  .title-wrap .date{color:var(--dim);margin-top:10px;font-size:clamp(14px,1.4vw,18px)}
+  .title-wrap .thesis{margin-top:26px;max-width:760px;font-size:clamp(16px,1.8vw,22px);color:var(--ink)}
+  .title-wrap .thesis b{color:var(--pres)}
+  .title-wrap .mode{margin-top:14px;color:var(--dim);font-size:13px}
+  /* laws slide */
+  .laws{flex:1;display:flex;flex-direction:column;justify-content:center;gap:26px;max-width:980px;margin:0 auto;width:100%}
+  .law{display:flex;gap:22px;align-items:baseline;border-left:4px solid var(--core);padding:10px 22px;background:var(--panel)}
+  .law .num{font-size:clamp(28px,3.6vw,46px);font-weight:700;color:var(--core);font-variant-numeric:tabular-nums}
+  .law h3{font-size:clamp(19px,2.2vw,28px);font-weight:600}
+  .law p{color:var(--dim);font-size:clamp(13px,1.4vw,17px);margin-top:4px}
+  .law:nth-child(2){border-left-color:var(--sim)} .law:nth-child(2) .num{color:var(--sim)}
+  .law:nth-child(3){border-left-color:var(--pres)} .law:nth-child(3) .num{color:var(--pres)}
+  /* cards slide */
+  .cols{flex:1;display:flex;gap:22px;min-height:0;max-width:1180px;margin:0 auto;width:100%}
+  .col{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px 20px;min-height:0;overflow:hidden}
+  .col h3{font-size:clamp(16px,1.6vw,21px);margin-bottom:10px}
+  .col ul{list-style:none}
+  .col li{margin-bottom:9px;font-size:clamp(12.5px,1.15vw,15px)}
+  .col li b{display:block}
+  .col li span{color:var(--dim)}
+  .col.defer h3{color:var(--pres)} .col.next h3{color:var(--sim)}
+  .col .revisit{color:var(--core)}
+  /* nav chrome */
+  .zone{position:fixed;top:52px;bottom:46px;width:11vw;z-index:4;cursor:pointer;background:transparent}
+  .zone.prev{left:0} .zone.next{right:0}
+  .zone:hover{background:linear-gradient(90deg,rgba(92,200,255,.06),transparent)}
+  .zone.next:hover{background:linear-gradient(270deg,rgba(92,200,255,.06),transparent)}
+  .dots{position:fixed;bottom:0;left:0;right:0;height:46px;display:flex;align-items:center;justify-content:center;gap:9px;
+    background:var(--panel);border-top:1px solid var(--line);z-index:6}
+  .dot{width:11px;height:11px;border-radius:50%;border:1px solid var(--line);background:transparent;cursor:pointer;padding:0}
+  .dot:hover{border-color:var(--core)}
+  .dot.on{background:var(--core);border-color:var(--core)}
+  .hint{position:fixed;bottom:12px;right:16px;color:var(--dim);font-size:11px;z-index:6}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand"><b>Local Arcade</b> — Architecture Walkthrough</div>
+  <div class="count" id="count">1 / 10</div>
+</header>
+
+<!-- ============================== 1 · TITLE ============================== -->
+<section class="slide active">
+  <div class="title-wrap">
+    <h1>Local <b>Arcade</b> — Architecture</h1>
+    <div class="date">Walkthrough deck · 2026-11-19 · updated 2026-11-20 · spine: 27 invariants (AD-1 … AD-27)</div>
+    <div class="thesis"><b>Local LLMs build the games; deterministic recording makes them verifiable.</b><br>
+      Everything ships as one sealed static bundle — zero models at runtime, and exactly one named outbound call: the same-origin report POST (AD-26).</div>
+    <div class="mode">paradigm: microkernel (plugin architecture) — Arcade Core = kernel · Games = two-part contract plugins</div>
+  </div>
+  <div class="foot">microkernel · deterministic runtime · sealed build — AD-18</div>
+</section>
+
+<!-- ============================== 2 · THREE LAWS ============================== -->
+<section class="slide">
+  <h2>Three laws everything in the spine serves</h2>
+  <div class="sub">Every invariant exists to keep one of these provable.</div>
+  <div class="laws">
+    <div class="law"><div class="num">1</div><div>
+      <h3>Patrons really play</h3>
+      <p>A busy Cabinet is a Patron playing via the game’s own <b>autoplay(seed)</b> — no fake busy animation, busy is never permanent, takeover happens at gameEnded / roundBreak.</p>
+    </div></div>
+    <div class="law"><div class="num">2</div><div>
+      <h3>CI verifies in seconds, no browser</h3>
+      <p>L1 is headless: same seed → same stateHash, and a seeded autoplay must run to a <b>real end state</b>. Registration refuses a red gate.</p>
+    </div></div>
+    <div class="law"><div class="num">3</div><div>
+      <h3>Sound finds games</h3>
+      <p>Occluded spatial audio is the first pull signal — you hear a game around a pillar before you see it. The room never points at anything (no HUD, no waypoints).</p>
+    </div></div>
+  </div>
+  <div class="foot"><span class="tag">AD-23</span><span class="tag">AD-8</span><span class="tag">AD-7</span><span class="tag">AD-24</span></div>
+</section>
+
+<!-- ============================== 3 · MENTAL MODEL ============================== -->
+<section class="slide">
+  <h2>The mental model — one room, one kernel, plugins at the seam</h2>
+  <div class="sub">Solid arrows are the only allowed imports. Anything not drawn is forbidden.</div>
+  <svg viewBox="0 0 1060 620" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Kernel and plugin dependency diagram">
+    <defs>
+      <marker id="m3ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#5cc8ff"/></marker>
+      <marker id="m3gr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#8ddb8c"/></marker>
+    </defs>
+
+    <!-- registry re-export curves (over the top) -->
+    <path d="M800,64 C560,2 180,2 96,86" fill="none" stroke="#5cc8ff" stroke-width="1.6" marker-end="url(#m3ok)"/>
+    <path d="M840,66 C620,16 380,16 216,86" fill="none" stroke="#ffb454" stroke-width="1.6" marker-end="url(#m3ok)"/>
+    <text class="sm d" x="330" y="16" text-anchor="middle">registry re-exports sim halves to the kernel tick site (AD-6)</text>
+    <text class="sm d" x="560" y="34" text-anchor="middle">registry imports presentation modules</text>
+
+    <!-- plugin -->
+    <rect class="box" x="30" y="40" width="250" height="260" rx="8" stroke="#8ddb8c" stroke-width="1.6"/>
+    <text class="hd g" x="155" y="64" text-anchor="middle">games/&lt;game-id&gt;/</text>
+    <rect x="45" y="90" width="100" height="150" rx="6" fill="rgba(141,219,140,.08)" stroke="#8ddb8c"/>
+    <text class="hd g" x="95" y="110" text-anchor="middle" font-size="13">sim half</text>
+    <text class="st d" x="95" y="132" text-anchor="middle">tick(dt, input)</text>
+    <text class="st d" x="95" y="152" text-anchor="middle">seeded rng</text>
+    <text class="st d" x="95" y="172" text-anchor="middle">plain events</text>
+    <text class="st d" x="95" y="192" text-anchor="middle">pure · deterministic</text>
+    <rect x="165" y="90" width="100" height="150" rx="6" fill="rgba(255,180,84,.08)" stroke="#ffb454"/>
+    <text class="hd a" x="215" y="110" text-anchor="middle" font-size="13">presentation</text>
+    <text class="st d" x="215" y="132" text-anchor="middle">adapter only</text>
+    <text class="st d" x="215" y="152" text-anchor="middle">own sim + three</text>
+    <text class="st d" x="215" y="172" text-anchor="middle">+ Core services</text>
+    <text class="st d" x="215" y="192" text-anchor="middle">animates Cabinet only</text>
+    <path d="M165,230 L147,230" stroke="#ffb454" stroke-width="1.4" marker-end="url(#m3ok)" fill="none"/>
+
+    <!-- kernel -->
+    <rect class="box" x="380" y="40" width="330" height="300" rx="8" stroke="#5cc8ff" stroke-width="2"/>
+    <text class="hd k" x="545" y="64" text-anchor="middle">Arcade Core — kernel (core/)</text>
+    <text class="st t" x="545" y="92" text-anchor="middle">clock · fixed 60Hz tick — AD-3</text>
+    <text class="st t" x="545" y="114" text-anchor="middle">supervisor · faults contained — AD-15</text>
+    <text class="st t" x="545" y="136" text-anchor="middle">Patron system + presenter — AD-23</text>
+    <text class="st t" x="545" y="158" text-anchor="middle">zone interactions — AD-25</text>
+    <text class="st t" x="545" y="186" text-anchor="middle">core/contract — harness + record/replay (AD-26)</text>
+    <rect x="395" y="235" width="300" height="90" rx="6" fill="rgba(92,200,255,.07)" stroke="#5cc8ff" stroke-dasharray="3 3"/>
+    <text class="st k" x="545" y="258" text-anchor="middle">core/ services</text>
+    <text class="st d" x="545" y="280" text-anchor="middle">audio · input · storage/identity · scheduler</text>
+    <text class="st d" x="545" y="300" text-anchor="middle">owns all room services — AD-7</text>
+
+    <!-- room -->
+    <rect class="box" x="380" y="370" width="330" height="62" rx="8" stroke="#5cc8ff"/>
+    <text class="st k" x="545" y="394" text-anchor="middle">core/room</text>
+    <text class="sm d" x="545" y="414" text-anchor="middle">geometry · Wall Slots · occluder colliders · Zones</text>
+    <path d="M545,340 L545,368" stroke="#5cc8ff" stroke-width="1.4" marker-end="url(#m3ok)" fill="none"/>
+
+    <!-- three -->
+    <rect class="box" x="240" y="370" width="130" height="50" rx="6" stroke="#9aa7b3"/>
+    <text class="st t" x="305" y="400" text-anchor="middle">three 0.187.0</text>
+    <path d="M215,240 L262,368" stroke="#ffb454" stroke-width="1.4" marker-end="url(#m3ok)" fill="none"/>
+
+    <!-- forbidden marks -->
+    <path d="M380,200 L282,200" stroke="#ff6b6b" stroke-width="1.6" stroke-dasharray="5 4" fill="none"/>
+    <g stroke="#ff6b6b" stroke-width="2"><path d="M325,193 L337,207 M337,193 L325,207"/></g>
+    <text class="sm r" x="331" y="222" text-anchor="middle">Core → games source: forbidden (AD-1)</text>
+    <path d="M95,240 L99,368" stroke="#ff6b6b" stroke-width="1.6" stroke-dasharray="5 4" fill="none"/>
+    <g stroke="#ff6b6b" stroke-width="2"><path d="M90,300 L102,314 M102,300 L90,314"/></g>
+    <text class="sm r" x="95" y="345" text-anchor="middle">no three / WebAudio / DOM in sim</text>
+    <text class="sm r" x="95" y="361" text-anchor="middle">(AD-2)</text>
+
+    <!-- ci gates -->
+    <rect class="box" x="45" y="470" width="200" height="58" rx="8" stroke="#8ddb8c"/>
+    <text class="st g" x="145" y="492" text-anchor="middle">ci/ — L0–L2 gates</text>
+    <text class="sm d" x="145" y="512" text-anchor="middle">sim half + core/contract (AD-2, AD-26)</text>
+    <path d="M125,470 L97,244" stroke="#8ddb8c" stroke-width="1.4" marker-end="url(#m3gr)" fill="none"/>
+
+    <!-- registry / tools / data -->
+    <rect class="box" x="790" y="60" width="170" height="70" rx="8" stroke="#5cc8ff"/>
+    <text class="st k" x="875" y="86" text-anchor="middle">game registry</text>
+    <text class="sm d" x="875" y="106" text-anchor="middle">build output — the only game-facing surface (AD-1)</text>
+    <rect class="box" x="790" y="200" width="170" height="60" rx="8" stroke="#c792ea"/>
+    <text class="st p" x="875" y="224" text-anchor="middle">tools/ — build</text>
+    <text class="sm d" x="875" y="244" text-anchor="middle">registry + layout generation (AD-10)</text>
+    <rect class="box" x="790" y="320" width="250" height="86" rx="8" stroke="#c792ea"/>
+    <text class="st p" x="915" y="346" text-anchor="middle">arcade-ledger.json</text>
+    <text class="st p" x="915" y="366" text-anchor="middle">games/*/manifest.json</text>
+    <text class="sm d" x="915" y="388" text-anchor="middle">append-only history + descriptors (AD-9, AD-12)</text>
+    <path d="M875,320 L875,264" stroke="#c792ea" stroke-width="1.4" marker-end="url(#m3ok)" fill="none"/>
+    <path d="M875,200 L875,134" stroke="#c792ea" stroke-width="1.4" marker-end="url(#m3ok)" fill="none"/>
+    <path d="M710,95 L788,95" stroke="#5cc8ff" stroke-width="1.4" marker-end="url(#m3ok)" fill="none"/>
+
+    <!-- legend -->
+    <rect class="box" x="380" y="470" width="330" height="140" rx="8" stroke="#ff6b6b" stroke-dasharray="4 4"/>
+    <text class="st r" x="545" y="494" text-anchor="middle">forbidden — anything not drawn</text>
+    <text class="sm d" x="545" y="516" text-anchor="middle">Core → games/** source at authoring time (AD-1)</text>
+    <text class="sm d" x="545" y="536" text-anchor="middle">sim → three / WebAudio / DOM / window (AD-2)</text>
+    <text class="sm d" x="545" y="556" text-anchor="middle">game → game, game → Patron calls (AD-6)</text>
+    <text class="sm d" x="545" y="576" text-anchor="middle">iframe / webview embeds (AD-19)</text>
+    <text class="sm d" x="545" y="596" text-anchor="middle">games self-logging or self-replaying runs (AD-26)</text>
+  </svg>
+  <div class="foot"><span class="tag">AD-1</span><span class="tag">AD-2</span><span class="tag">AD-3</span><span class="tag">AD-6</span><span class="tag">AD-7</span><span class="tag">AD-9</span><span class="tag">AD-10</span><span class="tag">AD-11</span></div>
+</section>
+
+<!-- ============================== 4 · ANATOMY OF A GAME ============================== -->
+<section class="slide">
+  <h2>Anatomy of a Game — two halves, one seam</h2>
+  <div class="sub">The contract is the seam: four verbatim hooks plus canonical events. Everything else is game-local.</div>
+  <svg viewBox="0 0 1160 560" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Sim half and presentation adapter halves">
+    <defs>
+      <marker id="m4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#5cc8ff"/></marker>
+    </defs>
+    <!-- sim half -->
+    <rect class="box" x="40" y="40" width="420" height="360" rx="10" stroke="#8ddb8c" stroke-width="2"/>
+    <text class="lg g" x="250" y="76" text-anchor="middle">sim half — games/&lt;game-id&gt;/sim</text>
+    <text class="st t" x="250" y="112" text-anchor="middle">pure, deterministic, no browser surface</text>
+    <text class="st d" x="250" y="142" text-anchor="middle">tick(dt, input) · dt = 1/60 tick units</text>
+    <text class="st d" x="250" y="166" text-anchor="middle">state mutated ONLY inside tick() (AD-15)</text>
+    <text class="st d" x="250" y="190" text-anchor="middle">rng injected by Core — resolved seed (AD-4)</text>
+    <text class="st d" x="250" y="214" text-anchor="middle">sim time = tick count · no wall clocks</text>
+    <text class="st d" x="250" y="236" text-anchor="middle">tick input = declared control slots only (AD-7)</text>
+    <text class="st r" x="250" y="264" text-anchor="middle">banned by L0 lint:</text>
+    <text class="st r" x="250" y="286" text-anchor="middle">Math.random · Date.now · performance.now</text>
+    <text class="st r" x="250" y="308" text-anchor="middle">three · WebAudio · DOM · window · rAF</text>
+    <text class="sm r" x="250" y="328" text-anchor="middle">Math.sin/cos/atan2/pow → Core math module (AD-4)</text>
+    <text class="sm d" x="250" y="362" text-anchor="middle">CI, L1, autoplay(seed), stateHash import THIS half only</text>
+
+    <!-- seam -->
+    <line x1="580" y1="30" x2="580" y2="470" stroke="#5cc8ff" stroke-width="1.6" stroke-dasharray="6 6"/>
+    <text class="hd k" x="580" y="22" text-anchor="middle">the contract seam</text>
+    <g font-weight="600" font-size="13">
+      <rect x="480" y="60" width="200" height="34" rx="17" fill="rgba(92,200,255,.12)" stroke="#5cc8ff"/>
+      <text class="t" x="580" y="82" text-anchor="middle">attract()</text>
+      <rect x="480" y="110" width="200" height="34" rx="17" fill="rgba(92,200,255,.12)" stroke="#5cc8ff"/>
+      <text class="t" x="580" y="132" text-anchor="middle">autoplay(seed)</text>
+      <rect x="480" y="160" width="200" height="34" rx="17" fill="rgba(92,200,255,.12)" stroke="#5cc8ff"/>
+      <text class="t" x="580" y="182" text-anchor="middle">events()</text>
+      <rect x="480" y="210" width="200" height="34" rx="17" fill="rgba(92,200,255,.12)" stroke="#5cc8ff"/>
+      <text class="t" x="580" y="232" text-anchor="middle">stateHash()</text>
+    </g>
+    <text class="sm d" x="580" y="266" text-anchor="middle">hook names verbatim in code (AD-8)</text>
+    <text class="sm d" x="580" y="286" text-anchor="middle">stateHash computed by the Core wrapper (AD-5)</text>
+    <text class="sm d" x="575" y="306" text-anchor="middle">kernel pulls: tick → then events() per tick</text>
+    <text class="sm d" x="575" y="330" text-anchor="middle">snapshot() carries the rng cursor (AD-4)</text>
+
+    <!-- presentation half -->
+    <rect class="box" x="700" y="40" width="420" height="360" rx="10" stroke="#ffb454" stroke-width="2"/>
+    <text class="lg a" x="910" y="76" text-anchor="middle">presentation — games/&lt;game-id&gt;/presentation</text>
+    <text class="st t" x="910" y="112" text-anchor="middle">thin adapter, binds sim state to the room</text>
+    <text class="st d" x="910" y="142" text-anchor="middle">may import: three · Core service APIs · own sim</text>
+    <text class="st d" x="910" y="166" text-anchor="middle">nothing else (AD-2)</text>
+    <text class="st d" x="910" y="190" text-anchor="middle">all motion derives from sim state at tick time —</text>
+    <text class="st d" x="910" y="210" text-anchor="middle">no adapter-internal frame animation (AD-3)</text>
+    <text class="st d" x="910" y="244" text-anchor="middle">animates only its own Cabinet —</text>
+    <text class="st d" x="910" y="264" text-anchor="middle">never poses a Patron figure (AD-23)</text>
+    <text class="sm d" x="910" y="286" text-anchor="middle">reads the score-table service here — never the sim (AD-16)</text>
+    <text class="st r" x="910" y="304" text-anchor="middle">banned: direct WebAudio · localStorage ·</text>
+    <text class="st r" x="910" y="324" text-anchor="middle">window input listeners (AD-7)</text>
+    <text class="sm d" x="910" y="358" text-anchor="middle">wrappable around heterogeneous existing assets (AD-2)</text>
+
+    <!-- canonical events + controls schemes -->
+    <rect x="40" y="450" width="540" height="70" rx="10" fill="rgba(199,146,234,.08)" stroke="#c792ea"/>
+    <text class="hd p" x="310" y="476" text-anchor="middle">canonical events — the only channel on the room (AD-6)</text>
+    <text class="sm d" x="310" y="500" text-anchor="middle">gameEnded · roundBreak · scoreSubmitted — everything else is game-local plain data {type, payload}</text>
+    <rect x="600" y="450" width="520" height="70" rx="10" fill="rgba(92,200,255,.07)" stroke="#5cc8ff"/>
+    <text class="hd k" x="860" y="472" text-anchor="middle">declared control schemes — no devices, ever (AD-7, AD-12)</text>
+    <text class="sm d" x="860" y="494" text-anchor="middle">axis [-1,1] · button {down,pressed} · aim {dx,dy} — additive + versioned vocabulary</text>
+    <text class="sm d" x="860" y="512" text-anchor="middle">spinner, twin-stick, mouse-aim … arrive later without breaking any game</text>
+  </svg>
+  <div class="foot"><span class="tag">AD-2</span><span class="tag">AD-5</span><span class="tag">AD-6</span><span class="tag">AD-8</span><span class="tag">AD-15</span></div>
+</section>
+
+<!-- ============================== 5 · INSTALLING A GAME ============================== -->
+<section class="slide">
+  <h2>Installing a game — the whole install is five build-time steps</h2>
+  <div class="sub">Registration = commit a manifest. The ledger, the layout, and the bundle take it from there.</div>
+  <svg viewBox="0 0 1160 540" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Five-step install pipeline with wall slot fill rule">
+    <defs>
+      <marker id="m5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#5cc8ff"/></marker>
+    </defs>
+    <!-- pipeline -->
+    <g>
+      <rect class="box" x="30" y="30" width="190" height="96" rx="8" stroke="#c792ea"/>
+      <text class="hd p" x="125" y="58" text-anchor="middle">1 · commit source</text>
+      <text class="st t" x="125" y="80" text-anchor="middle">+ manifest.json</text>
+      <text class="sm d" x="125" y="102" text-anchor="middle">games/&lt;game-id&gt;/ + skill-written manifest</text>
+
+      <rect class="box" x="260" y="30" width="190" height="96" rx="8" stroke="#8ddb8c"/>
+      <text class="hd g" x="355" y="58" text-anchor="middle">2 · CI gates</text>
+      <text class="st t" x="355" y="80" text-anchor="middle">L0 · L1 · L2 vs room</text>
+      <text class="sm d" x="355" y="102" text-anchor="middle">Registration refuses a red gate (AD-8)</text>
+
+      <rect class="box" x="490" y="30" width="190" height="96" rx="8" stroke="#c792ea"/>
+      <text class="hd p" x="585" y="58" text-anchor="middle">3 · ledger append</text>
+      <text class="st t" x="585" y="80" text-anchor="middle">append-only row</text>
+      <text class="sm d" x="585" y="100" text-anchor="middle">{gameId, seq, revision,</text>
+      <text class="sm d" x="585" y="116" text-anchor="middle">manifestRef hash, op} (AD-9)</text>
+
+      <rect class="box" x="720" y="30" width="190" height="96" rx="8" stroke="#5cc8ff"/>
+      <text class="hd k" x="815" y="58" text-anchor="middle">4 · build-time layout</text>
+      <text class="st t" x="815" y="80" text-anchor="middle">registry + placement</text>
+      <text class="sm d" x="815" y="102" text-anchor="middle">pure function · Instruction Cards (AD-10, AD-11)</text>
+
+      <rect class="box" x="950" y="30" width="190" height="96" rx="8" stroke="#5cc8ff"/>
+      <text class="hd k" x="1045" y="58" text-anchor="middle">5 · one bundle</text>
+      <text class="st t" x="1045" y="80" text-anchor="middle">rsync → droplet nginx</text>
+      <text class="sm d" x="1045" y="102" text-anchor="middle">same artifact dev → CI → prod (AD-20)</text>
+
+      <path d="M220,78 L258,78" stroke="#5cc8ff" stroke-width="1.8" marker-end="url(#m5)" fill="none"/>
+      <path d="M450,78 L488,78" stroke="#5cc8ff" stroke-width="1.8" marker-end="url(#m5)" fill="none"/>
+      <path d="M680,78 L718,78" stroke="#5cc8ff" stroke-width="1.8" marker-end="url(#m5)" fill="none"/>
+      <path d="M910,78 L948,78" stroke="#5cc8ff" stroke-width="1.8" marker-end="url(#m5)" fill="none"/>
+    </g>
+
+    <!-- wall fill panel -->
+    <rect class="box" x="640" y="170" width="350" height="300" rx="10" stroke="#5cc8ff"/>
+    <text class="hd k" x="815" y="198" text-anchor="middle">Wall Slot fill rule</text>
+    <text class="sm d" x="815" y="216" text-anchor="middle">back → front, alternating left / right (AD-10)</text>
+    <!-- back row -->
+    <g>
+      <text class="sm d" x="660" y="248">back wall</text>
+      <g stroke="#ffb454">
+        <rect x="740" y="230" width="42" height="52" rx="4" fill="rgba(255,180,84,.25)"/>
+        <rect x="790" y="230" width="42" height="52" rx="4" fill="rgba(255,180,84,.25)"/>
+        <rect x="840" y="230" width="42" height="52" rx="4" fill="rgba(255,180,84,.25)"/>
+        <rect x="890" y="230" width="42" height="52" rx="4" fill="rgba(255,180,84,.25)"/>
+        <rect x="940" y="230" width="42" height="52" rx="4" fill="none" stroke-dasharray="4 3"/>
+      </g>
+      <text class="sm a" x="761" y="258" text-anchor="middle">1</text>
+      <text class="sm a" x="811" y="258" text-anchor="middle">2</text>
+      <text class="sm a" x="861" y="258" text-anchor="middle">3</text>
+      <text class="sm a" x="911" y="258" text-anchor="middle">4</text>
+      <text class="sm d" x="961" y="258" text-anchor="middle">…</text>
+    </g>
+    <!-- front row -->
+    <g>
+      <text class="sm d" x="660" y="352">front wall</text>
+      <g stroke="#ffb454">
+        <rect x="760" y="334" width="42" height="52" rx="4" fill="none" stroke-dasharray="4 3"/>
+        <rect x="810" y="334" width="42" height="52" rx="4" fill="none" stroke-dasharray="4 3"/>
+        <rect x="860" y="334" width="42" height="52" rx="4" fill="none" stroke-dasharray="4 3"/>
+      </g>
+      <text class="sm d" x="781" y="362" text-anchor="middle">5</text>
+      <text class="sm d" x="831" y="362" text-anchor="middle">6</text>
+      <text class="sm d" x="881" y="362" text-anchor="middle">7</text>
+    </g>
+    <text class="sm d" x="815" y="432" text-anchor="middle">slots pre-declared + evenly spaced · never auto-rearranges</text>
+    <text class="sm d" x="815" y="450" text-anchor="middle">same registration history → same room</text>
+    <path d="M815,126 L815,168" stroke="#5cc8ff" stroke-width="1.6" marker-end="url(#m5)" fill="none"/>
+
+    <!-- left note -->
+    <g>
+      <text class="lg t" x="60" y="220">zero hand-placement,</text>
+      <text class="lg t" x="60" y="252">zero core edits</text>
+      <text class="st d" x="60" y="292">A game registers by manifest alone —</text>
+      <text class="st d" x="60" y="314">no Arcade Core code change (AD-1, AD-9).</text>
+      <text class="st d" x="60" y="348">Refurbish = new row, same id + slot.</text>
+      <text class="st d" x="60" y="370">De-register = removed row, slot returns.</text>
+      <text class="st d" x="60" y="404">Personal Bests key on (gameId, visitorId) —</text>
+      <text class="st d" x="60" y="426">continuity survives refurbish (AD-16).</text>
+    </g>
+  </svg>
+  <div class="foot"><span class="tag">AD-8</span><span class="tag">AD-9</span><span class="tag">AD-10</span><span class="tag">AD-11</span><span class="tag">AD-12</span><span class="tag">AD-20</span></div>
+</section>
+
+<!-- ============================== 6 · THE CLOCK ============================== -->
+<section class="slide">
+  <h2>The living room, part 1 — the clock</h2>
+  <div class="sub">One global 60Hz tick drives everything: sims, Patrons, the scheduler, audio. No component self-drives.</div>
+  <svg viewBox="0 0 1160 540" preserveAspectRatio="xMidYMid meet" role="img" aria-label="60Hz clock, patron reaction causal chain, queue rules">
+    <defs>
+      <marker id="m6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#5cc8ff"/></marker>
+    </defs>
+    <!-- clock strip -->
+    <line x1="50" y1="120" x2="1110" y2="120" stroke="#5cc8ff" stroke-width="2"/>
+    <g stroke="#5cc8ff" stroke-width="1.5">
+      <path d="M70,110 L70,130 M105,114 L105,126 M140,114 L140,126 M175,114 L175,126 M210,110 L210,130 M245,114 L245,126 M280,114 L280,126 M315,114 L315,126 M350,110 L350,130 M385,114 L385,126 M420,114 L420,126 M455,114 L455,126 M490,110 L490,130 M525,114 L525,126 M560,114 L560,126 M595,114 L595,126 M630,110 L630,130 M665,114 L665,126 M700,114 L700,126 M735,114 L735,126 M770,110 L770,130 M805,114 L805,126 M840,114 L840,126 M875,114 L875,126 M910,110 L910,130 M945,114 L945,126 M980,114 L980,126 M1015,114 L1015,126 M1050,110 L1050,130 M1085,114 L1085,126"/>
+    </g>
+    <text class="hd k" x="580" y="86" text-anchor="middle">60 Hz fixed · dt = 1/60 tick units · sim time = tick count (AD-3)</text>
+    <text class="sm d" x="580" y="152" text-anchor="middle">no rAF / setInterval / Date.now / performance.now anywhere in the sim half — finer physics substeps live inside a game</text>
+
+    <!-- causal chain -->
+    <text class="hd t" x="580" y="200" text-anchor="middle">how a sim event reaches a Patron (AD-6 → AD-23)</text>
+    <rect class="box" x="40" y="225" width="230" height="104" rx="8" stroke="#8ddb8c"/>
+    <text class="hd g" x="155" y="255" text-anchor="middle">sim event</text>
+    <text class="sm d" x="155" y="278" text-anchor="middle">{type, payload}</text>
+    <text class="sm d" x="155" y="298" text-anchor="middle">pulled by events()</text>
+    <text class="sm d" x="155" y="318" text-anchor="middle">the only channel out</text>
+    <rect class="box" x="320" y="225" width="230" height="104" rx="8" stroke="#c792ea"/>
+    <text class="hd p" x="435" y="255" text-anchor="middle">impulse map</text>
+    <text class="sm d" x="435" y="278" text-anchor="middle">authored per-game data asset</text>
+    <text class="sm d" x="435" y="298" text-anchor="middle">game-local, no code</text>
+    <rect class="box" x="600" y="225" width="230" height="104" rx="8" stroke="#5cc8ff"/>
+    <text class="hd k" x="715" y="255" text-anchor="middle">reaction library</text>
+    <text class="sm d" x="715" y="278" text-anchor="middle">core/patrons/ data</text>
+    <text class="sm d" x="715" y="298" text-anchor="middle">flinch · slam · jump</text>
+    <text class="sm d" x="715" y="318" text-anchor="middle">universal set</text>
+    <rect class="box" x="880" y="225" width="240" height="104" rx="8" stroke="#5cc8ff"/>
+    <text class="hd k" x="1000" y="255" text-anchor="middle">kernel Patron presenter</text>
+    <text class="sm d" x="1000" y="278" text-anchor="middle">animates the figure —</text>
+    <text class="sm d" x="1000" y="298" text-anchor="middle">the flinch lands 1:1 with</text>
+    <text class="sm d" x="1000" y="318" text-anchor="middle">its sim event (L2 probe)</text>
+    <path d="M270,277 L318,277" stroke="#5cc8ff" stroke-width="1.8" marker-end="url(#m6)" fill="none"/>
+    <path d="M550,277 L598,277" stroke="#5cc8ff" stroke-width="1.8" marker-end="url(#m6)" fill="none"/>
+    <path d="M830,277 L878,277" stroke="#5cc8ff" stroke-width="1.8" marker-end="url(#m6)" fill="none"/>
+
+    <!-- queue panel -->
+    <rect class="box" x="40" y="370" width="640" height="140" rx="10" stroke="#8ddb8c"/>
+    <text class="hd g" x="360" y="398" text-anchor="middle">busy machines and the queue (AD-23)</text>
+    <text class="st t" x="60" y="424">busy Cabinet = a Patron playing via autoplay(seed) — busy is a texture, not a lock</text>
+    <text class="st t" x="60" y="450">takeover at gameEnded / roundBreak — guaranteed by the L1 end-state gate (AD-8)</text>
+    <text class="st t" x="60" y="476">precedence at a break: physically-present visitor beats the queue head</text>
+    <text class="st d" x="60" y="500">occupancy + queue are kernel state, seeded and tick-deterministic like everything else</text>
+    <rect class="box" x="700" y="370" width="420" height="140" rx="10" stroke="#5cc8ff"/>
+    <text class="hd k" x="910" y="398" text-anchor="middle">fixed in-tick phase order (AD-23)</text>
+    <text class="st t" x="910" y="428" text-anchor="middle">sim ticks → event dispatch →</text>
+    <text class="st t" x="910" y="452" text-anchor="middle">scheduler decisions → input routing</text>
+    <text class="st d" x="910" y="482" text-anchor="middle">the supervisor wraps every kernel call site (AD-15)</text>
+  </svg>
+  <div class="foot"><span class="tag">AD-3</span><span class="tag">AD-4</span><span class="tag">AD-6</span><span class="tag">AD-15</span><span class="tag">AD-23</span></div>
+</section>
+
+<!-- ============================== 7 · FIND BY EAR ============================== -->
+<section class="slide">
+  <h2>The living room, part 2 — find-by-ear</h2>
+  <div class="sub">One occluder-collider set in core/room serves both audio occlusion and sightlines — the whole pull ladder rides one geometry.</div>
+  <svg viewBox="0 0 1160 540" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Top-down room with occluded sound and broken sightline, pull-signal ladder">
+    <defs>
+      <marker id="m7c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#5cc8ff"/></marker>
+      <marker id="m7a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#ffb454"/></marker>
+    </defs>
+    <!-- room -->
+    <rect x="40" y="30" width="620" height="480" rx="10" fill="#10161f" stroke="#2a3542" stroke-width="3"/>
+    <!-- pillar / occluder -->
+    <rect x="356" y="212" width="34" height="136" fill="#3a4655" stroke="#5b6b80"/>
+    <text class="sm d" x="345" y="182" text-anchor="middle">occluder collider</text>
+    <!-- cabinet -->
+    <rect x="520" y="60" width="86" height="54" rx="5" fill="rgba(255,180,84,.25)" stroke="#ffb454" stroke-width="2"/>
+    <text class="sm a" x="563" y="92" text-anchor="middle">game</text>
+    <!-- sound rings -->
+    <g fill="none" stroke="#5cc8ff" stroke-width="1.4">
+      <path d="M500,120 A34,34 0 0 0 512,148" opacity=".7"/>
+      <path d="M482,128 A58,58 0 0 0 500,170" opacity=".5"/>
+      <path d="M462,140 A86,86 0 0 0 486,196" opacity=".35"/>
+    </g>
+    <!-- listener -->
+    <circle cx="140" cy="400" r="17" fill="rgba(92,200,255,.2)" stroke="#5cc8ff" stroke-width="2"/>
+    <text class="sm k" x="140" y="440" text-anchor="middle">visitor</text>
+    <!-- direct sound ray, blocked -->
+    <line x1="522" y1="112" x2="362" y2="242" stroke="#5cc8ff" stroke-width="1.6" stroke-dasharray="7 5"/>
+    <g stroke="#ff6b6b" stroke-width="2.4"><path d="M366,232 L382,248 M382,232 L366,248"/></g>
+    <text class="sm r" x="300" y="176" text-anchor="end">direct ray occluded →</text>
+    <text class="sm r" x="300" y="192" text-anchor="end">gain cut + lowpass (AD-7)</text>
+    <!-- diffracted path around pillar bottom -->
+    <path d="M518,122 C490,380 360,400 172,396" fill="none" stroke="#5cc8ff" stroke-width="1.4" stroke-dasharray="3 4" opacity=".55"/>
+    <text class="sm d" x="420" y="416" text-anchor="middle">sound still arrives around the obstacle — muffled, still findable</text>
+    <!-- sightline broken -->
+    <line x1="158" y1="386" x2="524" y2="116" stroke="#e6edf3" stroke-width="1.2" stroke-dasharray="3 6" opacity=".6"/>
+    <g stroke="#ff6b6b" stroke-width="2.2"><path d="M380,214 L394,228 M394,214 L380,228"/></g>
+    <text class="sm d" x="480" y="256" text-anchor="middle">sightline broken — same collider set</text>
+
+    <!-- ladder -->
+    <text class="hd t" x="930" y="60" text-anchor="middle">the pull-signal ladder is fixed</text>
+    <rect class="box" x="760" y="90" width="340" height="90" rx="10" stroke="#5cc8ff"/>
+    <text class="hd k" x="930" y="122" text-anchor="middle">1 · occluded spatial sound</text>
+    <text class="sm d" x="930" y="146" text-anchor="middle">PannerNode + distance attenuation + raycast occlusion,</text>
+    <text class="sm d" x="930" y="162" text-anchor="middle">one Core Audio Manager owns the whole graph</text>
+    <rect class="box" x="760" y="204" width="340" height="90" rx="10" stroke="#ffb454"/>
+    <text class="hd a" x="930" y="236" text-anchor="middle">2 · attract graphics</text>
+    <text class="sm d" x="930" y="260" text-anchor="middle">attract() liveness is stateHash-verified —</text>
+    <text class="sm d" x="930" y="276" text-anchor="middle">attract screens are never fake loops</text>
+    <rect class="box" x="760" y="318" width="340" height="90" rx="10" stroke="#8ddb8c"/>
+    <text class="hd g" x="930" y="350" text-anchor="middle">3 · Patron / player intensity</text>
+    <text class="sm d" x="930" y="374" text-anchor="middle">a crowd of real autoplay players is visible</text>
+    <text class="sm d" x="930" y="390" text-anchor="middle">drama — no hints needed to find it</text>
+    <path d="M930,180 L930,202" stroke="#5cc8ff" stroke-width="1.6" marker-end="url(#m7c)" fill="none"/>
+    <path d="M930,294 L930,316" stroke="#ffb454" stroke-width="1.6" marker-end="url(#m7a)" fill="none"/>
+    <text class="sm r" x="930" y="452" text-anchor="middle">zero UI hints anywhere — no HUD, no waypoints (AD-24)</text>
+  </svg>
+  <div class="foot"><span class="tag">AD-7</span><span class="tag">AD-23</span><span class="tag">AD-24</span></div>
+</section>
+
+<!-- ============================== 8 · THE ROOM AT SCALE ============================== -->
+<section class="slide">
+  <h2>The living room, part 3 — the room at scale</h2>
+  <div class="sub">Dozens of cabinets can't all run 60Hz. The wake set is a pure function of tick state — so replays reproduce it exactly (AD-27).</div>
+  <svg viewBox="0 0 1160 540" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Wake-set tiers around the player: playing, near, visible; distant machines idle-pulse">
+    <!-- room -->
+    <rect x="40" y="30" width="520" height="450" rx="10" fill="#10161f" stroke="#2a3542" stroke-width="3"/>
+    <!-- frustum wedge from player -->
+    <path d="M170,270 L520,140 L520,400 Z" fill="rgba(92,200,255,.06)" stroke="#5cc8ff" stroke-width="1" stroke-dasharray="4 4"/>
+    <!-- near radius -->
+    <circle cx="170" cy="270" r="120" fill="none" stroke="#8ddb8c" stroke-width="1.4" stroke-dasharray="6 5"/>
+    <!-- player -->
+    <circle cx="170" cy="270" r="16" fill="rgba(92,200,255,.25)" stroke="#5cc8ff" stroke-width="2"/>
+    <text class="sm k" x="170" y="308" text-anchor="middle">player</text>
+    <!-- played cabinet (always awake) -->
+    <rect x="60" y="80" width="74" height="46" rx="5" fill="rgba(255,180,84,.35)" stroke="#ffb454" stroke-width="2"/>
+    <text class="sm a" x="97" y="107" text-anchor="middle">played</text>
+    <text class="sm d" x="97" y="66" text-anchor="middle">occupied ⇒ always awake</text>
+    <!-- in frustum -->
+    <rect x="440" y="250" width="74" height="46" rx="5" fill="rgba(255,180,84,.25)" stroke="#ffb454" stroke-width="2"/>
+    <text class="sm a" x="477" y="277" text-anchor="middle">visible</text>
+    <text class="sm d" x="477" y="316" text-anchor="middle">in frustum ⇒ awake</text>
+    <!-- near but not seen -->
+    <rect x="240" y="120" width="74" height="46" rx="5" fill="rgba(141,219,140,.18)" stroke="#8ddb8c" stroke-width="1.6"/>
+    <text class="sm g" x="277" y="147" text-anchor="middle">near</text>
+    <text class="sm d" x="277" y="186" text-anchor="middle">within radius ⇒ awake</text>
+    <!-- distant, asleep -->
+    <rect x="440" y="70" width="74" height="46" rx="5" fill="none" stroke="#9aa7b3" stroke-dasharray="4 3"/>
+    <text class="sm d" x="477" y="97" text-anchor="middle">asleep</text>
+    <circle cx="418" cy="86" r="2.5" fill="#9aa7b3"/><circle cx="410" cy="94" r="2.5" fill="#9aa7b3" opacity=".7"/><circle cx="418" cy="102" r="2.5" fill="#9aa7b3" opacity=".4"/>
+    <rect x="440" y="400" width="74" height="46" rx="5" fill="none" stroke="#9aa7b3" stroke-dasharray="4 3"/>
+    <text class="sm d" x="477" y="427" text-anchor="middle">asleep</text>
+    <circle cx="418" cy="416" r="2.5" fill="#9aa7b3"/><circle cx="410" cy="424" r="2.5" fill="#9aa7b3" opacity=".7"/><circle cx="418" cy="432" r="2.5" fill="#9aa7b3" opacity=".4"/>
+    <text class="sm d" x="290" y="504" text-anchor="middle">awake = played ∪ near ∪ in-frustum · everyone else ticks at a shared idle-pulse (dilated time)</text>
+    <!-- right column -->
+    <rect class="box" x="600" y="30" width="520" height="140" rx="10" stroke="#5cc8ff"/>
+    <text class="hd k" x="860" y="58" text-anchor="middle">why determinism survives culling</text>
+    <text class="sm t" x="860" y="84" text-anchor="middle">wake/sleep computed IN-tick from camera, positions, occupancy —</text>
+    <text class="sm t" x="860" y="102" text-anchor="middle">never wall-clock, never frame-rate pressure</text>
+    <text class="sm d" x="860" y="126" text-anchor="middle">a replay reproduces the identical wake schedule and stateHashes (AD-26)</text>
+    <text class="sm d" x="860" y="144" text-anchor="middle">L1/L2 audit mode runs the room with culling OFF — gates see everything</text>
+    <rect class="box" x="600" y="190" width="520" height="150" rx="10" stroke="#ffb454"/>
+    <text class="hd a" x="860" y="218" text-anchor="middle">the audio mix follows the wake set</text>
+    <text class="sm t" x="860" y="244" text-anchor="middle">audible ⇒ awake — walk away from a machine and it fades for free</text>
+    <text class="sm t" x="860" y="262" text-anchor="middle">doorway: nearest read clearly · approach: it swells (distance + occlusion, AD-7)</text>
+    <text class="sm t" x="860" y="280" text-anchor="middle">seated: focus mix ducks every other cabinet to an authored floor — “tuned in”</text>
+    <text class="sm d" x="860" y="304" text-anchor="middle">mix state derives only from tick state; never 50 machines at one volume</text>
+    <rect class="box" x="600" y="360" width="520" height="140" rx="10" stroke="#8ddb8c"/>
+    <text class="hd g" x="860" y="388" text-anchor="middle">no law is traded for framerate</text>
+    <text class="sm t" x="860" y="414" text-anchor="middle">visible ⇒ awake — a Dead Machine is never bought with saved cycles (FR-5)</text>
+    <text class="sm t" x="860" y="432" text-anchor="middle">distant Patrons idle-pulse, so busy/queue keeps resolving unobserved (AD-23)</text>
+    <text class="sm d" x="860" y="456" text-anchor="middle">the arcade visibly wakes as you walk toward it — a feature, not a compromise</text>
+    <text class="sm d" x="860" y="476" text-anchor="middle">radius · frustum margin · pulse cadence · duck levels: numbers set at M2</text>
+  </svg>
+  <div class="foot"><span class="tag">AD-27</span><span class="tag">AD-7</span><span class="tag">AD-3</span><span class="tag">AD-8</span><span class="tag">AD-23</span></div>
+</section>
+
+<!-- ============================== 9 · REPRODUCIBLE RUNS ============================== -->
+<section class="slide">
+  <h2>Reproducible runs — record, replay, report (FR-18 · AD-26)</h2>
+  <div class="sub">A bad run isn’t an anecdote — it’s a file that plays back exactly, in the room and in CI.</div>
+  <svg viewBox="0 0 1160 540" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Run recording pipeline from kernel recorder to server-side report and headless replay">
+    <defs>
+      <marker id="mB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#5cc8ff"/></marker>
+    </defs>
+    <!-- flow row -->
+    <rect class="box" x="30" y="40" width="190" height="110" rx="10" stroke="#8ddb8c"/>
+    <text class="hd g" x="125" y="70" text-anchor="middle">every run</text>
+    <text class="sm d" x="125" y="94" text-anchor="middle">visitor or Patron,</text>
+    <text class="sm d" x="125" y="112" text-anchor="middle">kernel-driven instance</text>
+    <text class="sm d" x="125" y="136" text-anchor="middle">games never self-log</text>
+    <rect class="box" x="260" y="40" width="290" height="110" rx="10" stroke="#c792ea"/>
+    <text class="hd p" x="405" y="70" text-anchor="middle">Run Recording</text>
+    <text class="sm t" x="405" y="94" text-anchor="middle">{gameId, bundleRef, seed,</text>
+    <text class="sm t" x="405" y="112" text-anchor="middle">inputChanges (tick-indexed),</text>
+    <text class="sm t" x="405" y="130" text-anchor="middle">periodic + final stateHash}</text>
+    <rect class="box" x="590" y="40" width="230" height="110" rx="10" stroke="#c792ea"/>
+    <text class="hd p" x="705" y="70" text-anchor="middle">arcade.rec.* ring</text>
+    <text class="sm d" x="705" y="94" text-anchor="middle">latest per placed Cabinet</text>
+    <text class="sm d" x="705" y="112" text-anchor="middle">never evicted while placed</text>
+    <text class="sm d" x="705" y="136" text-anchor="middle">budget + hash cadence: M2</text>
+    <rect class="box" x="860" y="40" width="270" height="110" rx="10" stroke="#ffb454"/>
+    <text class="hd a" x="995" y="70" text-anchor="middle">report fixture at the Cabinet</text>
+    <text class="sm t" x="995" y="94" text-anchor="middle">download the JSON + submit:</text>
+    <text class="sm t" x="995" y="112" text-anchor="middle">POST /api/report → ingest service</text>
+    <text class="sm d" x="995" y="136" text-anchor="middle">recorded server-side on the droplet</text>
+    <path d="M220,95 L258,95" stroke="#5cc8ff" stroke-width="1.8" marker-end="url(#mB)" fill="none"/>
+    <path d="M550,95 L588,95" stroke="#5cc8ff" stroke-width="1.8" marker-end="url(#mB)" fill="none"/>
+    <path d="M820,95 L858,95" stroke="#5cc8ff" stroke-width="1.8" marker-end="url(#mB)" fill="none"/>
+    <!-- second row -->
+    <rect class="box" x="30" y="190" width="360" height="150" rx="10" stroke="#5cc8ff"/>
+    <text class="hd k" x="210" y="220" text-anchor="middle">replay, everywhere — v1</text>
+    <text class="sm t" x="210" y="246" text-anchor="middle">tools/replay — headless, through the same core/contract</text>
+    <text class="sm t" x="210" y="264" text-anchor="middle">harness CI’s L1 determinism already uses</text>
+    <text class="sm t" x="210" y="290" text-anchor="middle">in-room: playback renders on the cabinet’s own screen —</text>
+    <text class="sm t" x="210" y="308" text-anchor="middle">a kernel replay instance, never two instances per cabinet</text>
+    <rect class="box" x="420" y="190" width="340" height="150" rx="10" stroke="#ff6b6b"/>
+    <text class="hd r" x="590" y="220" text-anchor="middle">faults become reproducible</text>
+    <text class="sm t" x="590" y="246" text-anchor="middle">sim throws → recording seals at the last good tick with</text>
+    <text class="sm t" x="590" y="264" text-anchor="middle">marker {tick, errorId, lastGoodHash}</text>
+    <text class="sm t" x="590" y="290" text-anchor="middle">same seed + inputs ⇒ the same fault at the same tick</text>
+    <text class="sm d" x="590" y="314" text-anchor="middle">L2 reads the marker as a named Dead-Machine defect (AD-15)</text>
+    <rect class="box" x="790" y="190" width="340" height="150" rx="10" stroke="#8ddb8c"/>
+    <text class="hd g" x="960" y="220" text-anchor="middle">privacy by construction</text>
+    <text class="sm t" x="960" y="246" text-anchor="middle">no PII in any recording — not even the visitor id</text>
+    <text class="sm t" x="960" y="264" text-anchor="middle">sim never sees score tables or visitor-keyed state (AD-16)</text>
+    <text class="sm t" x="960" y="290" text-anchor="middle">the report POST is the bundle’s ONE allowed</text>
+    <text class="sm t" x="960" y="308" text-anchor="middle">outbound call — the sealed-build check proves it (AD-18)</text>
+    <!-- bottom loop -->
+    <rect x="30" y="380" width="1100" height="90" rx="10" fill="rgba(92,200,255,.05)" stroke="#5cc8ff" stroke-dasharray="5 4"/>
+    <text class="hd k" x="580" y="410" text-anchor="middle">the loop it closes</text>
+    <text class="st t" x="580" y="438" text-anchor="middle">notice a bad machine → report it in-world → pull the report → tools/replay shows the fault at the exact tick → fix → the recording becomes a regression test</text>
+    <text class="sm d" x="580" y="458" text-anchor="middle">from M2 on: no placed cabinet may be unreportable, no recording unreplayable · auto-submit stays off; triage is manual pull + replay</text>
+  </svg>
+  <div class="foot"><span class="tag">AD-26</span><span class="tag">AD-4</span><span class="tag">AD-5</span><span class="tag">AD-15</span><span class="tag">AD-16</span><span class="tag">AD-18</span></div>
+</section>
+
+<!-- ============================== 10 · EARNING TRUST ============================== -->
+<section class="slide">
+  <h2>Earning trust — the gate ladder</h2>
+  <div class="sub">L0–L2 are deterministic scripts with zero LLM tokens. L3 is the human, and it is final.</div>
+  <svg viewBox="0 0 1160 640" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Four-layer gate ladder from L0 lint to L3 human walk">
+    <defs>
+      <marker id="m8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#9aa7b3"/></marker>
+    </defs>
+    <path d="M40,590 L1090,45" stroke="#2a3542" stroke-width="2" marker-end="url(#m8)"/>
+    <rect class="box" x="40" y="480" width="330" height="140" rx="10" stroke="#8ddb8c"/>
+    <text class="hd g" x="205" y="508" text-anchor="middle">L0 · lint + schema</text>
+    <text class="sm d" x="205" y="532" text-anchor="middle">per-half import bans · banned APIs</text>
+    <text class="sm d" x="205" y="550" text-anchor="middle">Manifest JSON Schema validated</text>
+    <text class="sm d" x="205" y="568" text-anchor="middle">manifests skill-written, never by hand (AD-12)</text>
+
+    <rect class="box" x="280" y="330" width="360" height="150" rx="10" stroke="#8ddb8c"/>
+    <text class="hd g" x="460" y="358" text-anchor="middle">L1 · headless, no browser, seconds</text>
+    <text class="sm d" x="460" y="382" text-anchor="middle">same seed → same stateHash (AD-4, AD-5)</text>
+    <text class="sm d" x="460" y="400" text-anchor="middle">attract liveness: stateHash advances each cycle</text>
+    <text class="sm d" x="460" y="418" text-anchor="middle">autoplay(seed) runs to a REAL end state —</text>
+    <text class="sm d" x="460" y="436" text-anchor="middle">emits gameEnded / roundBreak before terminating</text>
+    <text class="sm d" x="460" y="452" text-anchor="middle">sealed-build check: static scan + no-network sandbox —</text>
+    <text class="sm d" x="460" y="470" text-anchor="middle">no outbound call but the same-origin report POST (AD-26)</text>
+
+    <rect class="box" x="540" y="175" width="380" height="150" rx="10" stroke="#5cc8ff"/>
+    <text class="hd k" x="730" y="203" text-anchor="middle">L2 · room audit vs ALL placed cabinets</text>
+    <text class="sm d" x="730" y="227" text-anchor="middle">dead-machine detector (stateHash-delta per attract cycle)</text>
+    <text class="sm d" x="730" y="245" text-anchor="middle">frame-diff sample + framerate floor · causality probe</text>
+    <text class="sm d" x="730" y="263" text-anchor="middle">character lint: no undeclared surface or UI marker</text>
+    <text class="sm d" x="730" y="281" text-anchor="middle">aisle-nav lint: every aisle and slot approach walkable</text>
+    <text class="sm d" x="730" y="299" text-anchor="middle">per-story: L0–L1 · pre-Registration: L0–L2 vs current room</text>
+
+    <rect class="box" x="790" y="25" width="340" height="140" rx="10" stroke="#ffb454" stroke-width="2"/>
+    <text class="hd a" x="960" y="55" text-anchor="middle">L3 · the human walk</text>
+    <text class="sm d" x="960" y="79" text-anchor="middle">final, irreducible: the builder walks the build</text>
+    <text class="sm d" x="960" y="97" text-anchor="middle">SM-1: first minute by ear · SM-4: feels like the memory</text>
+    <text class="sm d" x="960" y="115" text-anchor="middle">Registration refuses a red gate below</text>
+    <text class="sm d" x="960" y="133" text-anchor="middle">feel has no deterministic proxy — by design</text>
+
+    <text class="lg t" x="60" y="230">local LLMs build,</text>
+    <text class="lg t" x="60" y="264">CI verifies,</text>
+    <text class="lg a" x="60" y="298">the human judges feel.</text>
+    <text class="sm d" x="60" y="316">CI runs deterministic scripts — zero tokens (AD-18)</text>
+  </svg>
+  <div class="foot"><span class="tag">AD-8</span><span class="tag">AD-18</span><span class="tag">AD-24</span></div>
+</section>
+
+<!-- ============================== 11 · WHERE IT RUNS ============================== -->
+<section class="slide">
+  <h2>Where it runs — dev, CI, and one disposable droplet</h2>
+  <div class="sub">Same artifact dev → CI → prod. No backend except one thin same-origin report endpoint (AD-26); the prod bundle is sealed and re-verified before it ships.</div>
+  <svg viewBox="0 0 1160 520" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Deployment topology dev to GitHub Actions to droplet to browsers">
+    <defs>
+      <marker id="m9" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#5cc8ff"/></marker>
+    </defs>
+    <rect class="box" x="50" y="120" width="260" height="190" rx="10" stroke="#8ddb8c"/>
+    <text class="hd g" x="180" y="152" text-anchor="middle">dev</text>
+    <text class="st t" x="180" y="182" text-anchor="middle">vite dev server</text>
+    <text class="sm d" x="180" y="206" text-anchor="middle">same contract, same gates locally</text>
+    <text class="sm d" x="180" y="224" text-anchor="middle">monorepo: core/ games/ ci/ tools/</text>
+    <text class="sm d" x="180" y="242" text-anchor="middle">+ factory skills (AD-13, AD-14)</text>
+    <text class="sm d" x="180" y="284" text-anchor="middle">three 0.187.0 · TS 7.0.2 · Vite 8.3.8 · Node 26 LTS</text>
+
+    <rect class="box" x="430" y="80" width="330" height="280" rx="10" stroke="#5cc8ff"/>
+    <text class="hd k" x="595" y="112" text-anchor="middle">GitHub Actions</text>
+    <text class="st t" x="595" y="146" text-anchor="middle">per push</text>
+    <text class="sm d" x="595" y="166" text-anchor="middle">L0 / L1 for the touched game + build</text>
+    <text class="st t" x="595" y="200" text-anchor="middle">merge to main</text>
+    <text class="sm d" x="595" y="220" text-anchor="middle">one hashed static bundle</text>
+    <text class="sm d" x="595" y="238" text-anchor="middle">sealed-build property re-verified on the FINAL bundle</text>
+    <text class="st t" x="595" y="272" text-anchor="middle">scheduled</text>
+    <text class="sm d" x="595" y="292" text-anchor="middle">full-room L1–L2 regression</text>
+    <text class="sm d" x="595" y="330" text-anchor="middle">actions pinned to commit SHAs · zero tokens (AD-18)</text>
+
+    <rect class="box" x="880" y="100" width="250" height="240" rx="10" stroke="#ffb454"/>
+    <text class="hd a" x="1005" y="132" text-anchor="middle">DigitalOcean droplet</text>
+    <text class="st t" x="1005" y="164" text-anchor="middle">nginx ≥ 1.30.7 + certbot</text>
+    <text class="sm d" x="1005" y="186" text-anchor="middle">HTTPS-only · strict CSP · single origin</text>
+    <text class="sm d" x="1005" y="204" text-anchor="middle">zero external scripts · rate limiting</text>
+    <text class="sm d" x="1005" y="222" text-anchor="middle">nginx from upstream repo, not backports</text>
+    <text class="st t" x="1005" y="252" text-anchor="middle">static bundle + ONE thin endpoint:</text>
+    <text class="sm d" x="1005" y="272" text-anchor="middle">report-ingest (Node stdlib): no auth,</text>
+    <text class="sm d" x="1005" y="290" text-anchor="middle">size-capped, rate-limited, JSON on disk (AD-26)</text>
+    <text class="sm d" x="1005" y="316" text-anchor="middle">Workshop snapshot baked into bundle (AD-21)</text>
+
+    <path d="M310,180 L428,180" stroke="#5cc8ff" stroke-width="2" marker-end="url(#m9)" fill="none"/>
+    <text class="sm d" x="369" y="170" text-anchor="middle">push</text>
+    <path d="M760,200 L878,200" stroke="#5cc8ff" stroke-width="2" marker-end="url(#m9)" fill="none"/>
+    <text class="sm d" x="819" y="190" text-anchor="middle">rsync · green gate</text>
+    <path d="M1055,340 L1055,404" stroke="#5cc8ff" stroke-width="2" marker-end="url(#m9)" fill="none"/>
+    <path d="M900,404 L900,342" stroke="#c792ea" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#m9)" fill="none"/>
+    <text class="sm p" x="912" y="380">report POST —</text>
+    <text class="sm p" x="912" y="394">one allowed call</text>
+    <rect class="box" x="820" y="406" width="310" height="70" rx="10" stroke="#9aa7b3"/>
+    <text class="hd t" x="975" y="434" text-anchor="middle">desktop browsers</text>
+    <text class="sm d" x="975" y="456" text-anchor="middle">enforced: Chrome · Edge — compat: Firefox (AD-17)</text>
+    <text class="lg t" x="60" y="380">the droplet is disposable —</text>
+    <text class="lg a" x="60" y="414">the repo is the state.</text>
+    <text class="sm d" x="60" y="444">rebuild the whole arcade from git history (AD-9, AD-11)</text>
+  </svg>
+  <div class="foot"><span class="tag">AD-13</span><span class="tag">AD-17</span><span class="tag">AD-20</span><span class="tag">AD-21</span><span class="tag">AD-26</span></div>
+</section>
+
+<!-- ============================== 12 · UNDECIDED + NEXT ============================== -->
+<section class="slide">
+  <h2>Deliberately undecided — and what happens next</h2>
+  <div class="sub">The spine refuses to decide without a trigger. Each deferral carries a named revisit condition.</div>
+  <div class="cols">
+    <div class="col defer">
+      <h3>Deferred, with revisit conditions</h3>
+      <ul>
+        <li><b>Pinball engine + first playable table</b><span><span class="revisit">when M6 opens for story-scoping.</span> Must also settle packaging inside the sim half, GPL obligations in a distributed sealed bundle, cross-browser physics determinism.</span></li>
+        <li><b>Thicker backend API</b><span><span class="revisit">beyond the v1 report-ingest endpoint (AD-26):</span> (a) donation-completion polling → its own later epic; (b) leaderboards / multiplayer → post-M6. Report triage stays manual — pull + replay.</span></li>
+        <li><b>Numeric thresholds</b> — framerate floor, audio channel budget, focus-mix duck levels, wake-set radius / frustum margin / pulse cadence, Patron reaction window<span><span class="revisit">set at M2</span> with the health-check skill. Until then the full no-dead-machines law is not CI-enforceable.</span></li>
+        <li><b>Soft multi-ray audio occlusion</b><span><span class="revisit">when</span> single-ray quality/perf demands it (AD-7).</span></li>
+        <li><b>Room growth</b><span><span class="revisit">its own epic when</span> Wall Slots run out. No cabinet relocation in v1.</span></li>
+        <li><b>Time-to-playable budget · arcade marquee name · custom cabinet models</b><span><span class="revisit">at</span> first shell measurement · launch prep · within a game’s epic, slot geometry fit required.</span></li>
+      </ul>
+    </div>
+    <div class="col next">
+      <h3>Next steps</h3>
+      <ul>
+        <li><b>bmad-spec</b><span>turn the spine + PRD into build-ready specifications.</span></li>
+        <li><b>Epics M0–M6</b><span>M0: vendored Moon Patrol wrapped to the contract + walking-skeleton room. Then Core (M2: thresholds + health-check + record / replay / report, FR-18), Hall of Models (M3), Workshop (M4), Snack Bar (M5), Pinball Corner engine (M6).</span></li>
+        <li><b>The law the whole plan serves</b><span>an arcade you can install games into — the ledger, manifest, and one-build pipeline <i>are</i> the install UX; Core complexity is paid once, games after it stay thin: sim + adapter + manifest.</span></li>
+        <li><b>This spine will NOT decide</b><span>story breakdown, room art, per-game design, anything whose revisit condition hasn’t fired.</span></li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot"><span class="tag">AD-18</span><span class="tag">AD-26</span><span class="tag">AD-27</span><span class="tag">Deferred section of the spine</span></div>
+</section>
+
+<!-- nav chrome -->
+<div class="zone prev" id="prev" title="Previous"></div>
+<div class="zone next" id="next" title="Next"></div>
+<div class="dots" id="dots"></div>
+<div class="hint">← → keys · click edges · dots</div>
+
+<script>
+(function(){
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var dots = document.getElementById('dots');
+  var count = document.getElementById('count');
+  var cur = 0;
+  slides.forEach(function(_, i){
+    var b = document.createElement('button');
+    b.className = 'dot';
+    b.setAttribute('aria-label', 'Go to slide ' + (i + 1));
+    b.addEventListener('click', function(e){ e.stopPropagation(); go(i); });
+    dots.appendChild(b);
+  });
+  function go(i){
+    cur = Math.max(0, Math.min(slides.length - 1, i));
+    slides.forEach(function(s, j){ s.classList.toggle('active', j === cur); });
+    Array.prototype.forEach.call(dots.children, function(d, j){ d.classList.toggle('on', j === cur); });
+    count.textContent = (cur + 1) + ' / ' + slides.length;
+  }
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'ArrowRight' || e.key === 'PageDown') { go(cur + 1); e.preventDefault(); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { go(cur - 1); e.preventDefault(); }
+    else if (e.key === ' ') { go(cur + 1); e.preventDefault(); }
+    else if (e.key === 'Home') { go(0); }
+    else if (e.key === 'End') { go(slides.length - 1); }
+  });
+  document.getElementById('prev').addEventListener('click', function(){ go(cur - 1); });
+  document.getElementById('next').addEventListener('click', function(){ go(cur + 1); });
+  go(0);
+})();
+</script>
+</body>
+</html>

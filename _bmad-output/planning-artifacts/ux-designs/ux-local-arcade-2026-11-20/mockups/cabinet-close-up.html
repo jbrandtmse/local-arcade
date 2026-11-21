@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cabinet close-up ~0.7m (key screen mock)</title>
+<style>
+/* DESIGN.md tokens verbatim. Zero external requests — type roles simulated with local stacks, each labeled with its DESIGN role. */
+:root{
+  --room-black:#15110E; --wall-warm:#2E241D; --wall-panel:#4A3628;
+  --glow-marquee:#FFC46B; --glow-cyan:#5BC8FF; --glow-pink:#FF4FA3; --glow-steel:#7FB0C9;
+  --paper-card:#F2E8D4; --card-ink:#2A241C; --sign-chalk:#E8E4DD;
+  --ui-surface:#191919; --ui-text:#EDEDED; --ui-muted:#9A9A9A; --ui-border:#2E2E2E;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d0b09;font-family:system-ui,'Segoe UI',sans-serif;color:var(--sign-chalk);padding:24px}
+h1{font-size:15px;font-weight:600;color:var(--ui-text);margin-bottom:4px}
+h1 span{color:var(--ui-muted);font-weight:400}
+.stage{position:relative;width:1140px;height:640px;background:var(--room-black);border:1px solid var(--ui-border);overflow:hidden}
+.roomwall{position:absolute;inset:0 0 110px 0;background:linear-gradient(180deg,var(--room-black) 0 34%,var(--wall-warm) 34% 74%,var(--wall-panel) 74% 100%)}
+.floor{position:absolute;inset:auto 0 0 0;height:110px;background:#221B27}
+.floor::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 46px,#3E3046 46px 48px);opacity:.35} /* carpet-pattern, low contrast */
+/* Distant cabinets: dim toward room-black, never dead (liveness law) */
+.distant{position:absolute;bottom:96px;width:74px;height:210px;background:#241c16;border-top:8px solid #2a221b}
+.distant .m{position:absolute;top:6px;left:8px;right:8px;height:14px;background:var(--room-black);font-family:'Bahnschrift','DIN Alternate','Arial Narrow',sans-serif;font-size:9px;letter-spacing:.12em;text-align:center;padding-top:2px}
+.distant .s{position:absolute;top:30px;left:8px;right:8px;height:56px;background:var(--room-black)}
+.d1{left:60px}.d1 .m{color:rgba(176,124,255,.42)}.d1 .s{box-shadow:0 0 14px 2px rgba(176,124,255,.12)}
+.d2{left:168px}.d2 .m{color:rgba(91,200,255,.42)}.d2 .s{box-shadow:0 0 14px 2px rgba(91,200,255,.12)}
+.d3{right:60px}.d3 .m{color:rgba(255,79,163,.42)}.d3 .s{box-shadow:0 0 14px 2px rgba(255,79,163,.12)}
+/* The Cabinet — stand-up shell, rounded.cabinet 0px, seen at ~0.7m */
+.cab{position:absolute;left:330px;bottom:88px;width:330px;height:470px;background:var(--wall-panel);border:2px solid var(--card-ink);border-radius:0}
+.halo{position:absolute;left:316px;bottom:330px;width:360px;height:250px;background:radial-gradient(ellipse at 50% 40%,rgba(91,200,255,.30),rgba(91,200,255,0) 70%)} /* attract glow halo — machine is the light source, dust-haze falloff */
+.marquee{position:absolute;left:346px;top:104px;width:298px;height:52px;background:var(--room-black);border:1px solid var(--card-ink)}
+.marquee span{display:block;text-align:center;padding-top:11px;font-family:'Bahnschrift','DIN Alternate','Arial Narrow',sans-serif;font-weight:600;font-size:26px;letter-spacing:.18em;color:var(--glow-marquee);text-shadow:0 0 12px rgba(255,196,107,.75)}
+.screen{position:absolute;left:356px;top:176px;width:278px;height:200px;background:var(--room-black);border:4px solid var(--card-ink)}
+.attract-title{margin-top:44px;text-align:center;font-family:'Bahnschrift','DIN Alternate',sans-serif;font-size:20px;letter-spacing:.2em;color:var(--glow-cyan);text-shadow:0 0 10px rgba(91,200,255,.8)}
+.attract-lines{margin:14px auto 0;width:180px;height:34px;background:repeating-linear-gradient(180deg,rgba(91,200,255,.5) 0 2px,transparent 2px 9px)} /* phase-shifted low-freq CRT motion, era flavor, never flicker-decoration */
+.next{margin-top:16px;text-align:center;font-family:'Bahnschrift','DIN Alternate',sans-serif;font-size:12px;letter-spacing:.3em;color:var(--glow-marquee)}
+/* Coin door ajar → Instruction Card (card↔drawer pairing lives in Workshop) */
+.cd-reveal{position:absolute;left:392px;top:404px;width:150px;height:120px;background:var(--paper-card);border-radius:4px;padding:7px 8px;color:var(--card-ink)}
+.cd-reveal h3{font-family:'Arial Narrow','Helvetica Neue Condensed',sans-serif;font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.cd-reveal p{font-family:Arial,'Helvetica',sans-serif;font-size:8.5px;line-height:1.45}
+.cd-reveal .attr{margin-top:4px;font-style:italic;font-size:7.5px}
+.coindoor{position:absolute;left:384px;top:398px;width:44px;height:128px;background:var(--wall-warm);border:2px solid var(--card-ink);transform:perspective(300px) rotateY(52deg);transform-origin:left}
+.coindoor .slot{position:absolute;left:12px;top:26px;width:16px;height:3px;background:var(--sign-chalk)}
+/* Report claim-check at the cabinet edge */
+.claim{position:absolute;left:664px;top:352px;width:132px;padding:8px 9px;background:var(--paper-card);color:var(--card-ink);border-radius:2px;transform:rotate(3deg);font-family:'Arial Narrow',sans-serif;font-size:10px;line-height:1.45}
+.tag{position:absolute;font-size:10px;color:var(--glow-steel);border-bottom:1px dotted var(--glow-steel);max-width:260px}
+.anno{position:absolute;font-size:11px;line-height:1.5;color:var(--ui-muted);border:1px dashed var(--ui-border);padding:8px;max-width:250px;background:rgba(25,25,25,.78)}
+.anno b{color:var(--ui-text)} .anno code{color:var(--glow-steel);font-size:10px}
+.mini{display:flex;align-items:flex-end;gap:8px;margin-top:8px;height:70px;background:var(--room-black);padding:8px;border:1px solid var(--ui-border)}
+.mini .c{width:26px;height:52px;background:#241c16;border-top:5px solid #1d1712}
+.mini .c.hot{border-top-color:var(--glow-cyan);box-shadow:0 0 12px 3px rgba(91,200,255,.5)}
+.mini .c.duck{opacity:.16}
+.mini .pillar{width:18px;height:70px;background:#0f0c0a;position:relative}
+.mini .spillm{position:absolute;inset:-6px -14px;border-radius:50%;background:radial-gradient(ellipse,rgba(255,196,107,.55),transparent 70%)}
+.meta{width:1140px;margin-top:10px;font-size:11px;color:var(--ui-muted)}
+</style>
+</head>
+<body>
+<h1>Cabinet close-up <span>· stand-up Cabinet at ~0.7m · surface: “Cabinet surfaces (screen, marquee, coin door + Instruction Card)” · EXPERIENCE · IA</span></h1>
+<div class="stage">
+  <div class="roomwall"></div><div class="floor"></div>
+  <div class="distant d1"><div class="m">PINBALL</div><div class="s"></div></div>
+  <div class="distant d2"><div class="m">RALLY</div><div class="s"></div></div>
+  <div class="distant d3"><div class="m">MAZE</div><div class="s"></div></div>
+  <div class="halo"></div>
+  <div class="cab"></div>
+  <div class="marquee"><span>MOON PATROL</span></div>
+  <div class="screen">
+    <div class="attract-title">MOON PATROL</div>
+    <div class="attract-lines"></div>
+    <div class="next">NEXT</div>
+  </div>
+  <div class="cd-reveal">
+    <h3>HOW TO PLAY</h3>
+    <p>JOYSTICK: MOVE · FIRE: SHOOT<br>JUMP: SECOND STICK<br>ONE PLAY ONE PLAYER</p>
+    <p class="attr">Built with a local model — attribution lives here (Instruction Card), nowhere else in the room (AD-24).</p>
+  </div>
+  <div class="coindoor"><div class="slot"></div></div>
+  <div class="claim">“Something's wrong<br>with this machine.”</div>
+  <span class="tag" style="left:660px;top:96px">marquee-title · Chakra Petch (Bahnschrift sim, no webfont) · cap 0.18m · Manifest.title only — no model names, no taglines</span>
+  <span class="tag" style="left:648px;top:236px">Cabinet screen · attract + NEXT — NEXT at marquee's authored minimum, rung 3 of pull ladder works without audio</span>
+  <span class="tag" style="left:664px;top:470px">Report claim-check · paper-card/card-ink · its own staging state · download + submit (EXPERIENCE · Component Patterns)</span>
+  <span class="tag" style="left:140px;top:436px">coin door ajar → Instruction Card · instruction-heading (Arial Narrow sim, x-height ≥20mm) + instruction-body (Archivo→Arial sim, ≥12mm @0.5m) · card↔plan drawer pairing</span>
+  <span class="tag" style="left:26px;top:170px">distant cabinets: dim toward room-black, never dead · attract glow halo = machine is the light source (glow-cyan, this game's hue family)</span>
+  <div class="anno" style="right:20px;top:20px"><b>Focus-mix, seated (callout).</b> Seated play doesn't pause the room; the mix collapses around this cabinet and every other cabinet ducks to an authored near-silent floor (“tuned in”). Duck levels set at M2. <code>Mix ladder · EXPERIENCE</code>
+    <div class="mini"><div class="c duck"></div><div class="c duck"></div><div class="c hot"></div><div class="c duck"></div><div class="c duck"></div></div>
+  </div>
+  <div class="anno" style="right:20px;top:296px"><b>Glow spill around a pillar occluder (callout).</b> One occlusion geometry blocks <b>sound and sight</b> together — but light gets authored spill: bleed around edges, floor sheen, ceiling bounce-cone, so the proximity gradient (and rung 2) survives blind spots. <code>DESIGN · Elevation &amp; Depth</code>
+    <div class="mini"><div class="c"></div><div class="pillar"><div class="spillm"></div></div><div style="flex:1;height:26px;background:linear-gradient(90deg,rgba(255,196,107,.4),transparent)"></div></div>
+  </div>
+</div>
+<p class="meta">Shell: rounded.cabinet 0px — 80s boxes, softened by wear not radius · marquee bg room-black, lettering glow-marquee #FFC46B · card radius rounded.card 4px · world scale anchors: eye-height 1.60m, cabinet-width 0.60m · faulted Cabinet would keep marquee+screen motion alive (kernel fallback); a dark/still cabinet is a defect, never a state.</p>
+</body>
+</html>

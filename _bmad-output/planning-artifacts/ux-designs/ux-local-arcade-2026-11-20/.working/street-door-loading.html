@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Street-door view — loading (key screen mock)</title>
+<style>
+/* DESIGN.md tokens verbatim. Zero external requests — type roles simulated with local stacks, each labeled with its DESIGN role. */
+:root{
+  --room-black:#15110E; --wall-warm:#2E241D; --wall-panel:#4A3628;
+  --glow-marquee:#FFC46B; --glow-red:#FF6B5E; --glow-steel:#7FB0C9;
+  --paper-card:#F2E8D4; --card-ink:#2A241C; --sign-chalk:#E8E4DD;
+  --ui-surface:#191919; --ui-text:#EDEDED; --ui-muted:#9A9A9A; --ui-border:#2E2E2E; --ui-focus:#5BC8FF;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d0b09;font-family:system-ui,'Segoe UI',sans-serif;color:var(--sign-chalk);padding:24px}
+h1{font-size:15px;font-weight:600;color:var(--ui-text);margin-bottom:4px}
+h1 span{color:var(--ui-muted);font-weight:400}
+.stage{position:relative;width:1140px;height:600px;background:var(--room-black);border:1px solid var(--ui-border);overflow:hidden}
+/* Street envelope — the fiction's first beat, still dim + warm */
+.sidewalk{position:absolute;left:0;right:0;bottom:0;height:120px;background:var(--wall-warm)}
+.facade{position:absolute;left:120px;right:120px;top:0;height:480px;background:var(--wall-warm);border:10px solid var(--wall-panel)}
+.awning{position:absolute;left:120px;right:120px;top:480px;height:26px;background:var(--wall-panel)}
+/* Door — closed. Zone hue glow-red at the door (DESIGN · Brand & Style) */
+.doorframe{position:absolute;left:468px;top:150px;width:204px;height:330px;background:var(--wall-panel)}
+.door{position:absolute;left:480px;top:162px;width:180px;height:318px;background:var(--room-black);border:2px solid var(--card-ink);border-radius:0}
+.door .glass{position:absolute;left:52px;top:26px;width:76px;height:88px;background:linear-gradient(180deg,#3a2c20,#2a2018)}
+.door .glass.bright{box-shadow:0 0 26px 6px rgba(255,196,107,.35)} /* glass brightens as assets stream */
+.doorzone{position:absolute;left:472px;top:118px;width:196px;height:16px;background:var(--glow-red);box-shadow:0 0 18px 4px rgba(255,107,94,.5)}
+.handle{position:absolute;left:636px;top:320px;width:10px;height:26px;background:var(--sign-chalk);transform:rotate(18deg)}
+/* Light-bleed under the door — widening = visual twin of the audio swell */
+.bleed{position:absolute;left:440px;bottom:104px;width:280px;height:20px;background:radial-gradient(ellipse at 50% 0,rgba(255,196,107,.85),rgba(255,196,107,0) 72%);filter:blur(1px)}
+.bleed-ghost{position:absolute;bottom:104px;height:20px;border-bottom:1px dashed rgba(255,196,107,.45)}
+svg.spill{position:absolute;inset:0;pointer-events:none}
+/* Welcome Flyer — stapled paper by the door (spine: Welcome Flyer) */
+.flyer{position:absolute;left:724px;top:206px;width:128px;padding:8px 10px;background:var(--paper-card);color:var(--card-ink);transform:rotate(-2deg);border-radius:2px;font-family:'Arial Narrow','Helvetica Neue Condensed',sans-serif;font-size:10px;line-height:1.5;text-transform:uppercase}
+.flyer b{font-size:11px;letter-spacing:.06em}
+.staple{position:absolute;top:-3px;left:60px;width:14px;height:5px;border:1.5px solid #8a7c66;border-bottom:none}
+/* Annotation callouts (mock chrome only, never in-room) */
+.anno{position:absolute;font-size:11px;line-height:1.45;color:var(--ui-muted);border:1px dashed var(--ui-border);padding:6px 8px;max-width:230px;background:rgba(25,25,25,.72)}
+.anno b{color:var(--ui-text)}
+.anno code{color:var(--glow-steel);font-size:10px}
+.tag{position:absolute;font-size:10px;color:var(--glow-steel);border-bottom:1px dotted var(--glow-steel)}
+/* Load-failure panel VARIANT — outside-fiction page chrome, workbench voice */
+.fail{position:absolute;right:26px;bottom:26px;width:300px;background:var(--ui-surface);border:1px solid var(--ui-border);border-radius:6px;padding:14px 16px}
+.fail h2{font-size:16px;font-weight:600;line-height:1.25;color:var(--ui-text)} /* ui-heading sim */
+.fail p{font-size:13px;line-height:1.6;color:var(--ui-muted)} /* ui-body sim · Reload link in ui-focus */
+.fail a{color:var(--ui-focus)}
+.meta{width:1140px;margin-top:10px;font-size:11px;color:var(--ui-muted)}
+</style>
+</head>
+<body>
+<h1>Front-door street view — loading beat <span>· surface: “Front-door street view (Page load, ≤60s ceiling)” · EXPERIENCE · IA + State Patterns</span></h1>
+<div class="stage">
+  <div class="sidewalk"></div><div class="facade"></div><div class="awning"></div>
+  <!-- Sound-spill: attract sound out the door, pull ladder rung 1 -->
+  <svg class="spill" viewBox="0 0 1140 600">
+    <path d="M 452 452 A 96 96 0 0 1 418 322" fill="none" stroke="#FF6B5E" stroke-width="5" opacity=".5"/>
+    <path d="M 420 478 A 156 156 0 0 1 366 296" fill="none" stroke="#FF6B5E" stroke-width="4" opacity=".33"/>
+    <path d="M 388 504 A 216 216 0 0 1 314 270" fill="none" stroke="#FF6B5E" stroke-width="3" opacity=".18"/>
+    <path d="M 688 452 A 96 96 0 0 0 722 322" fill="none" stroke="#FF6B5E" stroke-width="5" opacity=".5"/>
+    <path d="M 720 478 A 156 156 0 0 0 774 296" fill="none" stroke="#FF6B5E" stroke-width="4" opacity=".33"/>
+    <path d="M 752 504 A 216 216 0 0 0 826 270" fill="none" stroke="#FF6B5E" stroke-width="3" opacity=".18"/>
+  </svg>
+  <div class="doorframe"></div><div class="doorzone"></div>
+  <div class="door"><div class="glass bright"></div></div>
+  <div class="handle"></div>
+  <div class="bleed-ghost" style="left:510px;width:140px"></div>
+  <div class="bleed-ghost" style="left:486px;width:188px"></div>
+  <div class="bleed"></div>
+  <div class="flyer"><span class="staple"></span><b>WELCOME</b><br>MOVE: W A S D<br>LOOK: MOUSE<br>DO: E</div>
+  <span class="tag" style="left:298px;top:292px">sound-spill wave arcs · attract sound out the door — rung 1 of pull ladder</span>
+  <span class="tag" style="left:652px;top:458px">light-bleed widens (ghosts = earlier, narrower states) — visual twin of the swell · glass brightens</span>
+  <span class="tag" style="left:652px;top:318px">handle turns at ready</span>
+  <span class="tag" style="left:470px;top:96px">glow-red — door-zone identity hue (#FF6B5E)</span>
+  <span class="tag" style="left:742px;top:352px">Welcome Flyer · paper-card #F2E8D4 / card-ink #2A241C · room-sign role, Arial Narrow caps sim</span>
+  <div class="anno" style="left:24px;top:24px"><b>No progress bar.</b> The door opens when the room is ready; the ≤60s ceiling is a guardrail, never shown. <code>State Patterns · Loading</code></div>
+  <div class="anno" style="left:24px;top:150px;max-width:250px">Door closed = <b>Cabinet attract sound spills and swells</b> as assets stream. Muted/Deaf or autoplay-blocked browsers read the swell as <b>light</b> (bleed widens) — rung-2-only variant survives here. <code>Accessibility Floor</code></div>
+  <div class="fail">
+    <div style="font-size:10px;color:var(--ui-muted);border:1px dashed var(--ui-border);display:inline-block;padding:2px 5px;margin-bottom:8px">VARIANT · Load failure / asset timeout (~90s [ASSUMPTION]) — plain outside-fiction panel, workbench voice. No partial fiction.</div>
+    <h2>The arcade didn't open.</h2>
+    <p><a href="#">Reload</a> — or adjust Settings, then re-enter.</p>
+    <p style="margin-top:8px">panel = ui-surface #191919 · ui-text #EDEDED · ui-focus #5BC8FF · rounded.ui-md 6px · <b style="color:var(--ui-text)">ui-heading / ui-body</b> (IBM Plex Sans sim, local stack)</p>
+  </div>
+</div>
+<p class="meta">Scene surfaces: facade = wall-warm #2E241D / wall-panel #4A3628 · street = room-black #15110E (never flat screen-black) · bleed + doorzone = authored machine/zone light, not wall-painted decoration (DESIGN · Do's and Don'ts). Room never explains: no prompt, no HUD — banned everywhere.</p>
+</body>
+</html>

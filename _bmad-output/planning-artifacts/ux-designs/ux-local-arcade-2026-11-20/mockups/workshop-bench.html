@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Workshop — bench & staging lifecycle (key screen mock)</title>
+<style>
+/* DESIGN.md tokens verbatim. Zero external requests — type roles simulated with local stacks, each labeled with its DESIGN role. */
+:root{
+  --room-black:#15110E; --wall-warm:#2E241D; --wall-panel:#4A3628;
+  --glow-steel:#7FB0C9; --glow-marquee:#FFC46B; --glow-green:#57E6A3;
+  --paper-card:#F2E8D4; --card-ink:#2A241C; --sign-chalk:#E8E4DD;
+  --ui-surface:#191919; --ui-text:#EDEDED; --ui-muted:#9A9A9A; --ui-border:#2E2E2E;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d0b09;font-family:system-ui,'Segoe UI',sans-serif;color:var(--sign-chalk);padding:24px}
+h1{font-size:15px;font-weight:600;color:var(--ui-text);margin-bottom:4px}
+h1 span{color:var(--ui-muted);font-weight:400}
+.stage{position:relative;width:1140px;height:640px;background:var(--room-black);border:1px solid var(--ui-border);overflow:hidden}
+.roomwall{position:absolute;inset:0 0 120px 0;background:linear-gradient(180deg,var(--room-black) 0 30%,var(--wall-warm) 30% 70%,var(--wall-panel) 70% 100%)}
+.floor{position:absolute;inset:auto 0 0 0;height:120px;background:#221B27}
+.floor::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 46px,#3E3046 46px 48px);opacity:.35} /* carpet-pattern, low contrast */
+/* Zone entry: open door, glow-steel spill — Workshop identity hue as light, not wall decoration */
+.doorway{position:absolute;left:34px;bottom:118px;width:120px;height:300px;background:#0f0c0a;border:6px solid var(--wall-panel)}
+.dooropen{position:absolute;left:150px;bottom:118px;width:56px;height:288px;background:var(--wall-panel);border:2px solid var(--card-ink);transform:perspective(340px) rotateY(-58deg);transform-origin:left}
+.steel-spill{position:absolute;left:40px;bottom:60px;width:330px;height:150px;background:radial-gradient(ellipse at 8% 20%,rgba(127,176,201,.34),rgba(127,176,201,0) 70%)}
+.sign{position:absolute;left:24px;top:86px;font-family:'Arial Narrow','Helvetica Neue Condensed',sans-serif;text-transform:uppercase;font-size:26px;letter-spacing:.14em;color:var(--sign-chalk)} /* room-sign sim: Archivo Narrow caps, cap ≥60mm @3m */
+/* Desk: plan sheets + repo-fed monitor */
+.desk{position:absolute;left:40px;bottom:118px;width:250px;height:96px;background:var(--wall-panel);border-top:8px solid #5b4433}
+.monitor{position:absolute;left:70px;bottom:206px;width:196px;height:112px;background:var(--room-black);border:4px solid var(--card-ink);padding:6px 8px;font-family:Consolas,'Cascadia Mono',monospace;font-size:8.6px;line-height:1.6;color:var(--glow-steel)}
+.plan{position:absolute;width:74px;height:52px;background:var(--paper-card);border-radius:4px;transform:rotate(-4deg)}
+.plan.p2{transform:rotate(5deg)}
+.plan i{display:block;margin:6px 8px;border:1px dashed var(--card-ink);height:26px}
+/* Workshop bench & staging — four lifecycle stages, left → right */
+.bench{position:absolute;left:320px;right:24px;bottom:118px;height:70px;background:var(--wall-panel);border-top:8px solid #5b4433}
+.st{position:absolute;bottom:186px;width:186px;height:250px}
+.chalk{position:absolute;left:0;bottom:-64px;width:170px;height:56px;border:2px dashed rgba(232,228,221,.65)} /* chalk outline: sign-chalk */
+.drawer{position:absolute;left:14px;bottom:0;width:120px;height:86px;background:var(--wall-panel);border:2px solid var(--card-ink)}
+.drawer .pull{position:absolute;left:24px;top:-8px;width:70px;height:34px;background:var(--paper-card);border-radius:4px;transform:rotate(-2deg)}
+.skel{position:absolute;left:26px;width:126px;height:210px;background:transparent;border:2px solid rgba(232,228,221,.5)}
+.skel .sq{position:absolute;left:14px;top:22px;width:98px;height:74px;border:1px dashed rgba(232,228,221,.35)}
+.worklight{position:absolute;left:150px;top:-30px;width:12px;height:12px;background:var(--sign-chalk);border-radius:50%}
+.cone{position:absolute;left:104px;top:-18px;width:110px;height:220px;background:linear-gradient(190deg,rgba(255,196,107,.4),transparent 72%);clip-path:polygon(46% 0,58% 0,100% 100%,0 100%)} /* work light: glow-marquee cone */
+.note{position:absolute;left:0;top:212px;width:120px;padding:4px 6px;background:var(--paper-card);color:var(--card-ink);font-family:'Arial Narrow',sans-serif;font-size:9px;transform:rotate(-3deg)}
+.artcab{position:absolute;left:34px;width:120px;height:210px;background:var(--wall-panel);border:2px solid var(--card-ink)}
+.artcab .amq{position:absolute;left:6px;top:6px;width:108px;height:22px;background:var(--room-black);color:var(--glow-marquee);font-family:'Bahnschrift','Arial Narrow',sans-serif;font-size:9px;letter-spacing:.14em;text-align:center;padding-top:6px;text-shadow:0 0 8px rgba(255,196,107,.7)}
+.artcab .asc{position:absolute;left:10px;top:34px;width:100px;height:70px;background:var(--room-black);box-shadow:0 0 18px 3px rgba(87,230,163,.35)} /* first attract glow: glow-green */
+.tag-tested{position:absolute;left:120px;top:96px;padding:3px 6px;background:var(--paper-card);color:var(--card-ink);font-family:'Arial Narrow',sans-serif;font-size:9px;letter-spacing:.1em;transform:rotate(2deg)}
+.crate{position:absolute;left:22px;bottom:0;width:142px;height:118px;background:var(--wall-panel);border:3px solid #38291e}
+.crate::before,.crate::after{content:"";position:absolute;left:-3px;right:-3px;height:10px;background:#38291e}
+.crate::before{top:26px}.crate::after{bottom:26px}
+.crate .stencil{position:absolute;top:52px;left:0;right:0;text-align:center;font-family:'Bahnschrift','Arial Narrow',sans-serif;font-size:12px;letter-spacing:.18em;color:var(--sign-chalk)}
+.stlabel{position:absolute;font-size:10.5px;line-height:1.5;color:var(--ui-muted);border:1px dashed var(--ui-border);padding:6px 7px;background:rgba(25,25,25,.78);max-width:200px}
+.stlabel b{color:var(--ui-text)} .stlabel code{color:var(--glow-steel);font-size:9.5px}
+.tag{position:absolute;font-size:10px;color:var(--glow-steel);border-bottom:1px dotted var(--glow-steel);max-width:280px}
+.meta{width:1140px;margin-top:10px;font-size:11px;color:var(--ui-muted)}
+</style>
+</head>
+<body>
+<h1>Workshop — bench & staging <span>· Zone, back-right, walked to · “Authorship as discovery — repo truth rendered as plans and bench” · EXPERIENCE · IA</span></h1>
+<div class="stage">
+  <div class="roomwall"></div><div class="floor"></div>
+  <div class="doorway"></div><div class="dooropen"></div><div class="steel-spill"></div>
+  <div class="sign">Workshop</div>
+  <div class="desk"></div>
+  <div class="monitor">commit 91bb0e1 plan: COSMIC CRUSHER<br>commit 7d3e5f2 skeleton — gate RED<br>commit 4f9a2c1 gate green · TESTED<br>commit e08b713 registered → crate<br><span style="color:#5b4433">— real commits from this week (UJ-2) —</span></div>
+  <div class="plan" style="left:212px;bottom:212px"><i></i></div>
+  <div class="plan p2" style="left:64px;bottom:206px;width:56px"><i></i></div>
+  <div class="bench"></div>
+  <div class="st" style="left:340px"><div class="chalk"></div><div class="drawer"><div class="pull"></div></div></div>
+  <div class="st" style="left:556px"><div class="skel"><div class="sq"></div></div><div class="worklight"></div><div class="cone"></div><div class="note">“honest silence” — half-built bench machines make none (Soundscape)</div></div>
+  <div class="st" style="left:772px"><div class="artcab"><div class="amq">TEST GAME</div><div class="asc"></div></div><div class="tag-tested">TESTED</div></div>
+  <div class="st" style="left:960px"><div class="crate"><div class="stencil">COSMIC<br>CRUSHER</div></div></div>
+  <div class="stlabel" style="left:332px;bottom:16px"><b>1 · plan-only</b><br>chalk outline + drawer plan. Repo: plan committed, unbuilt — staged legibly as unbuilt. <code>Empty Wall Slot / roadmap</code></div>
+  <div class="stlabel" style="left:548px;bottom:16px"><b>2 · red gate</b><br>bare skeleton + work light, honest silence. Repo: built, gate not green. <code>gate green or registration refuses</code></div>
+  <div class="stlabel" style="left:764px;bottom:16px"><b>3 · green gate</b><br>art-on + TESTED tag + first attract glow. Repo: gate green, not yet registered. <code>registration skill commits Manifest</code></div>
+  <div class="stlabel" style="left:956px;bottom:16px"><b>4 · registered</b><br>stenciled crate, headed to its Wall Slot on the unfilled stretch. <code>Layout System assigns slot</code></div>
+  <span class="tag" style="left:24px;top:132px">room-sign · Archivo Narrow caps (Arial Narrow sim) · sign-chalk #E8E4DD · glow-steel #7FB0C9 = Workshop zone hue, as light/material identity only</span>
+  <span class="tag" style="left:24px;bottom:412px">open door + steel spill · bench reads build truth: worn paper & honest materials, never gamey props (DESIGN · Components)</span>
+  <span class="tag" style="left:64px;bottom:330px">plan sheets: paper-card #F2E8D4 / card-ink · each Cabinet's Instruction Card matches a plan here (card↔drawer pairing)</span>
+</div>
+<p class="meta">Component: “Workshop bench & staging” (EXPERIENCE · Component Patterns) — staging mirrors repo truth: plan-only → chalk outline + drawer plan · red gate → bare skeleton + work light (honest silence) · green → art-on + TESTED tag · registered → installed. Growth in the room reads as Wall Slots filling back→front, never a changelog.</p>
+</body>
+</html>

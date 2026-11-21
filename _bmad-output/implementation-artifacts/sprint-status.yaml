@@ -1,0 +1,103 @@
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created, ready for development
+#   - in-progress: Developer actively working on implementation
+#   - review: Implementation complete, ready for review
+#   - done: Story completed
+
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+
+# Action Item Status:
+#   - open: Committed during a retrospective, not yet addressed
+#   - in-progress: Actively being worked on
+#   - done: Completed
+
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when its first story starts (via build's sprint sync)
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates the next story after the previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+# - Retrospective appends its action items to action_items; the status view surfaces open ones
+generated: 11-20-2026 20:55
+last_updated: 11-20-2026 20:55
+project: local-arcade
+project_key: NOKEY
+tracking_system: file-system
+story_location: C:/git/local-arcade/_bmad-output/implementation-artifacts
+development_status:
+  epic-1: backlog
+  1-1-project-bootstrap-and-the-deterministic-kernel-core: backlog
+  1-2-first-person-walk-look-and-move-no-prompts: backlog
+  1-3-the-arcade-room-slots-pillars-zones-and-the-roadmap-wall: backlog
+  1-4-the-standard-stand-up-cabinet-shell-marquee-live-screen: backlog
+  1-5-moon-patrol-plays-in-place-vendored-wrapped-alive: backlog
+  1-6-one-busy-machine-a-patron-actually-plays: backlog
+  1-7-fault-containment-a-broken-game-never-kills-the-room: backlog
+  1-8-the-room-knows-you-without-an-account: backlog
+  1-9-the-street-door-beat-loading-as-fiction-s-first-shot: backlog
+  epic-1-retrospective: optional
+
+  epic-2: backlog
+  2-1-core-audio-manager-attract-sound-that-occludes-and-swells: backlog
+  2-2-the-proximity-ladder-and-the-seated-focus-mix-tuned-in: backlog
+  2-3-light-spill-and-atmospheric-depth-the-graphics-rung-works-al: backlog
+  2-4-the-settings-page-comfort-presets-on-at-first-visit: backlog
+  2-5-the-site-page-and-honest-disclosures: backlog
+  2-6-the-m1-walk-sm-1-in-both-variants-honestly-measured: backlog
+  epic-2-retrospective: optional
+
+  epic-3: backlog
+  3-1-the-game-build-contract-finalized-harness-manifest-schema-l0: backlog
+  3-2-the-gate-goes-deterministic-l0-l1-scripts-contract-test-skil: backlog
+  3-3-the-ledger-and-registration-a-game-joins-by-manifest-alone: backlog
+  3-4-the-layout-system-placement-is-a-pure-build-time-function: backlog
+  3-5-instruction-cards-from-the-manifest-and-the-character-lint: backlog
+  3-6-the-sit-down-shell-two-standard-cabinets-equipped-per-manife: backlog
+  3-7-the-l2-room-audit-whole-room-proof-and-the-numbers-that-make: backlog
+  3-8-lifecycle-refurbish-and-remove-never-move: backlog
+  3-9-game-2-end-to-end-the-pipeline-proves-itself-sm-2-and-the-ro: backlog
+  3-10-moon-patrol-reimplemented-to-the-standard: backlog
+  3-11-run-recording-the-kernel-captures-every-run: backlog
+  3-12-replay-headless-and-in-room-on-the-same-harness: backlog
+  3-13-the-claim-check-and-the-report-endpoint-a-bad-run-is-provabl: backlog
+  3-14-liveness-tiers-the-room-scales-while-the-law-holds: backlog
+  3-15-the-public-posture-one-sealed-bundle-to-one-droplet: backlog
+  epic-3-retrospective: optional
+
+  epic-4: backlog
+  4-1-vendor-the-table-set-and-wrap-it-the-contract-wraps-foreign: backlog
+  4-2-batch-registration-and-the-pinball-corner-the-roster-is-a-le: backlog
+  4-3-nameplates-and-the-shared-prompt-found-never-announced-museu: backlog
+  4-4-the-dead-machine-law-holds-in-the-museum: backlog
+  epic-4-retrospective: optional
+
+  epic-5: backlog
+  5-1-the-workshop-monitor-repo-truth-baked-into-the-bundle: backlog
+  5-2-the-plan-drawer-bmad-plans-as-diegetic-paper-paired-with-car: backlog
+  5-3-the-workbench-the-build-lifecycle-staged-honestly: backlog
+  5-4-the-workshop-honesty-audit-allowlist-and-pairing-machine-che: backlog
+  epic-5-retrospective: optional
+
+  epic-6: backlog
+  6-1-the-snack-bar-stands-counter-fixtures-and-the-attendant: backlog
+  6-2-the-tip-jar-a-coin-into-the-mix: backlog
+  6-3-ordering-a-coffee-the-navigation-is-the-donation: backlog
+  6-4-crypto-links-and-the-offer-never-confirmation-law-machine-ch: backlog
+  epic-6-retrospective: optional
+
+  epic-7: backlog
+  7-1-the-engine-decision-oq-4-settled-with-evidence-not-vibes: backlog
+  7-2-the-first-playable-table-pinball-obeys-the-full-contract: backlog
+  7-3-two-live-in-one-frame-playable-and-attract-side-by-side: backlog
+  7-4-the-corner-found-by-ear-pinball-s-audio-anchors: backlog
+  epic-7-retrospective: optional

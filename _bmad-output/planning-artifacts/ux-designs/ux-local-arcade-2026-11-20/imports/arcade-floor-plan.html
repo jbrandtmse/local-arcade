@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Local Arcade — Spatial One-Pager · Floor Plan</title>
+<style>
+  :root{
+    --bg:#070b10; --panel:#0c1219; --ink:#cfe3ee; --dim:#7e93a3; --faint:#44586a;
+    --line:#173247; --wall:#b9d7e6;
+    --neon-cyan:#46e6ff; --neon-mag:#ff4fa3; --neon-amber:#ffb84d;
+    --neon-violet:#b07cff; --neon-green:#57e6a3; --neon-warm:#ff9a5c;
+    --neon-steel:#7fb0c9; --neon-red:#ff6b5e;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:
+      repeating-linear-gradient(0deg, transparent 0 39px, rgba(70,230,255,.035) 39px 40px),
+      repeating-linear-gradient(90deg, transparent 0 39px, rgba(70,230,255,.035) 39px 40px),
+      radial-gradient(1200px 700px at 50% 30%, #0b141d 0%, var(--bg) 70%);
+    color:var(--ink);
+    font-family:ui-monospace, "Cascadia Mono", Consolas, "Courier New", monospace;
+    font-size:14px; line-height:1.45;
+  }
+  header{padding:22px 28px 10px}
+  h1{margin:0;font-size:20px;letter-spacing:.14em;color:var(--neon-cyan);text-transform:uppercase;
+     text-shadow:0 0 14px rgba(70,230,255,.35)}
+  h1 span{color:var(--neon-mag);text-shadow:0 0 14px rgba(255,79,163,.4)}
+  .sub{color:var(--dim);margin-top:6px;font-size:12px;letter-spacing:.04em}
+  .wrap{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:20px;padding:14px 28px 28px;align-items:start}
+  @media (max-width:1100px){.wrap{grid-template-columns:1fr}}
+  .card{background:linear-gradient(180deg,#0d151e,#0a1017);border:1px solid var(--line);border-radius:10px;
+        box-shadow:0 0 30px rgba(0,0,0,.5), inset 0 0 60px rgba(70,230,255,.03)}
+  .mapcard{padding:12px}
+  svg{width:100%;height:auto;display:block}
+  aside{display:flex;flex-direction:column;gap:16px}
+  .pad{padding:14px 16px}
+  h2{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin:0 0 10px;
+    border-bottom:1px dashed var(--line);padding-bottom:6px}
+  /* notes panel */
+  #note .nt{font-size:14px;color:var(--neon-amber);letter-spacing:.06em;margin:0 0 6px}
+  #note .nb{font-size:12.5px;color:var(--ink)}
+  #note .nb b{color:var(--neon-cyan);font-weight:600}
+  #note .src{font-size:10.5px;color:var(--faint);margin-top:8px}
+  /* legend */
+  .lg{display:flex;flex-wrap:wrap;gap:7px}
+  .chip{display:inline-flex;align-items:center;gap:7px;font-size:10.5px;letter-spacing:.05em;
+        border:1px solid var(--line);border-radius:20px;padding:3px 9px;color:var(--dim)}
+  .sw{width:10px;height:10px;border-radius:3px;flex:none}
+  .rules{font-size:11.5px;color:var(--dim)}
+  .rules li{margin-bottom:6px}
+  .rules b{color:var(--neon-mag);font-weight:600}
+  .rank{color:var(--neon-amber)}
+  ul{margin:0;padding-left:18px}
+  /* soundscape */
+  .snd{font-size:11.5px;color:var(--dim)}
+  .snd li{margin-bottom:6px}
+  .snd b{color:var(--neon-violet);font-weight:600}
+  .snd .gong{color:var(--neon-amber)}
+  footer{padding:6px 28px 30px;color:var(--faint);font-size:11px;letter-spacing:.06em}
+  footer em{color:var(--neon-amber);font-style:normal}
+  /* SVG interactivity */
+  .hot{cursor:pointer}
+  .hot .hl{transition:filter .15s, opacity .15s}
+  .hot:hover .hl, .hot.sel .hl{filter:drop-shadow(0 0 6px currentColor)}
+  text{pointer-events:none;user-select:none}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>The Local Arcade <span>· walk-in floor plan</span></h1>
+  <div class="sub">Top-down blueprint from the 2026-11-18 brainstorming session — every brainstormed idea, pinned to a location.
+  Click any zone or cabinet for its note. The room is too big to take in at once: broken sightlines, pillars, sound from around corners.</div>
+</header>
+
+<div class="wrap">
+<div class="card mapcard">
+<svg viewBox="0 0 1160 810" role="img" aria-label="Top-down floor plan of the arcade">
+<defs>
+  <pattern id="floor" width="40" height="40" patternUnits="userSpaceOnUse">
+    <rect width="40" height="40" fill="#0a1017"/>
+    <path d="M40 0H0V40" fill="none" stroke="#12283a" stroke-width=".6"/>
+  </pattern>
+  <linearGradient id="shrineGrad" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#ff4fa3" stop-opacity=".16"/>
+    <stop offset="1" stop-color="#ff4fa3" stop-opacity="0"/>
+  </linearGradient>
+  <radialGradient id="podGlow">
+    <stop offset="0" stop-color="#ffb84d" stop-opacity=".14"/>
+    <stop offset="1" stop-color="#ffb84d" stop-opacity="0"/>
+  </radialGradient>
+</defs>
+
+<!-- room shell -->
+<rect x="42" y="42" width="1076" height="716" fill="url(#floor)" stroke="var(--wall)" stroke-width="5"/>
+<!-- front door opening: patch over bottom wall -->
+<rect x="538" y="750" width="84" height="16" fill="#0a1017"/>
+<rect x="538" y="752" width="84" height="12" fill="none" stroke="var(--neon-red)" stroke-width="1.4" stroke-dasharray="3 3"/>
+<!-- door swing -->
+<path d="M538 758 A34 34 0 0 1 572 724" fill="none" stroke="var(--wall)" stroke-width="1.2"/>
+<path d="M622 758 A34 34 0 0 0 588 724" fill="none" stroke="var(--wall)" stroke-width="1.2"/>
+<!-- sound spilling out of the door -->
+<g class="hot" id="z-entrance" color="#ff6b5e" style="color:#ff6b5e" data-id="entrance">
+  <title>FRONT DOOR — the first minute is the walk-in</title>
+  <path class="hl" d="M556 780 A26 26 0 0 1 604 780 M548 792 A38 38 0 0 1 612 792 M540 802 A48 48 0 0 1 620 802"
+        fill="none" stroke="currentColor" stroke-width="1.6" opacity=".8"/>
+  <rect class="hot" x="530" y="742" width="100" height="24" fill="transparent"/>
+  <text x="580" y="797" text-anchor="middle" font-size="11" fill="currentColor" letter-spacing="1">FRONT DOOR</text>
+  <text x="580" y="771" text-anchor="middle" font-size="8.5" fill="currentColor" opacity=".85">sound spills out — you locate games by ear before you see them</text>
+</g>
+
+<!-- chronology guide lines (each row one year older toward the back) -->
+<g stroke="#46e6ff" stroke-width=".6" stroke-dasharray="2 6" opacity=".13">
+  <line x1="42" y1="645" x2="1118" y2="645"/>
+  <line x1="42" y1="591" x2="1118" y2="591"/>
+  <line x1="42" y1="537" x2="1118" y2="537"/>
+  <line x1="42" y1="483" x2="1118" y2="483"/>
+  <line x1="42" y1="445" x2="1118" y2="445"/>
+  <line x1="42" y1="391" x2="1118" y2="391"/>
+  <line x1="42" y1="353" x2="1118" y2="353"/>
+  <line x1="42" y1="315" x2="1118" y2="315"/>
+  <line x1="42" y1="249" x2="1118" y2="249"/>
+  <line x1="42" y1="209" x2="1118" y2="209"/>
+</g>
+<!-- year ruler on the left margin -->
+<g font-size="9" fill="#46e6ff" opacity=".65" letter-spacing="1">
+  <text transform="rotate(-90 24 649)" x="24" y="649">ROADMAP 1985–86</text>
+  <text transform="rotate(-90 24 637)" x="24" y="637">ROW 1985</text>
+  <text transform="rotate(-90 24 583)" x="24" y="583">ROW 1984</text>
+  <text transform="rotate(-90 24 529)" x="24" y="529">ROW 1983</text>
+  <text transform="rotate(-90 24 465)" x="24" y="465">ROW 1982</text>
+  <text transform="rotate(-90 24 357)" x="24" y="357">ROW 1981</text>
+  <text transform="rotate(-90 24 261)" x="24" y="261">ROW 1980</text>
+  <text transform="rotate(-90 24 221)" x="24" y="221">ROW 1979</text>
+</g>
+<text transform="rotate(-90 34 720)" x="34" y="720" font-size="7.5" fill="#44586a" letter-spacing="1">← rows run front-to-back · each row one year OLDER as you walk deeper</text>
+
+<!-- THE SHRINE zone (back wall) -->
+<g class="hot" id="z-shrine" style="color:#ff4fa3" data-id="shrine">
+  <title>THE SHRINE — golden-age anchors, dimmer light, forever-playable</title>
+  <rect class="hl" x="270" y="42" width="560" height="105" fill="url(#shrineGrad)" stroke="#ff4fa3" stroke-width="1" stroke-dasharray="4 4" opacity=".85"/>
+  <text x="285" y="140" font-size="11" fill="#ff4fa3" letter-spacing="3">THE SHRINE</text>
+  <text x="380" y="140" font-size="8" fill="#ff4fa3" opacity=".7">dimmer light · the first machines you sit down at · forever-playable · their attract music doubles as the room's PA</text>
+</g>
+
+<!-- FEATURED POD (room center) -->
+<g class="hot" id="z-pod" style="color:#ffb84d" data-id="pod">
+  <title>FEATURED POD — newest additions, launch dates</title>
+  <circle class="hl" cx="560" cy="400" r="60" fill="url(#podGlow)" stroke="#ffb84d" stroke-width="1.4"/>
+  <g fill="#1a1408" stroke="#ffb84d" stroke-width="1">
+    <rect x="553" y="345" width="14" height="14"/><rect x="600" y="373" width="14" height="14"/>
+    <rect x="600" y="415" width="14" height="14"/><rect x="553" y="441" width="14" height="14"/>
+    <rect x="506" y="415" width="14" height="14"/><rect x="506" y="373" width="14" height="14"/>
+  </g>
+  <text x="560" y="396" text-anchor="middle" font-size="11" fill="#ffb84d" letter-spacing="2">FEATURED POD</text>
+  <text x="560" y="410" text-anchor="middle" font-size="7.5" fill="#ffb84d" opacity=".75">newest builds · launch dates · what you walk straight to</text>
+  <circle class="hl" cx="560" cy="400" r="105" fill="none" stroke="#b07cff" stroke-width="1.2" stroke-dasharray="5 5" opacity=".7"/>
+  <text x="560" y="283" text-anchor="middle" font-size="9" fill="#b07cff" letter-spacing="1">HALL OF MODELS (future) — 15 tables, one shared prompt, each plaque names its model</text>
+</g>
+<!-- walk-straight-to path from door to pod -->
+<path d="M580 736 L580 480" fill="none" stroke="#ffb84d" stroke-width="1" stroke-dasharray="2 6" opacity=".45"/>
+<path d="M580 492 l-4 8 h8 z" fill="#ffb84d" opacity=".5"/>
+<!-- stenciled crate by the door, crowbar still in it -->
+<g class="hot" id="z-crate" style="color:#ffb84d" data-id="crate">
+  <title>LOADING DAY — stenciled crate by the door, crowbar still in it</title>
+  <rect class="hl" x="646" y="706" width="34" height="26" fill="#151006" stroke="#ffb84d" stroke-width="1.2"/>
+  <line x1="646" y1="719" x2="680" y2="719" stroke="#ffb84d" stroke-width=".8"/>
+  <text x="663" y="700" text-anchor="middle" font-size="7.5" fill="#ffb84d" opacity=".8">stenciled crate · crowbar still in it</text>
+</g>
+
+<!-- roadmap empty stretch (both walls, front) -->
+<g class="hot" id="z-roadmap" style="color:#ffb84d" data-id="roadmap">
+  <title>1985–86 — empty stretch = the roadmap</title>
+  <g fill="none" stroke="#ffb84d" stroke-width="1" stroke-dasharray="3 3" opacity=".8">
+    <rect class="hl" x="48" y="662" width="34" height="26"/><rect class="hl" x="48" y="700" width="34" height="26"/>
+    <rect class="hl" x="1078" y="662" width="34" height="26"/><rect class="hl" x="1078" y="700" width="34" height="26"/>
+  </g>
+  <text x="106" y="681" font-size="8.5" fill="#ffb84d" letter-spacing="1">EMPTY STRETCH 1985–86 — the roadmap (plans on the workshop desk foreshadow these launches)</text>
+</g>
+
+<!-- sightlines broken by pillars (deliberate) -->
+<g stroke="#7fb0c9" stroke-width=".8" stroke-dasharray="4 5" opacity=".4" fill="none">
+  <path d="M565 730 L362 332"/><path d="M362 332 L120 240"/><path d="M590 730 L758 600"/><path d="M758 600 L980 520"/>
+</g>
+<g class="hot" id="z-pillar1" style="color:#7fb0c9" data-id="pillar">
+  <title>PILLAR — broken sightlines are deliberate</title>
+  <rect class="hl" x="348" y="318" width="26" height="26" fill="#0e1720" stroke="#7fb0c9" stroke-width="1.4"/>
+  <path d="M348 318 l26 26 M374 318 l-26 26" stroke="#7fb0c9" stroke-width=".8"/>
+</g>
+<g class="hot" id="z-pillar2" style="color:#7fb0c9" data-id="pillar">
+  <title>PILLAR — broken sightlines are deliberate</title>
+  <rect class="hl" x="747" y="588" width="26" height="26" fill="#0e1720" stroke="#7fb0c9" stroke-width="1.4"/>
+  <path d="M747 588 l26 26 M773 588 l-26 26" stroke="#7fb0c9" stroke-width=".8"/>
+</g>
+<text x="392" y="316" font-size="7.5" fill="#7fb0c9" opacity=".7">pillar — sightline broken on purpose:</text>
+<text x="392" y="326" font-size="7.5" fill="#7fb0c9" opacity=".7">the room must be too big to take in at once</text>
+
+<!-- PINBALL CORNER (back left) -->
+<g class="hot" id="z-pinball" style="color:#b07cff" data-id="pinball">
+  <title>PINBALL CORNER — its own timeline, findable by ear</title>
+  <rect class="hl" x="52" y="52" width="252" height="140" rx="8" fill="rgba(176,124,255,.05)" stroke="#b07cff" stroke-width="1.2" stroke-dasharray="5 4"/>
+  <text x="60" y="68" font-size="10" fill="#b07cff" letter-spacing="2">PINBALL CORNER</text>
+  <text x="60" y="80" font-size="7.5" fill="#b07cff" opacity=".8">its own timeline: EM → talky/DMD 80s–90s → modern color-LCD → custom, dated TODAY</text>
+  <path d="M70 178 H290 m-8 -4 l8 4 l-8 4" stroke="#b07cff" stroke-width="1" fill="none" opacity=".7"/>
+  <!-- EM row -->
+  <g>
+    <rect class="hl" x="62" y="140" width="34" height="20" rx="3" fill="#150d20" stroke="#b07cff"/>
+    <text x="62" y="134" font-size="7" fill="#b07cff">Eight Ball Deluxe '78 · EM</text>
+  </g>
+  <!-- 80s/90s Williams-Bally -->
+  <g>
+    <rect class="hl" x="112" y="140" width="34" height="20" rx="3" fill="#150d20" stroke="#b07cff"/>
+    <text x="112" y="134" font-size="7" fill="#b07cff">Earthshaker! '89</text>
+    <rect class="hl" x="162" y="140" width="34" height="20" rx="3" fill="#150d20" stroke="#b07cff"/>
+    <text x="162" y="134" font-size="7" fill="#b07cff">The Addams Family '92</text>
+    <rect class="hl" x="212" y="140" width="34" height="20" rx="3" fill="#150d20" stroke="#b07cff"/>
+    <text x="212" y="134" font-size="7" fill="#b07cff">Twilight Zone '93</text>
+  </g>
+  <!-- modern -->
+  <g>
+    <rect class="hl" x="62" y="98" width="34" height="20" rx="3" fill="#150d20" stroke="#b07cff" stroke-dasharray="3 2"/>
+    <text x="62" y="92" font-size="7" fill="#b07cff">modern color-LCD tables</text>
+  </g>
+  <!-- custom cluster -->
+  <g class="hot" id="z-custom" data-id="custom" style="color:#b07cff">
+    <title>CUSTOM TABLES — invented here, unveiled monthly into the featured pod</title>
+    <rect class="hl" x="110" y="88" width="186" height="44" rx="6" fill="none" stroke="#b07cff" stroke-width="1" stroke-dasharray="3 3"/>
+    <circle cx="122" cy="110" r="6" fill="#150d20" stroke="#b07cff"/><circle cx="140" cy="110" r="6" fill="#150d20" stroke="#b07cff"/>
+    <circle cx="158" cy="110" r="6" fill="#150d20" stroke="#b07cff"/><circle cx="176" cy="110" r="6" fill="#150d20" stroke="#b07cff"/>
+    <text x="120" y="100" font-size="6.5" fill="#b07cff">CUSTOM · dated TODAY (from repo pinball/):</text>
+    <text x="120" y="127" font-size="6.5" fill="#b07cff">Dragon's Keep · Quantum Core: Meltdown · Space Station · Storm Chaser · Nova Strike · Midnight Heist · Ragnarök · Neon Quest · + more</text>
+  </g>
+  <text x="60" y="188" font-size="7" fill="#b07cff" opacity=".8">simulation engine: dragonwar/ (open-source GPL) · attract audio: <tspan fill="#ffb84d">gong · SPIKE CHILLER · rumble</tspan> — the corner is findable by ear</text>
+</g>
+
+<!-- casual alley (mid-right) -->
+<g class="hot" id="z-casual" style="color:#57e6a3" data-id="casual">
+  <title>CASUAL ALLEY — the head-to-head social equalizer</title>
+  <rect class="hl" x="836" y="470" width="196" height="118" rx="8" fill="rgba(87,230,163,.05)" stroke="#57e6a3" stroke-width="1.2" stroke-dasharray="5 4"/>
+  <text x="844" y="486" font-size="10" fill="#57e6a3" letter-spacing="2">CASUAL ALLEY</text>
+  <text x="844" y="498" font-size="7.5" fill="#57e6a3" opacity=".8">anyone can compete — where the hang-out job lives (tactile players, families, casual crowds)</text>
+  <!-- Skee-Ball lane -->
+  <rect class="hl" x="852" y="512" width="16" height="66" rx="4" fill="#0d1a14" stroke="#57e6a3"/>
+  <circle cx="860" cy="520" r="4" fill="none" stroke="#57e6a3"/>
+  <text x="852" y="588" font-size="7" fill="#57e6a3">Skee-Ball</text>
+  <!-- Whac-A-Mole -->
+  <circle class="hl" cx="930" cy="545" r="24" fill="#0d1a14" stroke="#57e6a3"/>
+  <g fill="#57e6a3" opacity=".8"><circle cx="920" cy="537" r="3"/><circle cx="940" cy="537" r="3"/><circle cx="930" cy="552" r="3"/><circle cx="916" cy="554" r="3"/><circle cx="944" cy="554" r="3"/></g>
+  <text x="908" y="588" font-size="7" fill="#57e6a3">Whac-A-Mole</text>
+  <!-- Hoops -->
+  <g class="hot" id="z-hoops" data-id="hoops" style="color:#57e6a3"><title>Hoops — arcade basketball, head-to-head</title>
+  <rect class="hl" x="978" y="512" width="44" height="66" rx="4" fill="#0d1a14" stroke="#57e6a3"/>
+  <circle cx="1000" cy="528" r="8" fill="none" stroke="#57e6a3"/>
+  <text x="982" y="588" font-size="7" fill="#57e6a3">Hoops (arcade basketball)</text></g>
+</g>
+
+<!-- snack bar (front right) -->
+<g class="hot" id="z-snack" style="color:#ff9a5c" data-id="snack">
+  <title>SNACK BAR — supporters keep the lights on</title>
+  <rect class="hl" x="896" y="664" width="198" height="44" rx="6" fill="rgba(255,154,92,.06)" stroke="#ff9a5c" stroke-width="1.4"/>
+  <text x="906" y="681" font-size="10" fill="#ff9a5c" letter-spacing="2">SNACK BAR</text>
+  <text x="906" y="694" font-size="7.5" fill="#ff9a5c" opacity=".85">donation surface · tip jar · crypto wallets · Buy Me a Coffee</text>
+  <text x="906" y="704" font-size="7.5" fill="#ff9a5c" opacity=".85">attendee takes your “order” — ordering a coffee IS the click</text>
+  <g><title>Tip jar — clinks into the room's soundscape</title>
+    <circle class="hl" cx="1068" cy="686" r="9" fill="#150e08" stroke="#ff9a5c"/>
+    <path d="M1063 683 h10 M1063 688 h10" stroke="#ff9a5c" stroke-width=".8"/>
+    <path class="hl" d="M1078 680 A8 8 0 0 1 1086 690" fill="none" stroke="#ff9a5c" stroke-width="1" opacity=".8"/>
+  </g>
+</g>
+
+<!-- WORKSHOP (back right) — door left open -->
+<g class="hot" id="z-workshop" style="color:#7fb0c9" data-id="workshop">
+  <title>THE WORKSHOP — a door left OPEN</title>
+  <path class="hl" d="M898 42 V102 M898 150 V172 H1118" fill="none" stroke="#7fb0c9" stroke-width="3"/>
+  <path d="M898 102 A48 48 0 0 1 946 150" fill="none" stroke="#7fb0c9" stroke-width="1" stroke-dasharray="3 3" opacity=".7"/>
+  <text x="906" y="60" font-size="10" fill="#7fb0c9" letter-spacing="2">WORKSHOP</text>
+  <text x="906" y="72" font-size="7.5" fill="#7fb0c9" opacity=".85">door left open · still-warm chair · reads the actual repo for its state</text>
+  <!-- desk with plans + monitor -->
+  <rect class="hl" x="922" y="84" width="70" height="26" rx="2" fill="#0e1720" stroke="#7fb0c9"/>
+  <rect x="928" y="89" width="14" height="16" fill="#18242e" stroke="#7fb0c9" stroke-width=".7"/>
+  <rect x="946" y="89" width="14" height="16" fill="#18242e" stroke="#7fb0c9" stroke-width=".7"/>
+  <rect x="964" y="88" width="22" height="18" rx="2" fill="#0a0f14" stroke="#7fb0c9" stroke-width=".8"/>
+  <text x="966" y="100" font-size="5.5" fill="#7fb0c9">git log</text>
+  <text x="922" y="122" font-size="6.5" fill="#7fb0c9" opacity=".85">desk: spread-open plans = stories in progress · boxed+dated = shipped · plan under an ON-HOLD brick = blocked</text>
+  <!-- bench with lifecycle stages -->
+  <g class="hot" id="z-bench" data-id="bench" style="color:#7fb0c9">
+    <title>REPO-FED BENCH — a half-assembled machine matching the actual build stage</title>
+    <rect class="hl" x="1004" y="140" width="104" height="24" rx="2" fill="none" stroke="#7fb0c9" stroke-width="1" stroke-dasharray="4 3"/>
+    <rect x="1010" y="145" width="16" height="14" fill="none" stroke="#7fb0c9" stroke-dasharray="2 2"/>
+    <rect x="1032" y="145" width="16" height="14" fill="none" stroke="#7fb0c9"/>
+    <rect x="1054" y="145" width="16" height="14" fill="#18242e" stroke="#7fb0c9"/>
+    <rect x="1080" y="145" width="22" height="14" fill="#0e1720" stroke="#7fb0c9"/>
+    <text x="1004" y="178" font-size="6.5" fill="#7fb0c9" opacity=".85">lifecycle on the bench: spec-day chalk outline + cardboard template → mid-build bare skeleton, playfield on sawhorses, work light on, honest silence → tests-green: first attract mode on the bench, TESTED tag → loading-day crate to the featured pod</text>
+  </g>
+</g>
+
+<!-- attract-glow sound arcs: shrine anchors + pinball -->
+<g class="hot" id="z-pacman-arc" data-id="pacman" style="color:#ff4fa3"><title>Pac-Man / Galaga themes — the room's identity, eyes-closed recognizable</title>
+  <path class="hl" d="M690 96 A22 22 0 0 1 726 122 M682 88 A36 36 0 0 1 738 132" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".7"/>
+</g>
+<g id="z-pinball-arc" style="color:#b07cff">
+  <path class="hl" d="M304 60 A22 22 0 0 1 320 92 M312 50 A34 34 0 0 1 336 96" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".6"/>
+  <title>Anchor sounds of the pinball corner (see soundscape)</title>
+</g>
+
+<!-- cabinets (generated) -->
+<g id="cabs"></g>
+<!-- patrons (busy machines) -->
+<g id="patrons" fill="#ffb84d">
+  <g class="hot" id="p1" data-id="busy"><title>Busy machine — a patron mid-play blocks it</title>
+    <circle cx="96" cy="341" r="4.5"/><circle cx="92" cy="337" r="1.5"/><path d="M96 336 l3 -4 M96 340 l-4 -4" stroke="#ffb84d" stroke-width=".8"/></g>
+  <g class="hot" id="p2" data-id="busy"><title>Busy machine — jerky motion, slammed controls, little jumps</title>
+    <circle cx="96" cy="633" r="4.5"/><path d="M96 628 l3 -4 M96 632 l-4 -4" stroke="#ffb84d" stroke-width=".8"/></g>
+</g>
+<text x="104" y="349" font-size="7" fill="#ffb84d" opacity=".8">● patron at a cabinet: “this one's busy right now” — real games, not loops (every machine runs headless)</text>
+
+<!-- compass / walk note -->
+<g font-size="8" fill="#44586a">
+  <text x="50" y="775">plan view · front door at bottom · the seek is the first hero moment: finding-by-memory, by ear</text>
+  <text x="850" y="775">marquees show ONLY game names — model attribution lives on the in-cabinet instruction card, behind the coin door</text>
+</g>
+</svg>
+</div>
+
+<aside>
+  <div class="card pad">
+    <h2>Arkhist's notes — click a zone</h2>
+    <div id="note">
+      <p class="nt" id="noteTitle">THE META-LAW</p>
+      <p class="nb" id="noteBody">Everything in the building is <b>FOUND, never announced</b>. Attract-hum seeking, the instruction card behind the coin door, the workshop plans, the repo-fed bench — one authorship-as-discovery mechanic. The showcase is that the arcade is <b>built</b> with local LLMs — the artifact, not the electricity. Runtime behavior is deterministic. Start clicking the plan.</p>
+      <p class="src">source: brainstorm-local-llm-arcade-2026-11-18 · memlog</p>
+    </div>
+  </div>
+
+  <div class="card pad">
+    <h2>Soundscape — anchor sounds</h2>
+    <ul class="snd">
+      <li><b>Pac-Man theme</b> and <b>Galaga theme</b> — recognizable eyes-closed; attract-mode broadcast, entertaining to WATCH with nobody playing; they double as the room's <b>PA system</b> and are why crowds form.</li>
+      <li><span class="gong">Pinball corner:</span> <b>Twilight Zone's GONG</b>, <b>Addams Family “SPIKE CHILLER”</b>, <b>Earthshaker's rumble</b> — plus clacks, bells, flipper volleys, machines that talk. The corner is findable by ear.</li>
+      <li><b>Attract hum is the seek system</b> — you locate the game you remember by ear before you see it; sound from around corners.</li>
+      <li><b>Tip jar CLINKS</b> into the room's soundscape at the snack bar. Half-built machines on the bench sit in <b>honest silence</b> (mid-build).</li>
+    </ul>
+  </div>
+
+  <div class="card pad">
+    <h2>Legend / key</h2>
+    <div class="lg">
+      <span class="chip"><span class="sw" style="background:#ff6b5e"></span>front door · sound spills out</span>
+      <span class="chip"><span class="sw" style="background:#ffb84d"></span>featured pod · newest / launches</span>
+      <span class="chip"><span class="sw" style="background:#b07cff"></span>Hall of Models (planned) · pinball corner</span>
+      <span class="chip"><span class="sw" style="background:#46e6ff"></span>wall rows · chronological timeline</span>
+      <span class="chip"><span class="sw" style="background:#ffb84d;border:1px dashed #ffb84d;background:transparent"></span>1985–86 empty stretch = roadmap</span>
+      <span class="chip"><span class="sw" style="background:#ff4fa3"></span>the shrine · dimmer light, forever-playable</span>
+      <span class="chip"><span class="sw" style="background:#57e6a3"></span>casual alley · head-to-head</span>
+      <span class="chip"><span class="sw" style="background:#ff9a5c"></span>snack bar · supporters keep the lights on</span>
+      <span class="chip"><span class="sw" style="background:#7fb0c9"></span>workshop · door left open · repo-fed</span>
+      <span class="chip"><span class="sw" style="background:#57e6a3;border-radius:50%"></span>already BUILT (moonpatrol/)</span>
+      <span class="chip"><span class="sw" style="background:#ffb84d;border-radius:50%;width:8px;height:8px"></span>patron mid-play · “busy right now”</span>
+      <span class="chip"><span class="sw" style="background:#0e1720;border:1px solid #7fb0c9"></span>pillar · deliberate broken sightline</span>
+    </div>
+    <h2 style="margin-top:14px">The rules etched on this plan</h2>
+    <ul class="rules">
+      <li><b>Pull signals, in order:</b> <span class="rank">1)</span> sound effects → <span class="rank">2)</span> bright attract-mode graphics/animation → <span class="rank">3)</span> player intensity (jerking on controls, talking, bantering).</li>
+      <li><b>NO DEAD MACHINES.</b> Every cabinet always performs — attract mode running, marquee lit, screen moving. If a screenshot looks static, it failed.</li>
+      <li><b>One animated system:</b> game events → agent impulse → body reaction (flinch, slam, jump); player inputs → game state. Body language is a broadcast channel — drama readable from across the room.</li>
+      <li><b>Find, never announce:</b> the arcade never breaks character; model names are metadata you go looking for (instruction card behind the coin door; archives/click-through outside the fiction).</li>
+      <li><b>No guided play, no forced order.</b> The crowd of machines IS the content; patrons set the stage, real visitors fill it.</li>
+      <li><b>The timeline scales:</b> every themed corner is a museum of its own tech — main rows 1978→1985, pinball corner EM→DMD→modern→custom.</li>
+    </ul>
+  </div>
+</aside>
+</div>
+
+<footer>
+  Generated from the 2026-11-18 brainstorming memlog (only source — no invented facts). Thesis as recorded: local LLMs author content and behavior CODE at build time; the runtime sim is deterministic event-driven rules — <em>“the arcade is a fixed recording of what local models can build.”</em>
+</footer>
+
+<script>
+const C = "#46e6ff", B = "#ff4fa3", G = "#57e6a3";
+// 22-cabinet inventory. Wall rows run front-to-back, each row one year older;
+// the four golden-age anchors sit at the back where the timeline begins (THE SHRINE).
+const cabs = [
+ // ---- left wall ----
+ {id:"gauntlet",n:"Gauntlet",y:1985,side:"L",x:48,yy:620,col:C,patron:true,
+  note:"One of your own peak memories — it anchors the mid-decade rows."},
+ {id:"paperboy",n:"Paperboy",y:1984,side:"L",x:48,yy:566,col:C,
+  note:"Sit-down handlebars, physics chaos, crowd magnet. Fills the empty 1984 row."},
+ {id:"dragonslair",n:"Dragon's Lair",y:1983,side:"L",x:48,yy:512,col:C,
+  note:"Peak memory #1: finished start-to-finish (~45–60 min) with a crowd watching — accomplishment + an audience."},
+ {id:"poleposition",n:"Pole Position",y:1982,side:"L",x:48,yy:458,col:C,
+  note:"Peak discovery memory — being INSIDE it was the magic."},
+ {id:"moonpatrol",n:"Moon Patrol '82",y:1982,side:"L",x:48,yy:420,col:G,tag:"BUILT",
+  note:"Already BUILT: moonpatrol/ — an arcade-faithful Moon Patrol '82 clone, vanilla JS, zero deps, one-shot. A wall candidate that exists in the repo."},
+ {id:"centipede",n:"Centipede",y:1981,side:"L",x:48,yy:366,col:C,
+  note:"Trackball, instantly recognizable attract audio — shrine-watchable from across the room."},
+ {id:"donkeykong",n:"Donkey Kong",y:1981,side:"L",x:48,yy:328,col:C,patron:true,
+  note:"The arcade's definitive hero-machine: climb, final screen, crowd."},
+ {id:"turbo",n:"Turbo",y:1981,side:"L",x:48,yy:290,col:C,
+  note:"Atari sit-down cockpit racing — granddaddy of the Pole Position memory."},
+ {id:"missilecommand",n:"Missile Command",y:1980,side:"L",x:48,yy:236,col:C,
+  note:"Communal 'save the city' drama; fits the shrine era."},
+ {id:"galaxian",n:"Galaxian",y:1979,side:"L",x:48,yy:196,col:C,
+  note:"From your own wall list; the oldest end of the timeline rows, beside the shrine."},
+ // ---- right wall ----
+ {id:"elevatoraction",n:"Elevator Action",y:1985,side:"R",x:1078,yy:620,col:C,
+  note:"From your own wall list — the newest wall row, nearest the featured pod."},
+ {id:"starwars",n:"Star Wars",y:1983,side:"R",x:1078,yy:512,col:C,
+  note:"Peak memory #2: the vector cockpit — being INSIDE it, flying the X-wing, R2-D2 talking to you."},
+ {id:"digdug",n:"Dig Dug",y:1982,side:"R",x:1078,yy:458,col:C,
+  note:"Completes the maze row next to Pac-Man."},
+ {id:"joust",n:"Joust",y:1982,side:"R",x:1078,yy:420,col:C,
+  note:"Two-player love, iconic flap — strategy readable from outside the game."},
+ {id:"frogger",n:"Frogger",y:1981,side:"R",x:1078,yy:366,col:C,
+  note:"Pure visible tension — everyone knows the death sound."},
+ {id:"defender",n:"Defender",y:1981,side:"R",x:1078,yy:328,col:C,
+  note:"Rescue-a-humanoid runs are the most watchable shooter drama ever."},
+ {id:"tempest",n:"Tempest",y:1981,side:"R",x:1078,yy:290,col:C,
+  note:"From your own wall list; belongs to 1981, the densest row."},
+ {id:"battlezone",n:"Battlezone",y:1980,side:"R",x:1078,yy:236,col:C,
+  note:"Sit-down periscope vector tank — an 'inside it' job, era-authentic."},
+ // ---- the shrine (back wall) ----
+ {id:"invaders",n:"Space Invaders",y:1978,side:"B",x:300,yy:48,col:B,shrine:true,
+  note:"Anchor cabinet of the golden-age shrine — one of the first machines you sit down at. Dimmer light, forever-playable."},
+ {id:"asteroids",n:"Asteroids",y:1979,side:"B",x:405,yy:48,col:B,shrine:true,
+  note:"Anchor cabinet of the shrine. From your own wall list."},
+ {id:"pacman",n:"Pac-Man",y:1980,side:"B",x:630,yy:48,col:B,shrine:true,
+  note:"Anchor cabinet. Its theme is a recognizable-eyes-closed anchor sound — the room's identity, doubling as the PA system."},
+ {id:"galaga",n:"Galaga",y:1981,side:"B",x:735,yy:48,col:B,shrine:true,
+  note:"Anchor cabinet. Its theme + Pac-Man's are attract-mode broadcast audio — entertaining to WATCH with nobody playing, which is exactly why crowds form around them."}
+];
+const zones = {
+ entrance:{t:"FRONT DOOR — the first minute IS the walk-in",b:"Dazing around an overwhelmed room, then FINDING the cabinet you're looking for. The seeking, not the playing, is the core first-visit loop. Sound spills out; attract hum is the seek system — you locate the game you remember <b>by ear before you see it</b>. Finding-by-memory is the first hero moment."},
+ roadmap:{t:"1985–86 — the empty stretch",b:"Deliberately empty wall rows = <b>the roadmap</b>. Plans on the workshop desk for machines not yet built are in-world foreshow of featured-pod launches: run the build pipeline over a weekend and Monday there's a new table under the pod."},
+ pod:{t:"FEATURED POD — room center",b:"The FEATURED machines = the newest additions, launch dates — what visitors walk straight to. The arcade grows over time and the floor plan shows it. Monthly custom-table unveilings land here."},
+ hall:{t:"HALL OF MODELS (future exhibit, pod ring)",b:"15 tables built from an <b>identical prompt</b> by different local models (the repo's pinball/ work), each on its own cabinet with a plaque. Nameplates ARE explicit — the cabinet shows which model built its table. <b>Museum, not guessing game.</b> Optional garnish: Model Grand Prix — shared leaderboards attributed per model, arguing about sibling models whose tables sit side by side."},
+ crate:{t:"LOADING DAY at the pod",b:"Lifecycle's last stage, rendered in-world: stenciled crate by the door, clean swept bench, <b>crowbar still in the crate</b> on the featured pod."},
+ pillar:{t:"Pillars & broken sightlines — deliberate",b:"Design the room to be <b>too big to take in at once</b> — broken sightlines, sounds from around corners. Worst possible first minute (static images, no lit marquees, no animation) is the failure mode this defends against."},
+ shrine:{t:"THE SHRINE — back of the room",b:"The golden-age anchors: Space Invaders, Pac-Man, Galaga, Asteroids — <b>the first machines you sit down at</b>. Dimmer light, forever-playable. These four are the anchor cabinets; the wall timeline's oldest end meets them here."},
+ pinball:{t:"PINBALL CORNER — its own timeline",b:"A museum of its own tech: <b>EM-era → talky/DMD 80s–90s Williams/Bally → modern color-LCD → custom tables dated TODAY</b>. Widens the audience beyond gamers (tactile players, families). Its attract mode IS sound+motion — clacks, bells, flipper volleys, machines that talk; findable by ear via the gong / 'SPIKE CHILLER' / rumble. Simulation engine: dragonwar/ (open-source GPL pinball sim)."},
+ custom:{t:"CUSTOM TABLES — dated today",b:"The project's ultimate showcase: tables that never physically existed — name, theme, rules, backglass art, even their attract voice invented by the local LLM. Built in the repo (Dragon's Keep, Quantum Core: Meltdown, Space Station, Storm Chaser, Nova Strike, Midnight Heist, Ragnarök, Neon Quest, + more). Unveiled monthly into the featured pod; visitors could propose themes. They will form the Hall of Models."},
+ casual:{t:"CASUAL ALLEY — the head-to-head equalizer",b:"Skee-Ball, Whac-A-Mole, Hoops: the casual player's room-within-the-room. <b>Anyone can compete</b> — this is where the hang-out job lives."},
+ hoops:{t:"Hoops",b:"Arcade basketball — head-to-head, an equalizer alongside Skee-Ball and Whac-A-Mole."},
+ snack:{t:"SNACK BAR — supporters keep the lights on",b:"v1: a simple donation surface — leave a tip, links to crypto wallets, a Buy Me a Coffee link — behind a <b>diegetic counter</b>: an attendant takes your 'order' (ordering a coffee IS the Buy-Me-a-Coffee click; behavior is deterministic, authored at build time). A physical tip jar <b>CLINKS into the soundscape</b>. Donor presence visible in-fiction: names on the cooler — 'this month's coffees = 40 hours of Galaga lit.' The retention fixture that turns a visit into a hangout."},
+ workshop:{t:"THE WORKSHOP — a door left OPEN",b:"On the desk lie <b>real plans</b>: how the arcade and its games were built — via the BMAD method and local models. Specs, epics, story files, prompt logs; git log as the work log on the monitor; test suites running. Its state is <b>NOT fiction — it reads the actual repository</b>: which machine is being worked on, and what state it's in. Every cabinet's instruction card pairs with ITS plans in its drawer (showroom ↔ workshop map). Open door + still-warm chair = the thesis made physical."},
+ bench:{t:"THE REPO-FED BENCH — build stage made visible",b:"A machine PARTIALLY ASSEMBLED, matching the actual build stage: <b>spec-day</b> — chalk outline, cardboard cabinet template, binder dated today; <b>mid-build</b> — bare skeleton, playfield on sawhorses, one leg on, marquee in a box, work light on, honest silence; <b>tests-green</b> — art on, first attract mode running on the bench, TESTED tag, back panel half closed; <b>loading-day</b> — stenciled crate by the door, crowbar still in it at the pod. Plans render as diegetic paper: spread-open = in-progress, boxed+dated = shipped, under an 'ON HOLD' brick = blocked."},
+ busy:{t:"BUSY MACHINE — a patron mid-play",b:"A patron stands at a cabinet mid-play, blocking it: 'this one's busy right now, you can't play it yet.' A real player jerks on controls, slams, jumps, whole-body movement — game events → impulse → body reaction. Because every machine runs <b>headless</b> (playable by an agent alone), 'busy' cabinets are real games, not loops."},
+ moonpatrol:{t:"Moon Patrol '82 — ALREADY BUILT",b:"<b>moonpatrol/</b> in the repo: an arcade-faithful Moon Patrol '82 clone, vanilla JS, zero deps, one-shot. A wall candidate that already exists."}
+};
+const NS="http://www.w3.org/2000/svg";
+const layer=document.getElementById("cabs");
+function el(t,a){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);return e;}
+cabs.forEach(c=>{
+  const g=el("g",{class:"hot",style:"color:"+c.col}); g.dataset.id=c.id;
+  const ti=el("title",{}); ti.textContent=c.n+" ("+c.y+")"; g.appendChild(ti);
+  const glow=el("circle",{r:26,fill:c.col,opacity:.06}); // attract-mode glow: NO DEAD MACHINES
+  let rect,label,badge=null;
+  if(c.side==="L"){
+    rect=el("rect",{x:c.x,y:c.yy,width:34,height:26,fill:"#0d1a22",stroke:c.col,"stroke-width":1.1,class:"hl"});
+    glow.setAttribute("cx",c.x+17);glow.setAttribute("cy",c.yy+13);
+    const mq=el("line",{x1:c.x,y1:c.yy+2,x2:c.x,y2:c.yy+24,stroke:c.col,"stroke-width":2}); // lit marquee, wall-side
+    label=el("text",{x:c.x+42,y:c.yy+16,"font-size":7.6,fill:c.col});
+    if(c.tag){badge=el("rect",{x:c.x+42,y:c.yy+2,width:34,height:9,rx:2,fill:"#07130c",stroke:c.col,"stroke-width":.7});
+      const bt=el("text",{x:c.x+45,y:c.yy+9,"font-size":6,fill:c.col});bt.textContent="● "+c.tag;g.appendChild(bt);}
+    g.appendChild(glow);g.appendChild(rect);g.appendChild(mq);if(badge)g.appendChild(badge);
+  }else if(c.side==="R"){
+    rect=el("rect",{x:c.x,y:c.yy,width:34,height:26,fill:"#0d1a22",stroke:c.col,"stroke-width":1.1,class:"hl"});
+    glow.setAttribute("cx",c.x+17);glow.setAttribute("cy",c.yy+13);
+    const mq=el("line",{x1:c.x+34,y1:c.yy+2,x2:c.x+34,y2:c.yy+24,stroke:c.col,"stroke-width":2});
+    label=el("text",{x:c.x-6,y:c.yy+16,"text-anchor":"end","font-size":7.6,fill:c.col});
+    g.appendChild(glow);g.appendChild(rect);g.appendChild(mq);
+  }else{ // back wall
+    rect=el("rect",{x:c.x,y:c.yy,width:26,height:34,fill:"#1a0d15",stroke:c.col,"stroke-width":1.1,class:"hl"});
+    glow.setAttribute("cx",c.x+13);glow.setAttribute("cy",c.yy+20);glow.setAttribute("r",34);glow.setAttribute("opacity",.05);
+    const mq=el("line",{x1:c.x+2,y1:c.yy,x2:c.x+24,y2:c.yy,stroke:c.col,"stroke-width":2});
+    label=el("text",{x:c.x+13,y:c.yy+50,"text-anchor":"middle","font-size":7.6,fill:c.col});
+    const yl=el("text",{x:c.x+13,y:c.yy+60,"text-anchor":"middle","font-size":6.5,fill:c.col,opacity:.75});
+    yl.textContent=c.y; g.appendChild(yl);
+    g.appendChild(glow);g.appendChild(rect);g.appendChild(mq);
+  }
+  label.textContent=c.n+" · "+c.y;
+  g.appendChild(label);
+  g.addEventListener("click",e=>{e.stopPropagation();show(c.id);});
+  layer.appendChild(g);
+});
+// attach zone handlers
+document.querySelectorAll(".hot[data-id]").forEach(h=>{
+  if(cabs.some(c=>c.id===h.dataset.id))return;
+  h.addEventListener("click",e=>{e.stopPropagation();show(h.dataset.id);});
+});
+const nt=document.getElementById("noteTitle"),nb=document.getElementById("noteBody");
+function show(id){
+  const d=zones[id]||(()=>{const c=cabs.find(c=>c.id===id);return c?{t:c.n+" · "+c.y,b:c.note}:null;})();
+  if(!d)return;
+  document.querySelectorAll(".hot.sel").forEach(s=>s.classList.remove("sel"));
+  const g=document.querySelector('[data-id="'+id+'"]'); if(g)g.classList.add("sel");
+  nt.textContent=d.t; nb.innerHTML=d.b;
+}
+</script>
+</body>
+</html>

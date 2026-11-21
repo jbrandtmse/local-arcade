@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>UX Design Validation: Local Arcade</title>
+<style>
+  :root {
+    --bg: #fafaf9;
+    --surface: #ffffff;
+    --border: #e7e5e4;
+    --text: #1c1917;
+    --muted: #78716c;
+
+    --verdict-strong: #16a34a;
+    --verdict-adequate: #65a30d;
+    --verdict-thin: #d97706;
+    --verdict-broken: #dc2626;
+
+    --sev-low: #64748b;
+    --sev-medium: #ca8a04;
+    --sev-high: #ea580c;
+    --sev-critical: #dc2626;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    font-size: 15px;
+  }
+  .container { max-width: 960px; margin: 0 auto; padding: 32px 24px 64px; }
+
+  header.report-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+  .title h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+  .title .subtitle { color: var(--muted); font-size: 13px; margin-top: 4px; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+
+  .synthesis {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--muted);
+    border-radius: 8px;
+    padding: 18px 22px;
+    margin-bottom: 24px;
+    font-size: 15.5px;
+  }
+  .synthesis p { margin: 0 0 10px; }
+  .synthesis p:last-child { margin-bottom: 0; }
+
+  .dimension-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  .dim-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .dim-card .dim-name { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .dim-card .dim-verdict { font-size: 14px; font-weight: 600; }
+
+  section.dimension, section.reviewer-section { margin-bottom: 14px; }
+  section.dimension details, section.reviewer-section details {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  section summary {
+    padding: 14px 20px;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  section summary::-webkit-details-marker { display: none; }
+  section summary::before {
+    content: "▸";
+    display: inline-block;
+    color: var(--muted);
+    transition: transform 0.15s ease;
+  }
+  section details[open] summary::before { transform: rotate(90deg); }
+  section summary h2 {
+    display: inline;
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    flex: 1;
+  }
+  .verdict-pill {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: white;
+  }
+  .verdict-strong { background: var(--verdict-strong); }
+  .verdict-adequate { background: var(--verdict-adequate); }
+  .verdict-thin { background: var(--verdict-thin); }
+  .verdict-broken { background: var(--verdict-broken); }
+
+  .dim-body { padding: 4px 20px 18px; }
+  .dim-judgment { color: var(--text); font-size: 14.5px; }
+  .dim-judgment p { margin: 0 0 10px; }
+
+  .findings-list { padding: 0 20px 4px; }
+  article.finding {
+    padding: 14px 0;
+    border-top: 1px solid var(--border);
+  }
+  article.finding:first-child { border-top: none; }
+  article.finding header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+  }
+  .badge {
+    font-size: 10.5px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    line-height: 1.4;
+  }
+  .badge-sev-low { background: rgba(100, 116, 139, 0.12); color: var(--sev-low); }
+  .badge-sev-medium { background: rgba(202, 138, 4, 0.14); color: var(--sev-medium); }
+  .badge-sev-high { background: rgba(234, 88, 12, 0.14); color: var(--sev-high); }
+  .badge-sev-critical { background: rgba(220, 38, 38, 0.14); color: var(--sev-critical); }
+  .finding-title { margin: 0; font-size: 15px; font-weight: 500; flex: 1; min-width: 200px; }
+  .finding-location { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px; color: var(--muted); }
+  .finding-note, .finding-fix { margin-top: 6px; font-size: 14px; }
+  .finding-fix strong { color: var(--muted); font-weight: 500; }
+
+  .reviewer-source {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  .mechanical {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-top: 24px;
+    font-size: 14px;
+  }
+  .mechanical h3 { margin: 0 0 10px; font-size: 14px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .mechanical ul { margin: 0; padding-left: 20px; }
+  .mechanical li { margin-bottom: 4px; color: var(--text); }
+
+  footer.report-footer {
+    margin-top: 40px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--muted);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  footer .meta { display: flex; gap: 24px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+  <div class="container">
+
+    <header class="report-header">
+      <div class="title">
+        <h1>Local Arcade — UX Design Validation Report</h1>
+        <div class="subtitle">_bmad-output/planning-artifacts/ux-designs/ux-local-arcade-2026-11-20/</div>
+      </div>
+    </header>
+
+    <div class="synthesis">
+      <p>The pair is a coherent, mostly extractable contract: DESIGN.md tokens all carry hex, EXPERIENCE.md honors every required section, and cross-references into the PRD and architecture spine resolve. The rubric verdict is <em>consumable after a short fix pass</em> — no criticals, one high, seven medium.</p>
+      <p>The accessibility lens shifts the picture materially: <strong>conditional pass</strong>. Two of the contract's three accessibility guarantees are asserted rather than authored — the hard-of-hearing discovery guarantee is undermined by the contract's own occluder-geometry law — and the non-sighted question is silently excluded where the brand is otherwise relentlessly honest. All blocking items (ACC-1, ACC-2, H-4, V-4/VE-1, SET-1) plus all High/Medium findings have been resolved into the spines as authored values and named test gates; new lint requirements (sightline, legibility) are flagged for their ci/ seats at build time.</p>
+    </div>
+
+    <div class="dimension-summary">
+      <div class="dim-card"><div class="dim-name">Flow coverage</div><div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div></div>
+      <div class="dim-card"><div class="dim-name">Token completeness</div><div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div></div>
+      <div class="dim-card"><div class="dim-name">Component coverage</div><div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div></div>
+      <div class="dim-card"><div class="dim-name">State coverage</div><div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div></div>
+      <div class="dim-card"><div class="dim-name">Visual reference coverage</div><div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div></div>
+      <div class="dim-card"><div class="dim-name">Bloat &amp; overspecification</div><div class="dim-verdict" style="color: var(--verdict-strong)">strong</div></div>
+      <div class="dim-card"><div class="dim-name">Inheritance discipline</div><div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div></div>
+      <div class="dim-card"><div class="dim-name">Shape fit</div><div class="dim-verdict" style="color: var(--verdict-strong)">strong</div></div>
+    </div>
+
+    <section class="dimension">
+      <details>
+        <summary><h2>1. Flow coverage</h2><span class="verdict-pill verdict-adequate">adequate</span></summary>
+        <div class="dim-body"><div class="dim-judgment"><p>All three PRD UJs and FR-18 have flows with named protagonists, numbered steps, and climax beats; failure paths present where applicable.</p></div></div>
+        <div class="findings-list">
+          <article class="finding"><header><span class="badge badge-sev-low">low</span><h3 class="finding-title">Flow 3 protagonist unnamed</h3><span class="finding-location">EXPERIENCE · Key Flows</span></header><div class="finding-note">Flows 1/2/4/5 name their people; Flow 3 says "the builder".</div><div class="finding-fix"><strong>Fix applied:</strong> named Josh [ASSUMPTION: builder = Josh; UJ-1 says "his own arcade"].</div></article>
+          <article class="finding"><header><span class="badge badge-sev-low">low</span><h3 class="finding-title">FR-13 donation has no Key Flow</h3><span class="finding-location">EXPERIENCE · IA / Voice / State</span></header><div class="finding-note">M5 beats live only in rows and lines.</div><div class="finding-fix"><strong>Fix applied:</strong> short Flow 6 added (order a coffee = the click).</div></article>
+        </div>
+      </details>
+    </section>
+
+    <section class="dimension">
+      <details>
+        <summary><h2>2. Token completeness</h2><span class="verdict-pill verdict-adequate">adequate</span></summary>
+        <div class="dim-body"><div class="dim-judgment"><p>All 17 colors hex-valued; all {path} refs resolve; single-mode fiction defensible. One broken reference and missing numeric in-world contrast/size targets.</p></div></div>
+        <div class="findings-list">
+          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">{colors.settings-page} unresolvable</h3><span class="finding-location">DESIGN · Components</span></header><div class="finding-note">Only broken {…} reference in the pair.</div><div class="finding-fix"><strong>Fix applied:</strong> rewritten to {components.settings-page}.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">No numeric contrast/size targets for in-world text</h3><span class="finding-location">DESIGN · Colors / Typography</span></header><div class="finding-note">Downstream code mirrors the spine; needs numbers.</div><div class="finding-fix"><strong>Fix applied:</strong> legibility table (mm caps, distances, lux floor, flat-pair ratios) + legibility lint named.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-low">low</span><h3 class="finding-title">ui-border token missing</h3><span class="finding-location">DESIGN · Elevation</span></header><div class="finding-note">"1px lighter" with no hex.</div><div class="finding-fix"><strong>Fix applied:</strong> ui-border token added.</div></article>
+        </div>
+      </details>
+    </section>
+
+    <section class="dimension">
+      <details>
+        <summary><h2>3. Component coverage</h2><span class="verdict-pill verdict-adequate">adequate</span></summary>
+        <div class="dim-body"><div class="dim-judgment"><p>Visual and behavioral rows for 9 components with real rules; name drift breaks mechanical joining; Snack Bar and score/NEXT under-specified.</p></div></div>
+        <div class="findings-list">
+          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Component-name drift across spines</h3><span class="finding-location">both · Components/Patterns</span></header><div class="finding-note">Report Claim-Check vs Report fixture; Cabinet shells vs Cabinet instance; Workshop staging objects vs desk &amp; bench.</div><div class="finding-fix"><strong>Fix applied:</strong> unified: report-claim-check, cabinet, workshop-bench.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Snack Bar fixtures lack behavioral row</h3><span class="finding-location">EXPERIENCE · Component Patterns</span></header><div class="finding-note">M5 story-dev gets no pattern row.</div><div class="finding-fix"><strong>Fix applied:</strong> Snack Bar counter/attendant row added (ordering IS the BMC click; top-level navigations; offer-not-confirmed).</div></article>
+          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Score table / NEXT have no visual spec row</h3><span class="finding-location">DESIGN · Components</span></header><div class="finding-note">Core-owned room UI (AD-16) left unscoped.</div><div class="finding-fix"><strong>Fix applied:</strong> cabinet-screen row added (type role, NEXT minimum, screen palette).</div></article>
+          <article class="finding"><header><span class="badge badge-sev-low">low</span><h3 class="finding-title">room-sign / nameplate rows incomplete</h3><span class="finding-location">both</span></header><div class="finding-note">room-sign spread across sections; nameplate visual-only.</div><div class="finding-fix"><strong>Fix applied:</strong> rows added in both spines.</div></article>
+        </div>
+      </details>
+    </section>
+
+    <section class="dimension">
+      <details open>
+        <summary><h2>4. State coverage</h2><span class="verdict-pill verdict-adequate">adequate</span></summary>
+        <div class="dim-body"><div class="dim-judgment"><p>Eight surfaces' states map cleanly to AD-15/26/27 — but the make-or-break street view has no failure states.</p></div></div>
+        <div class="findings-list">
+          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Street-door view: no load-failure / unsupported-browser / pointer-lock-denied states</h3><span class="finding-location">EXPERIENCE · State Patterns</span></header><div class="finding-note">PRD §6 calls load the make-or-break; "door opens when ready" is happy-path only.</div><div class="finding-fix"><strong>Fix applied:</strong> three state rows; fiction boundary answers with the plain outside-fiction page; pointer-lock denial falls to drag/arrow look.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-low">low</span><h3 class="finding-title">First-visit empty score table unnamed; settings persistence unstated</h3><span class="finding-location">EXPERIENCE · State / Patterns</span></header><div class="finding-note">Implied, not committed.</div><div class="finding-fix"><strong>Fix applied:</strong> Patron-runs-only first visit named; settings persist per browser, reset-to-defaults added.</div></article>
+        </div>
+      </details>
+    </section>
+
+    <section class="dimension">
+      <details>
+        <summary><h2>5. Visual reference coverage</h2><span class="verdict-pill verdict-adequate">adequate</span></summary>
+        <div class="dim-body"><div class="dim-judgment"><p>Three named mockup references, spine-wins stated once, no orphans; mockups themselves pending by design (scheduled at Finalize).</p></div></div>
+        <div class="findings-list">
+          <article class="finding"><header><span class="badge badge-sev-low">low</span><h3 class="finding-title">All mockup links sit only in IA section</h3><span class="finding-location">EXPERIENCE · IA</span></header><div class="finding-note">cabinet-close-up / workshop-bench belong beside their sections.</div><div class="finding-fix"><strong>Fix:</strong> links relocated when mocks render.</div></article>
+        </div>
+      </details>
+    </section>
+
+    <section class="dimension">
+      <details>
+        <summary><h2>6. Bloat &amp; overspecification</h2><span class="verdict-pill verdict-strong">strong</span></summary>
+        <div class="dim-body"><div class="dim-judgment"><p>No pixel-spec bloat, no source restatement; Soundscape Contract earns its invented place.</p></div></div>
+        <div class="findings-list">
+          <article class="finding"><header><span class="badge badge-sev-low">low</span><h3 class="finding-title">Room-skeleton paragraph near-duplicated</h3><span class="finding-location">DESIGN · Layout / EXPERIENCE · IA</span></header><div class="finding-note">Two sources of truth for one decision.</div><div class="finding-fix"><strong>Fix applied:</strong> skeleton lives in EXPERIENCE · IA; DESIGN references it.</div></article>
+        </div>
+      </details>
+    </section>
+
+    <section class="dimension">
+      <details>
+        <summary><h2>7. Inheritance discipline</h2><span class="verdict-pill verdict-adequate">adequate</span></summary>
+        <div class="dim-body"><div class="dim-judgment"><p>All four sources resolve on disk; glossary and AD cross-refs verified. Two provenance claims fail at the hex level; UJ titles restated.</p></div></div>
+        <div class="findings-list">
+          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">"Hues kept verbatim from floor plan" false for 2 of 7; Workshop steel untokened; green misattributed</h3><span class="finding-location">DESIGN · Colors / EXPERIENCE · Anti-patterns</span></header><div class="finding-note">Plan amber #FFB84D vs token #FFC46B; plan cyan #46E6FF vs token #5BC8FF; plan Workshop steel #7FB0C9 had no token; #57E6A3 is Casual Alley's green.</div><div class="finding-fix"><strong>Fix applied:</strong> honest restatement ("lifted… adjusted for in-scene legibility"); glow-steel token added; zone attributions corrected.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">UJ titles not verbatim</h3><span class="finding-location">EXPERIENCE · Key Flows</span></header><div class="finding-note">Traceability by title breaks.</div><div class="finding-fix"><strong>Fix applied:</strong> PRD titles verbatim in headings; retitles kept as subtitles.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-low">low</span><h3 class="finding-title">"autoplay" prose vs glossary "Auto-play session"</h3><span class="finding-location">EXPERIENCE</span></header><div class="finding-note">Hook name fine; prose should use the glossary term.</div><div class="finding-fix"><strong>Fix applied:</strong> orthography normalized.</div></article>
+        </div>
+      </details>
+    </section>
+
+    <section class="dimension">
+      <details>
+        <summary><h2>8. Shape fit</h2><span class="verdict-pill verdict-strong">strong</span></summary>
+        <div class="dim-body"><div class="dim-judgment"><p>DESIGN.md in canonical order; all EXPERIENCE defaults present; both conditional sections earned; invented Soundscape Contract load-bearing; assumption-tagging discipline matches the memlog.</p></div></div>
+      </details>
+    </section>
+
+    <section class="reviewer-section">
+      <details>
+        <summary><h2>Accessibility review</h2><span class="reviewer-source">review-accessibility.md · CONDITIONAL PASS · 2 critical, 7 high, 9 medium, 5 low</span></summary>
+        <div class="dim-body"><div class="dim-judgment"><p>The fiction-pure + outside-fiction-settings posture is coherent and worth keeping; delivery fidelity fails — guarantees asserted but not authored, and one spine-level silent exclusion. Block Finalize until ACC-1, ACC-2, H-4, V-4/VE-1, SET-1 land. <strong>All have now been resolved into the spines.</strong></p></div></div>
+        <div class="findings-list">
+          <article class="finding"><header><span class="badge badge-sev-critical">critical</span><h3 class="finding-title">ACC-1 · Non-sighted visitors silently excluded both directions</h3><span class="finding-location">EXPERIENCE · Accessibility / Foundation</span></header><div class="finding-note">Auditory-core room, canvas with no text alternative, no claim and no disclaimer.</div><div class="finding-fix"><strong>Fix applied:</strong> honesty bullet + M1 non-sighted spike gate + site-page disclosure + canvas entry label &amp; skip link.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-critical">critical</span><h3 class="finding-title">ACC-2 · Occluder law deletes rung 2 exactly where rung 1 works</h3><span class="finding-location">EXPERIENCE · Accessibility vs Soundscape</span></header><div class="finding-note">"What blocks the ear blocks the eye" + pillars breaking sightlines ⇒ Deaf discovery = hearing or lucky geometry.</div><div class="finding-fix"><strong>Fix applied:</strong> authored light-spill law (DESIGN · Elevation); sightline budget ≥2 circulation-loop positions (sightline lint); HoH guarantee downgraded to gated M1 commitment; NEXT visible at min size.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">MOT-1 · Pointer-lock required with no remap / look alternative / denial fallback</h3><span class="finding-location">EXPERIENCE · Interaction / Platform</span></header><div class="finding-fix"><strong>Fix applied:</strong> settings input section — remap, look-source selector (mouse / arrow / drag), sensitivity; replay-safe via device-layer rule.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">VE-1 · Motion comfort: no baselines, no safe default, no prefers-reduced-motion</h3><span class="finding-location">EXPERIENCE · Accessibility / DESIGN · spacing</span></header><div class="finding-fix"><strong>Fix applied:</strong> baseline tokens (walk 1.4 m/s etc. [ASSUMPTION]); comfort preset ON at first visit, seeded by prefers-reduced-motion; FOV + vignette; L3 vestibular test.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">VE-2 · No flash/photosensitivity ceiling despite the always-glowing law</h3><span class="finding-location">DESIGN · Do's and Don'ts / Brand</span></header><div class="finding-fix"><strong>Fix applied:</strong> ≤3 flashes/s law; CRT flicker phase-shifted low-freq; "calm cabinets" settings tier.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">SET-1 · Settings AA claim has zero form-control tokens behind it</h3><span class="finding-location">DESIGN · components</span></header><div class="finding-fix"><strong>Fix applied:</strong> ui-control family — slider, toggle (shape not color), ui-focus ring, ≥24px targets, ui-muted role scoped.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">SET-2 · No mid-session return to Settings; remedy costs a ≤60s reload</h3><span class="finding-location">EXPERIENCE · IA</span></header><div class="finding-fix"><strong>Fix applied:</strong> exit beat — walk out the door → street-door view → Settings link on the same page; new IA row.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">H-4 · Site page never discloses entry demands</h3><span class="finding-location">EXPERIENCE · IA · Site page</span></header><div class="finding-fix"><strong>Fix applied:</strong> workbench-voice disclosure: mouse+keyboard, first-person movement, stereo central, bright moving lights, desktop only, English only.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">QA-1 · SM-1 release gate is gated on hearing</h3><span class="finding-location">EXPERIENCE · Flow 1 failure</span></header><div class="finding-fix"><strong>Fix applied:</strong> SM-1 defined in two variants (audio + rung-2-only muted); HoH and low-vision testers mandatory at L3.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">V-1/V-2/V-3/V-4 · Identity anchors audio-only; subtitle physics unbounded; zone hues collapse; legibility circular</h3><span class="finding-location">both · Soundscape / Accessibility / Colors</span></header><div class="finding-fix"><strong>Fix applied:</strong> visual signature per named sound; banter stations + min cap + dwell + re-displays; non-hue zone signatures law + M1 color-blind check; full legibility table + legibility lint.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">SET-3/SET-4 · "No fork" ambiguity; settings rows incomplete/conflated</h3><span class="finding-location">EXPERIENCE · Accessibility</span></header><div class="finding-fix"><strong>Fix applied:</strong> fork clause scoped to world state; named control rows (look sensitivity, master, banter, focus-mix, comfort preset).</div></article>
+          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">COG-1 · Rules-to-play requires reading; deterministic-room cognitive assets unclaimed</h3><span class="finding-location">EXPERIENCE · State / Interaction</span></header><div class="finding-fix"><strong>Fix applied:</strong> learn-by-watch law (registration gate); card print budget; quiet-room tier; deterministic-room learnability claimed.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-low">low</span><h3 class="finding-title">L-1…L-5 · reset row, fps floor, face-swap legibility check, English-only line, ui-accent role</h3><span class="finding-location">both</span></header><div class="finding-fix"><strong>Fix applied:</strong> all five landed (fps floor deferred-named at M2 as token slot).</div></article>
+        </div>
+      </details>
+    </section>
+
+    <div class="mechanical">
+      <h3>Mechanical notes</h3>
+      <ul>
+        <li>Broken cross-ref fixed: {colors.settings-page} → {components.settings-page}.</li>
+        <li>Component names unified across spines: report-claim-check, cabinet, workshop-bench.</li>
+        <li>Hue audit: exact plan matches — violet/pink/green/orange/red; adjusted — amber, cyan; new glow-steel #7FB0C9 for Workshop.</li>
+        <li>Three forward-referenced mockups are the only pending assets; imports/ and .working/ empty.</li>
+        <li>rounded omits full; pills banned — internally consistent. spacing mixes world meters with px — permitted, meters cited by aisle-nav lint.</li>
+      </ul>
+    </div>
+
+    <footer class="report-footer">
+      <div class="meta">
+        <span>Rubric: review-rubric.md · Accessibility: review-accessibility.md</span>
+        <span>Generated: 2026-11-20</span>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hall of Models — wall row · key-screen mock · Local Arcade</title>
+<style>
+  /* ============================================================
+     Local Arcade — Hall of Models wall row (M3, pinball row area)
+     Key-screen design mock, ~2m viewer distance. Not a screenshot.
+     All hexes verbatim from DESIGN.md frontmatter tokens.
+     Zero external requests: no fonts, no images, no CDN.
+     ============================================================ */
+  :root {
+    /* Room envelope */
+    --room-black:    #15110E;
+    --wall-warm:     #2E241D;
+    --wall-panel:    #4A3628;
+    --carpet-base:   #221B27;
+    --carpet-pattern:#3E3046;
+    /* Glow anchors */
+    --glow-marquee:  #FFC46B;
+    --glow-pink:     #FF4FA3;
+    --glow-cyan:     #5BC8FF;
+    --glow-green:    #57E6A3;
+    --glow-violet:   #B07CFF;
+    --glow-orange:   #FF9A5C;
+    --glow-red:      #FF6B5E;
+    --glow-steel:    #7FB0C9;
+    /* In-world text surfaces */
+    --paper-card:    #F2E8D4;
+    --card-ink:      #2A241C;
+    --nameplate-brass:#D8C48F;
+    --sign-chalk:    #E8E4DD;
+    /* Outside-fiction only (annotation chrome) */
+    --ui-surface:    #191919;
+    --ui-text:       #EDEDED;
+    --ui-muted:      #9A9A9A;
+    --ui-border:     #2E2E2E;
+    --ui-focus:      #5BC8FF;
+    /* Rounded */
+    --r-cabinet: 0px;
+    --r-sm: 2px;
+    /* Era-flavored stacks — generic fallbacks only, no web fonts */
+    --f-nameplate: 'Spectral','Source Serif 4','Bookman Old Style','Palatino Linotype',Palatino,Georgia,serif;
+    --f-marquee:   'Chakra Petch','Saira Condensed','Eurostile','Bank Gothic','Agency FB','Arial Narrow',sans-serif;
+    --f-roomsign:  'Archivo Narrow','Oswald','Franklin Gothic Medium','Arial Narrow',sans-serif;
+    --f-annot:     'IBM Plex Sans',system-ui,'Segoe UI',sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html,body { background: var(--ui-surface); color: var(--ui-text); font-family: var(--f-annot); }
+  body { padding: 24px; }
+
+  .page { max-width: 1460px; margin: 0 auto; }
+
+  header.masthead {
+    border: 1px solid var(--ui-border);
+    border-radius: 6px;
+    background: #141311;
+    padding: 14px 18px;
+    margin-bottom: 16px;
+    display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap;
+  }
+  header.masthead h1 { font-size: 19px; font-weight: 600; letter-spacing: .01em; }
+  header.masthead h1 span { color: var(--nameplate-brass); }
+  header.masthead .kind { color: var(--ui-muted); font-size: 12.5px; }
+  header.masthead .spine { color: var(--ui-muted); font-size: 12px; }
+  header.masthead .spine b { color: var(--ui-text); font-weight: 600; }
+
+  .layout { display: flex; gap: 20px; align-items: flex-start; }
+
+  /* ---------- Scene frame ---------- */
+  .frame { flex: 0 0 1080px; }
+  .scene {
+    position: relative;
+    width: 1080px; height: 620px;
+    background: var(--room-black);
+    border: 1px solid var(--ui-border);
+    overflow: hidden;
+  }
+
+  /* Ceiling — room-black, receding to vanishing */
+  .ceiling {
+    position: absolute; inset: 0;
+    clip-path: polygon(0 0, 1080px 0, 1055px 252px, 0 64px);
+    background: linear-gradient(180deg, #100D0B 0%, var(--room-black) 78%, #1b1613 100%);
+  }
+  /* faint ceiling bounce-cones from machine glow (light comes FROM machines) */
+  .ceiling::after {
+    content:""; position:absolute; left:0; bottom:0; width:60%; height:70%;
+    background:
+      radial-gradient(38% 90% at 12% 100%, rgba(176,124,255,.10), transparent 70%),
+      radial-gradient(30% 80% at 40% 100%, rgba(255,196,107,.07), transparent 70%);
+  }
+
+  /* Upper wall — wall-warm */
+  .wall-upper {
+    position: absolute; inset: 0;
+    clip-path: polygon(0 64px, 1055px 252px, 1055px 302px, 0 336px);
+    background:
+      linear-gradient(90deg, var(--wall-warm) 0%, color-mix(in srgb, var(--wall-warm) 72%, var(--room-black)) 62%, color-mix(in srgb, var(--wall-warm) 46%, var(--room-black)) 100%);
+  }
+  /* painted room-sign, diegetic zone label (sign-chalk, Archivo Narrow caps) */
+  .roomsign {
+    position: absolute; left: 430px; top: 158px;
+    font-family: var(--f-roomsign);
+    font-weight: 700; letter-spacing: .26em;
+    color: var(--sign-chalk);
+    font-size: 21px;
+    transform: skewY(9.6deg) scaleX(.92);
+    opacity: .62;
+    text-shadow: 0 0 14px rgba(232,228,221,.14);
+    white-space: nowrap;
+  }
+  .roomsign small { display:block; font-size: 10px; letter-spacing: .34em; opacity: .75; margin-top: 3px; }
+
+  /* Chair rail */
+  .chair-rail {
+    position: absolute; inset: 0;
+    clip-path: polygon(0 336px, 1055px 302px, 1055px 307px, 0 344px);
+    background: color-mix(in srgb, var(--wall-panel) 70%, #000);
+  }
+
+  /* Wainscot — wall-panel wood, scuffed at kick-height */
+  .wainscot {
+    position: absolute; inset: 0;
+    clip-path: polygon(0 344px, 1055px 307px, 1055px 318px, 0 556px);
+    background:
+      repeating-linear-gradient(90deg, rgba(0,0,0,.20) 0 2px, transparent 2px 88px),
+      linear-gradient(180deg,
+        color-mix(in srgb, var(--wall-panel) 96%, #000) 0%,
+        var(--wall-panel) 34%,
+        color-mix(in srgb, var(--wall-panel) 88%, #000) 82%,
+        color-mix(in srgb, var(--wall-panel) 58%, var(--room-black)) 100%);
+  }
+  /* warm spill of machine light pooling on the wainscot */
+  .wainscot::after {
+    content:""; position:absolute; inset:0;
+    background:
+      radial-gradient(14% 60% at 14% 20%, rgba(255,196,107,.16), transparent 72%),
+      radial-gradient(12% 55% at 30% 12%, rgba(176,124,255,.13), transparent 72%),
+      radial-gradient(10% 45% at 47% 8%,  rgba(255,79,163,.09), transparent 72%),
+      radial-gradient(8% 38% at 62% 6%,  rgba(91,200,255,.07), transparent 72%);
+  }
+
+  /* Carpet floor */
+  .floor {
+    position: absolute; inset: 0;
+    clip-path: polygon(0 556px, 1055px 318px, 1055px 620px, 0 620px);
+    background:
+      repeating-linear-gradient(64deg, rgba(62,48,70,.14) 0 10px, transparent 10px 46px),
+      repeating-linear-gradient(-64deg, rgba(62,48,70,.14) 0 10px, transparent 10px 46px),
+      linear-gradient(180deg, color-mix(in srgb, var(--carpet-base) 70%, var(--room-black)) 0%, var(--carpet-base) 46%, #2a2130 100%);
+  }
+  /* glow sheen bleeding along the floor from the row (liveness = light) */
+  .floor::after {
+    content:""; position:absolute; inset:0;
+    background:
+      radial-gradient(20% 46% at 15% 8%,  rgba(176,124,255,.16), transparent 70%),
+      radial-gradient(16% 40% at 33% 6%,  rgba(255,196,107,.12), transparent 70%),
+      radial-gradient(13% 34% at 52% 4%,  rgba(91,200,255,.08), transparent 70%),
+      radial-gradient(10% 26% at 70% 3%,  rgba(87,230,163,.06), transparent 70%);
+  }
+
+  /* Depth haze — the row continues past sight; dim toward room-black, never dead */
+  .haze {
+    position: absolute; inset: 0; pointer-events: none;
+    background:
+      linear-gradient(90deg, transparent 0%, rgba(21,17,14,.10) 46%, rgba(21,17,14,.34) 74%, rgba(21,17,14,.52) 100%),
+      radial-gradient(60% 70% at 12% 62%, rgba(214,196,143,.05), transparent 66%);
+  }
+  /* soft vignette — memory-dusk */
+  .vignette { position:absolute; inset:0; pointer-events:none;
+    background: radial-gradient(120% 110% at 42% 46%, transparent 55%, rgba(10,8,6,.55) 100%); }
+
+  /* ---------- Row units ---------- */
+  .unit {
+    position: absolute;
+    left: var(--x); bottom: calc(620px - var(--b));
+    transform: scale(var(--s));
+    transform-origin: 0 100%;
+    filter: brightness(var(--dim));
+  }
+  .cab   { position: relative; width: var(--w); height: var(--h); border-radius: var(--r-cabinet); }
+
+  /* glow halo behind a machine — the machine IS the light source */
+  .cab::before {
+    content:""; position:absolute; inset: -22% -30% -8% -30%; z-index:-1;
+    background: radial-gradient(60% 55% at 50% 30%, var(--hue-soft), transparent 70%);
+    animation: breathe 5.2s ease-in-out infinite alternate;
+  }
+  @keyframes breathe { from { opacity: .78; } to { opacity: 1; } }
+  @keyframes attract { 0% { opacity:.82 } 34% { opacity:1 } 68% { opacity:.74 } 100% { opacity:.92 } }
+  @keyframes marquee-flicker { 0%,100%{opacity:.94} 12%{opacity:.78} 26%{opacity:.97} 55%{opacity:.85} }
+
+  /* --- Pinball table (side/¾ profile, EM-era through modern silhouettes) --- */
+  .cab.pinball { background: linear-gradient(100deg, color-mix(in srgb, var(--wall-panel) 82%, #000) 0%, color-mix(in srgb, var(--wall-panel) 64%, #000) 55%, color-mix(in srgb, var(--wall-panel) 52%, var(--room-black)) 100%); }
+  .cab.pinball .backbox {
+    position:absolute; left:2%; top:0; width:64%; height:44%;
+    background: var(--room-black);
+    border: 1px solid rgba(0,0,0,.6);
+  }
+  .cab.pinball .backglass {
+    position:absolute; left:7%; top:6%; width:54%; height:32%;
+    background: radial-gradient(70% 80% at 50% 40%, var(--hue), color-mix(in srgb, var(--hue) 40%, var(--room-black)) 74%, var(--room-black));
+    box-shadow: 0 0 22px var(--hue-soft), 0 0 46px var(--hue-soft);
+    animation: attract 6.5s ease-in-out infinite;
+  }
+  .cab.pinball .bb-title {
+    position:absolute; left:4%; top:46%; width:60%; text-align:center;
+    font-family: var(--f-marquee); letter-spacing:.14em;
+    font-size: 11px; color: var(--glow-marquee);
+    text-shadow: 0 0 8px rgba(255,196,107,.7);
+    animation: marquee-flicker 4.7s steps(1) infinite;
+  }
+  .cab.pinball .body {
+    position:absolute; left:0; bottom:12%; width:100%; height:46%;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--wall-panel) 70%, #000), color-mix(in srgb, var(--wall-panel) 55%, var(--room-black)));
+  }
+  /* playfield glass catch-line */
+  .cab.pinball .glass {
+    position:absolute; left:4%; bottom:52%; width:92%; height:4%;
+    transform: skewX(-26deg);
+    background: linear-gradient(90deg, transparent, var(--hue-soft) 20%, rgba(242,232,212,.34) 50%, var(--hue-soft) 80%, transparent);
+    animation: attract 5.1s ease-in-out infinite reverse;
+  }
+  .cab.pinball .coin {
+    position:absolute; left:16%; bottom:16%; width:22%; height:16%;
+    background: color-mix(in srgb, var(--wall-panel) 60%, #000);
+    border-top: 2px solid rgba(214,196,143,.35);
+  }
+  .cab.pinball .leg { position:absolute; bottom:0; width:9%; height:13%; background:#241b14; }
+  .cab.pinball .leg.l { left:6%; } .cab.pinball .leg.r { right:14%; }
+
+  /* --- Upright cabinet --- */
+  .cab.upright { width:150px; height:330px; background: linear-gradient(100deg, color-mix(in srgb, var(--wall-panel) 78%, #000), var(--room-black)); }
+  .cab.upright .marquee {
+    position:absolute; left:0; top:0; width:100%; height:15%;
+    background: var(--room-black);
+    display:flex; align-items:center; justify-content:center;
+    border-bottom: 1px solid rgba(0,0,0,.7);
+  }
+  .cab.upright .marquee span {
+    font-family: var(--f-marquee); letter-spacing:.18em; font-size:12px;
+    color: var(--glow-marquee); text-shadow: 0 0 10px rgba(255,196,107,.75);
+    animation: marquee-flicker 3.9s steps(1) infinite;
+  }
+  .cab.upright .screen {
+    position:absolute; left:7%; top:17%; width:86%; height:40%;
+    background: radial-gradient(75% 85% at 50% 42%, var(--hue), color-mix(in srgb, var(--hue) 35%, var(--room-black)) 72%, var(--room-black));
+    box-shadow: 0 0 26px var(--hue-soft);
+    animation: attract 7.2s ease-in-out infinite;
+  }
+  .cab.upright .screen::after { /* era-CRT scan drift, low-frequency, never a flash */
+    content:""; position:absolute; inset:0;
+    background: repeating-linear-gradient(180deg, rgba(0,0,0,.28) 0 2px, transparent 2px 4px);
+    animation: scandrift 8s linear infinite;
+  }
+  @keyframes scandrift { from { background-position:0 0 } to { background-position:0 24px } }
+  .cab.upright .body { position:absolute; left:0; top:57%; width:100%; height:43%;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--wall-panel) 66%, #000), color-mix(in srgb, var(--wall-panel) 40%, var(--room-black))); }
+  .cab.upright .coin { position:absolute; left:14%; top:64%; width:28%; height:14%;
+    background: color-mix(in srgb, var(--wall-panel) 56%, #000); border-top:2px solid rgba(214,196,143,.32); }
+
+  /* --- Plinth display (museum-style model on a turned-wood pedestal) --- */
+  .cab.plinth { width:112px; height:176px; }
+  .cab.plinth .pedestal {
+    position:absolute; left:0; bottom:0; width:100%; height:64%;
+    background:
+      repeating-linear-gradient(90deg, rgba(0,0,0,.16) 0 1px, transparent 1px 22px),
+      linear-gradient(180deg, var(--wall-panel), color-mix(in srgb, var(--wall-panel) 62%, var(--room-black)));
+    border-top: 2px solid color-mix(in srgb, var(--wall-panel) 60%, #fff 8%);
+  }
+  .cab.plinth .mini {
+    position:absolute; left:16%; bottom:62%; width:68%; height:38%;
+    background: var(--room-black);
+  }
+  .cab.plinth .mini .m-marquee {
+    position:absolute; left:0; top:0; width:100%; height:34%;
+    background: radial-gradient(70% 90% at 50% 30%, var(--hue), color-mix(in srgb, var(--hue) 42%, var(--room-black)) 80%);
+    box-shadow: 0 0 16px var(--hue-soft);
+    animation: attract 5.6s ease-in-out infinite;
+  }
+  .cab.plinth .mini .m-body { position:absolute; left:8%; bottom:0; width:84%; height:58%;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--wall-panel) 60%, #000), var(--room-black)); }
+
+  /* ---------- Nameplate — {components.nameplate} ---------- */
+  .nameplate {
+    position: absolute;
+    left: calc(100% + 16px); bottom: 26px;
+    width: 176px;
+    background: var(--room-black);
+    border: 1px solid color-mix(in srgb, var(--nameplate-brass) 38%, var(--room-black));
+    border-radius: var(--r-sm);             /* rounded.sm — hard corners, 2px */
+    padding: 9px 11px 8px;
+    box-shadow: 0 0 12px rgba(21,17,14,.9), 0 1px 0 rgba(214,196,143,.10);
+  }
+  .nameplate .np-title {
+    font-family: var(--f-nameplate);
+    font-size: 15px; font-weight: 600;
+    letter-spacing: .045em;
+    color: var(--nameplate-brass);
+    line-height: 1.2;
+    white-space: nowrap; overflow: hidden; text-overflow: clip;
+  }
+  .nameplate .np-rule {
+    height: 1px; margin: 5px 0 4px;
+    background: color-mix(in srgb, var(--nameplate-brass) 30%, var(--room-black));
+  }
+  .nameplate .np-by {
+    font-family: var(--f-nameplate);
+    font-size: 11px; font-style: italic;
+    color: color-mix(in srgb, var(--nameplate-brass) 88%, var(--room-black));
+    line-height: 1.35;
+  }
+  .nameplate .np-by b { font-style: normal; font-weight: 600; }
+  /* lit from machine light at its plane — ≥50 lux from the glow, brass reads warm */
+  .nameplate::after {
+    content:""; position:absolute; inset:0; pointer-events:none;
+    background: linear-gradient(115deg, rgba(255,196,107,.10), transparent 46%);
+  }
+  .nameplate.pl-left { left: auto; right: calc(100% + 16px); }
+
+  /* ---------- Annotation pins (mock apparatus, outside the fiction) ---------- */
+  .pin {
+    position:absolute; z-index: 30;
+    width: 19px; height: 19px;
+    background: var(--room-black);
+    border: 1px solid var(--nameplate-brass);
+    border-radius: var(--r-sm);
+    color: var(--nameplate-brass);
+    font-family: var(--f-annot); font-size: 11px; font-weight: 600;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .pin::after {
+    content:""; position:absolute; left:50%; top:100%; width:1px; height:18px;
+    background: color-mix(in srgb, var(--nameplate-brass) 55%, transparent);
+  }
+
+  /* ---------- Callout column ---------- */
+  aside.callouts { flex: 1 1 320px; min-width: 320px; max-width: 360px; }
+  aside.callouts h2 {
+    font-size: 13px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--ui-muted); font-weight: 600; margin: 4px 0 10px;
+  }
+  .co {
+    border: 1px solid var(--ui-border); border-radius: 6px;
+    background: #141311; padding: 11px 13px; margin-bottom: 10px;
+    font-size: 13px; line-height: 1.55;
+  }
+  .co .n {
+    display:inline-flex; align-items:center; justify-content:center;
+    width: 17px; height:17px; margin-right: 8px;
+    border: 1px solid var(--nameplate-brass); border-radius: 2px;
+    color: var(--nameplate-brass); font-size: 11px; font-weight:600;
+  }
+  .co b { color: var(--ui-text); }
+  .co code { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; color: var(--nameplate-brass); }
+  .co .mut { color: var(--ui-muted); }
+  .chip {
+    display:inline-block; width: 11px; height: 11px; border-radius: 2px;
+    border: 1px solid var(--ui-border); vertical-align: -1px; margin-right: 4px;
+  }
+  .foot {
+    margin-top: 14px; color: var(--ui-muted); font-size: 12px; line-height: 1.6;
+    border-top: 1px solid var(--ui-border); padding-top: 10px;
+  }
+  .foot b { color: var(--ui-text); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="masthead">
+    <div>
+      <h1>Local Arcade — <span>Hall of Models</span>, wall row</h1>
+      <div class="kind">Key-screen design mock (not a screenshot) · first-person, standing ~2m from the row · M3 · pinball row area</div>
+    </div>
+    <div class="spine">Spine counterparts: <b>DESIGN.md · Components (Nameplate)</b> + <b>EXPERIENCE.md · IA (Hall of Models)</b></div>
+  </header>
+
+  <div class="layout">
+    <div class="frame">
+      <div class="scene" role="img" aria-label="Design mock: a dim warm wall receding to the right, lined with glowing arcade tables, uprights, and plinth model displays, each with a brass-on-black museum nameplate; light falls off with distance.">
+
+        <div class="ceiling"></div>
+        <div class="wall-upper"></div>
+        <div class="roomsign">HALL OF MODELS<small>THE TABLES · AND WHO BUILT THEM</small></div>
+        <div class="chair-rail"></div>
+        <div class="wainscot"></div>
+        <div class="floor"></div>
+
+        <!-- ============ THE ROW — nearest at left, receding right ============ -->
+        <!-- nearest: EM-era pinball table, crisp -->
+        <div class="unit" style="--x:36px; --b:552px; --s:1; --dim:1;">
+          <div class="cab pinball" style="--w:212px; --h:300px; --hue:var(--glow-violet); --hue-soft:rgba(176,124,255,.32); animation-delay:0s;">
+            <div class="backbox">
+              <div class="backglass"></div>
+              <div class="bb-title">NEON MERIDIAN</div>
+            </div>
+            <div class="body"></div>
+            <div class="glass"></div>
+            <div class="coin"></div>
+            <div class="leg l"></div><div class="leg r"></div>
+          </div>
+          <div class="nameplate">
+            <div class="np-title">NEON MERIDIAN</div>
+            <div class="np-rule"></div>
+            <div class="np-by">playfield built by <b>BRAMBLE-1</b></div>
+          </div>
+        </div>
+
+        <div class="unit" style="--x:258px; --b:498px; --s:.74; --dim:.90;">
+          <div class="cab plinth" style="--hue:var(--glow-pink); --hue-soft:rgba(255,79,163,.30);">
+            <div class="pedestal"></div>
+            <div class="mini"><div class="m-marquee"></div><div class="m-body"></div></div>
+          </div>
+          <div class="nameplate">
+            <div class="np-title">POCKET HARBOR</div>
+            <div class="np-rule"></div>
+            <div class="np-by">table model by <b>KESTREL-2</b></div>
+          </div>
+        </div>
+
+        <div class="unit" style="--x:418px; --b:461px; --s:.59; --dim:.79;">
+          <div class="cab upright" style="--hue:var(--glow-cyan); --hue-soft:rgba(91,200,255,.28);">
+            <div class="marquee"><span>GLASS PACIFIC</span></div>
+            <div class="screen"></div>
+            <div class="body"></div>
+            <div class="coin"></div>
+          </div>
+          <div class="nameplate">
+            <div class="np-title">GLASS PACIFIC</div>
+            <div class="np-rule"></div>
+            <div class="np-by">built by <b>MOSSBOX</b></div>
+          </div>
+        </div>
+
+        <div class="unit" style="--x:552px; --b:431px; --s:.47; --dim:.70;">
+          <div class="cab plinth" style="--hue:var(--glow-green); --hue-soft:rgba(87,230,163,.26);">
+            <div class="pedestal"></div>
+            <div class="mini"><div class="m-marquee"></div><div class="m-body"></div></div>
+          </div>
+          <div class="nameplate">
+            <div class="np-title">TIDE &amp; TELEGRAPH</div>
+            <div class="np-rule"></div>
+            <div class="np-by">rules engine by <b>TALLOW-3</b></div>
+          </div>
+        </div>
+
+        <!-- era reads diegetically: silhouettes drift EM woodgrain → wide-body → sit-down -->
+        <div class="unit" style="--x:664px; --b:407px; --s:.385; --dim:.62;">
+          <div class="cab pinball" style="--w:236px; --h:288px; --hue:var(--glow-violet); --hue-soft:rgba(176,124,255,.24);">
+            <div class="backbox">
+              <div class="backglass"></div>
+              <div class="bb-title">COMET FERRY</div>
+            </div>
+            <div class="body"></div>
+            <div class="glass"></div>
+            <div class="coin"></div>
+            <div class="leg l"></div><div class="leg r"></div>
+          </div>
+          <div class="nameplate">
+            <div class="np-title">COMET FERRY</div>
+            <div class="np-rule"></div>
+            <div class="np-by">built by <b>WREN-7</b></div>
+          </div>
+        </div>
+
+        <div class="unit" style="--x:756px; --b:386px; --s:.315; --dim:.55;">
+          <div class="cab plinth" style="--hue:var(--glow-orange); --hue-soft:rgba(255,154,92,.22);">
+            <div class="pedestal"></div>
+            <div class="mini"><div class="m-marquee"></div><div class="m-body"></div></div>
+          </div>
+          <div class="nameplate">
+            <div class="np-title">LAMPLIGHTER</div>
+            <div class="np-rule"></div>
+            <div class="np-by">built by <b>SABLE</b></div>
+          </div>
+        </div>
+
+        <div class="unit" style="--x:826px; --b:370px; --s:.265; --dim:.50;">
+          <div class="cab upright" style="--hue:var(--glow-red); --hue-soft:rgba(255,107,94,.20);">
+            <div class="marquee"><span>CINDER ROUTE</span></div>
+            <div class="screen"></div>
+            <div class="body"></div>
+            <div class="coin"></div>
+          </div>
+          <div class="nameplate">
+            <div class="np-title">CINDER ROUTE</div>
+            <div class="np-rule"></div>
+            <div class="np-by">built by <b>ODET</b></div>
+          </div>
+        </div>
+
+        <!-- far end: glow still alive (liveness law), never dead -->
+        <div class="unit" style="--x:888px; --b:356px; --s:.225; --dim:.45;">
+          <div class="cab pinball" style="--w:212px; --h:300px; --hue:var(--glow-cyan); --hue-soft:rgba(91,200,255,.18);">
+            <div class="backbox">
+              <div class="backglass"></div>
+              <div class="bb-title">SEAWALL</div>
+            </div>
+            <div class="body"></div>
+            <div class="glass"></div>
+            <div class="coin"></div>
+            <div class="leg l"></div><div class="leg r"></div>
+          </div>
+          <div class="nameplate">
+            <div class="np-title">SEAWALL</div>
+            <div class="np-rule"></div>
+            <div class="np-by">built by <b>PIKA-9</b></div>
+          </div>
+        </div>
+
+        <div class="unit" style="--x:942px; --b:344px; --s:.19; --dim:.40;">
+          <div class="cab upright" style="--hue:var(--glow-steel); --hue-soft:rgba(127,176,201,.16);">
+            <div class="marquee"><span>NORTH GAFF</span></div>
+            <div class="screen"></div>
+            <div class="body"></div>
+            <div class="coin"></div>
+          </div>
+          <div class="nameplate">
+            <div class="np-title">NORTH GAFF</div>
+            <div class="np-rule"></div>
+            <div class="np-by">built by <b>ELM</b></div>
+          </div>
+        </div>
+
+        <div class="haze"></div>
+        <div class="vignette"></div>
+
+        <!-- annotation pins -->
+        <div class="pin" style="left:250px; top:470px;">1</div>
+        <div class="pin" style="left:442px; top:418px;">2</div>
+        <div class="pin" style="left:632px; top:368px;">3</div>
+        <div class="pin" style="left:762px; top:312px;">4</div>
+        <div class="pin" style="left:120px; top:120px;">5</div>
+      </div>
+    </div>
+
+    <aside class="callouts">
+      <h2>Margin callouts</h2>
+
+      <div class="co">
+        <span class="n">1</span><b>Nameplate = <code>{components.nameplate}</code></b><br>
+        <span class="chip" style="background:var(--nameplate-brass)"></span><code>#D8C48F</code> brass on
+        <span class="chip" style="background:var(--room-black)"></span><code>#15110E</code> room-black.
+        Hard corners: <code>{rounded.sm}</code> 2px. Spectral serif voice
+        <span class="mut">(era stack: Bookman / Palatino fallbacks)</span>; cap ≥ 30mm at 2m — legibility lint input.
+      </div>
+
+      <div class="co">
+        <span class="n">2</span><b>Hall of Models only · attribution surface</b><br>
+        Nameplates live only on this row. One of the two whitelisted in-room attribution surfaces (AD-24; the other is the Instruction Card).
+        Marquee lettering stays game-title-only — model names never touch marquees or signs.
+      </div>
+
+      <div class="co">
+        <span class="n">3</span><b>Museum voice, not guessing</b><br>
+        Plate copy is generated from <code>Manifest</code> attribution — title + “built by &lt;model&gt;”, stated, never speculative.
+        <span class="mut">Plates read as physical brass-on-black labels lit by machine light (≥50 lux law at the plate plane).</span>
+      </div>
+
+      <div class="co">
+        <span class="n">4</span><b>Liveness law survives falloff</b><br>
+        Light comes from the machines: marquees, backglass, attract screens all glow, always. Falloff dims the row toward room-black with distance — nearest plate crisp, far plates dim <b>but never dead</b>. Depth is atmospheric (haze, spill, floor sheen), never card-shadow.
+      </div>
+
+      <div class="co">
+        <span class="n">5</span><b>Diegetic era range · fiction-pure</b><br>
+        The row spans the game’s model generations; era shows through silhouette drift (EM woodgrain → wide-body → sit-down) and a painted <code>sign-chalk</code> zone room-sign — no dates UI, no HUD, no modern UI in-scene. Wall runs <span class="chip" style="background:var(--wall-warm)"></span><code>#2E241D</code> upper / <span class="chip" style="background:var(--wall-panel)"></span><code>#4A3628</code> wainscot.
+      </div>
+
+      <div class="foot">
+        Mock apparatus: numbered pins + this column are annotation, not in-room surfaces.
+        Viewer stance ≈ 2m from plate 1 · slot pitch <code>1.40m</code> · eye height <code>1.60m</code>.
+        Row continues past sight toward room-black (≈15 tables per EXPERIENCE.md · IA).
+      </div>
+    </aside>
+  </div>
+</div>
+</body>
+</html>
