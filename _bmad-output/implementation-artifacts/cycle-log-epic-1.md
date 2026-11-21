@@ -33,3 +33,4 @@
 2026-11-21T23:30:50Z	Story 1.1	committed	sha=5aebb03 submodules= ci=none
 2026-11-21T23:30:50Z	Story 1.1	story_cycle	plan_to_commit_min=1065 implement_passes=1 reviews=1 rework=0 first_ci=none
 2026-11-21T23:39:44Z	Story 1.1	report_error	fault=lead field=cr_complete.spawn_at reported=2026-11-21T17:56:02Z actual=2026-11-21T13:09:00Z impact=spawn_at_written_from_memory_not_the_open_stage_spawned_marker_cr_respawns_are_stage_api_error_not_new_markers
+2026-11-21T23:50:24Z	Epic 1	epic_context_compiled	reason=planning_artifact_newer	agent=epic-1-context-compile-1	note=routed_DW_bullets_excluded_from_epic_context_token_target_800-1500
