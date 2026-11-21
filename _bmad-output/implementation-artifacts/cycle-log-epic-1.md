@@ -8,3 +8,6 @@
 2026-11-21T05:27:22Z	Epic 1	epic_branch_created	repos=. from=168ba25
 2026-11-21T05:27:22Z	Epic 1	epic_branch_checked_out	repos=. head=168ba25
 2026-11-21T05:27:22Z	Epic 1	spine_resolved	path=_bmad-output/planning-artifacts/architecture/architecture-local-arcade-2026-11-19/ARCHITECTURE-SPINE.md ads=27 status=final
+2026-11-21T05:33:02Z	Epic 1	ledger_load	total=0 open=0 routed=0 escalated=0 decision_pending=0 terminal=0 status_unknown=0 owner_unknown=0 burndown=0 reowned_none=0
+2026-11-21T05:33:02Z	Epic 1	sprint_planning_complete	gate=CONCERNS findings=l3_human_walk_story_2.6,owner_taste_decisions_epic3_7,outward_infra_3.15_park,milestones_none
+2026-11-21T05:33:02Z	Epic 1	retro_review_skipped	reason=no_retro_no_open_ledger_no_open_action_items
