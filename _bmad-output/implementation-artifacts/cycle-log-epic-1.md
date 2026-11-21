@@ -17,3 +17,6 @@
 2026-11-21T06:08:43Z	Story 1.1	story_created	spawn_at=2026-11-21T05:44:58Z path=_bmad-output/implementation-artifacts/spec-1-1-project-bootstrap-and-the-deterministic-kernel-core.md build_status=ready-for-dev spec_tokens=2200 epic_context=compiled
 2026-11-21T06:08:43Z	Story 1.1	spec_validated	spawn_at=2026-11-21T05:44:58Z service_introducing=true integration_ac=present adr_constrained_acs=ac3,ac4,ac5,ac6,ac7 decision_dependency=none sections_created=none owned_ledger=none addressed=0 declined=0 mutates_shared_runtime=false cycle_iteration=1
 2026-11-21T06:09:27Z	Story 1.1	stage_spawned	stage=implement spawn_at=2026-11-21T06:09:27Z agent_name=1-1-bootstrap-implement-1 cycle_iteration=1 story_base=de1223d
+2026-11-21T12:03:25Z	Story 1.1	report_error	fault=lead field=story_base reported=de1223d actual=22602bc impact=stage_spawned_read_HEAD_before_its_own_commit_src_trees_identical
+2026-11-21T12:03:25Z	Story 1.1	dev_complete	spawn_at=2026-11-21T06:09:27Z build_sha=940b655 baseline_revision=22602bc story_base=22602bc review_loop_iteration=1 followup_review_recommended=true deferred=7 files=36 loc_added=3896 loc_removed=18 cycle_iteration=1
+2026-11-21T12:03:25Z	Story 1.1	ledger_routed_planned	story=1-7-fault-containment-a-broken-game-never-kills-the-room entries=3 excess=0 by=harvest

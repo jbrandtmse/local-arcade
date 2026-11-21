@@ -361,6 +361,9 @@ So that no machine ever reads dead and my visit never dies at someone else's exc
 **And** a Visitor seated at the faulted machine keeps a performing screen and is unseated gracefully at the next break (CAP-7; fault-sealed recording arrives in Epic 3)
 **And** the dev harness treats a `stateHash()` stall across N attract cycles as the dead-machine fault predicate (N is a placeholder until Epic 3 sets it) and stateHash-delta as attract liveness (FR-17 L1 precursor, CAP-7)
 **And** any out-of-tick mutation throws in the dev kernel — mutation-only-in-`tick()` is mechanical, not convention (AD-15)
+- DW-2: core/main.ts boot: a throwing createSim factory is unguarded - one faulty game kills the whole room at page load (AD-15) (ledger; routed by harvest 2026-11-21)
+- DW-3: unbounded growth in long-lived processes: supervisor.faults uncapped (60/s from a broken sim); loop.eventQueue never drained once games register (ledger; routed by harvest 2026-11-21)
+- DW-6: matrix Out-of-tick-write row has no composable fault-chain test surface (gate throws to caller; supervisor wraps kernel sites - two disjoint surfaces) (ledger; routed by harvest 2026-11-21)
 
 ### Story 1.8: The room knows you without an account
 
