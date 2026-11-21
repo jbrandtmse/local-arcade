@@ -1,0 +1,26 @@
+{
+  "name": "local-arcade",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=26"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"core/**/*.test.ts\" \"ci/**/*.test.ts\" \"tools/**/*.test.ts\"",
+    "registry": "node tools/gen-registry.mjs",
+    "depcheck": "node ci/depcheck.mjs",
+    "lint": "node ci/lint-bans.mjs"
+  },
+  "dependencies": {
+    "three": "0.187.0"
+  },
+  "devDependencies": {
+    "@types/three": "0.187.0",
+    "typescript": "7.0.2",
+    "vite": "8.3.8"
+  }
+}
