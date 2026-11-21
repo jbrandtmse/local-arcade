@@ -25,3 +25,4 @@
 2026-11-21T13:09:00Z	Story 1.1	qa_complete	spawn_at=2026-11-21T12:11:11Z tests_added=3 mutations_demonstrated=3 first_run_failures=0 clarifications=0 closing_sections_present=true cycle_iteration=1
 2026-11-21T13:09:00Z	Story 1.1	stage_spawned	stage=code-review spawn_at=2026-11-21T13:09:00Z agent_name=1-1-bootstrap-cr-1 cycle_iteration=1
 2026-11-21T17:50:24Z	Story 1.1	stage_api_error	stage=code-review error=other wait_min=0 detail=ECONNREFUSED_mid-patch tree=partial_patches_preserved respawn=1-1-bootstrap-cr-2
+2026-11-21T20:33:20Z	Story 1.1	stage_api_error	stage=code-review error=other wait_min=0 detail=network_restart_during_cr2 tree=unchanged_from_cr1_partial respawn=1-1-bootstrap-cr-3
