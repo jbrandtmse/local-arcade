@@ -37,3 +37,4 @@
 2026-11-21T23:53:46Z	Story 1.2	stage_spawned	stage=plan	spawn_at=2026-11-21T23:53:46Z	agent_name=1-2-walk-plan-1	cycle_iteration=1
 2026-11-22T00:19:14Z	Story 1.2	story_created	spawn_at=2026-11-21T23:53:46Z	path=_bmad-output/implementation-artifacts/spec-1-2-first-person-walk-look-and-move-no-prompts.md	build_status=ready-for-dev	spec_tokens=4132	epic_context=compiled
 2026-11-22T00:19:14Z	Story 1.2	spec_validated	spawn_at=2026-11-21T23:53:46Z	service_introducing=true	integration_ac=present	adr_constrained_acs=ac1,ac2,ac3,ac4,ac5,ac6,ac7	decision_dependency=none	sections_created=none	owned_ledger=none	addressed=0	declined=0	mutates_shared_runtime=false	cycle_iteration=1
+2026-11-22T00:21:09Z	Story 1.2	stage_spawned	stage=implement	spawn_at=2026-11-22T00:21:09Z	agent_name=1-2-walk-implement-1	cycle_iteration=1	story_base=56765fa
