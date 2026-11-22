@@ -42,3 +42,5 @@
 2026-11-22T03:30:30Z	Story 1.2	ledger_routed_planned	story=1-2-first-person-walk-look-and-move-no-prompts	entries=1	DW=DW-11	owner=burndown	by=harvest
 2026-11-22T03:40:37Z	Story 1.2	adr_verifications_complete	tool=node_cli	acs=ac1,ac2,ac3,ac4,ac6,ac7	result=pass	mutations=ac1:html-body-hud-div,ac2:diag-normalization-removed,ac3:drag-fallback-off,ac4:targetable-skip-always,ac6:z-axis-blocking-removed,ac6b:system-call-unwrapped,ac7:bob-phase-random	note=ac1_browser_half_deferred_to_smoke;in-view_half=DW-11	reverts=byte-identical	suite=106/106
 2026-11-22T03:41:30Z	Story 1.2	stage_spawned	stage=qa	spawn_at=2026-11-22T03:41:30Z	agent_name=1-2-walk-qa-1	cycle_iteration=1
+2026-11-22T04:15:31Z	Story 1.2	qa_complete	spawn_at=2026-11-22T03:41:30Z	tests_added=7	mutations_demonstrated=7	qa_files=core/player-qa.test.ts,core/main-glue.test.ts	suite=113/113	note=X-face-clamp_gap_found;browser_half_deferred_DW-11
+2026-11-22T04:15:31Z	Story 1.2	stage_spawned	stage=code-review	spawn_at=2026-11-22T04:15:31Z	agent_name=1-2-walk-cr-1	cycle_iteration=1
