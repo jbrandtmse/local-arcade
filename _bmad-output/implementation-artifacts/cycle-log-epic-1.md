@@ -53,3 +53,5 @@
 2026-11-22T07:21:08Z	Story 1.2	story_cycle	plan_to_commit_min=447	implement_passes=1	reviews=1	rework=0	first_ci=none
 2026-11-22T07:29:21Z	Epic 1	epic_context_compiled	reason=planning_artifact_newer	agent=epic-1-context-compile-2	note=spine_conventions_row_included_as_technical_decision
 2026-11-22T07:30:08Z	Story 1.3	stage_spawned	stage=plan	spawn_at=2026-11-22T07:30:08Z	agent_name=1-3-room-plan-1	cycle_iteration=1
+2026-11-22T08:13:06Z	Story 1.3	story_created	spawn_at=2026-11-22T07:30:08Z	path=_bmad-output/implementation-artifacts/spec-1-3-the-arcade-room-slots-pillars-zones-and-the-roadmap-wall.md	build_status=ready-for-dev	spec_tokens=6887	epic_context=reused	warnings=oversized
+2026-11-22T08:15:21Z	Story 1.3	spec_validated	service_introducing=true	integration_ac=present	adr_constrained_acs=ac1,ac2,ac3,ac4,ac6,ac7	decision_dependency=none	sections_created=none	owned_ledger=none	addressed=0	declined=0	mutates_shared_runtime=false
