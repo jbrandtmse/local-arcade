@@ -148,7 +148,7 @@ test("visibility change clears the whole device buffer (no look/walk burst on re
   assert.deepEqual(v, idle); // keys dropped, aim dropped, E level/edge dropped
 });
 
-test("pointerLocked reflects lock state for the glue/debug handle", () => {
+test("pointerLocked reflects lock state (QA/debug surface; the glue compares document.pointerLockElement itself)", () => {
   const { input } = harness();
   assert.equal(input.pointerLocked, false);
   input.pointerLockChanged(true);

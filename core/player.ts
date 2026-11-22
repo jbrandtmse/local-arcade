@@ -8,6 +8,7 @@
 // headless transcript replays bit-for-bit on any conforming engine (AD-4).
 
 import { math } from "./contract/index.ts";
+import { MS_PER_TICK } from "./loop.ts";
 import type { DeviceView } from "./input/index.ts";
 import type { CollisionVolume } from "./room/collision-volumes.ts";
 
@@ -31,8 +32,10 @@ export const TARGET_REACH = 2.0;
 export const BOB_WAVELENGTH = 0.7;
 /** Head-bob amplitude ease-out when stopped, seconds. */
 export const BOB_SETTLE_SECONDS = 0.25;
-/** Seconds per tick: step's dt unit is ticks (step(dt=1) = one tick). */
-const SECONDS_PER_TICK = 1 / 60;
+/** Seconds per tick: step's dt unit is ticks (step(dt=1) = one tick).
+ * Derived from the loop's canonical tick rate (core/loop.ts MS_PER_TICK)
+ * so walk speed and bob never desync from the kernel clock. */
+const SECONDS_PER_TICK = MS_PER_TICK / 1000;
 
 export interface PlayerState {
   /** XZ plane position (collision is 2D; Y is the fixed eye line + bob). */
@@ -192,8 +195,13 @@ export function createPlayerController(
         mx /= len;
         mz /= len;
         const dist = WALK_SPEED * dtSeconds;
+        const x0 = state.x;
+        const z0 = state.z;
         resolveMove(mx * dist, mz * dist);
-        travelled = dist;
+        // Bob rides distance ACTUALLY travelled: pinned against a blocking
+        // face the distance is 0, so the bob settles instead of oscillating
+        // in place (I/O matrix "Head bob": phase advances with distance).
+        travelled = Math.sqrt((state.x - x0) * (state.x - x0) + (state.z - z0) * (state.z - z0));
       }
 
       // Head bob: phase rides distance travelled (camera Y = EYE_HEIGHT +

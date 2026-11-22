@@ -111,6 +111,9 @@ test("wall block: stop at face minus player radius; strafing still slides", () =
   stepN(p, 400, view([1, 0])); // straight at the back wall
   const face = volById("wall-back").max.z;
   assert.equal(p.state.z, face + PLAYER_RADIUS);
+  // pinned at the face, distance travelled is 0: the bob settles, it does not
+  // oscillate in place (matrix "Head bob" — phase rides DISTANCE travelled)
+  assert.equal(p.state.bobAmp, 0);
   // slide: strafe along the wall keeps z pinned, x advances
   stepN(p, 60, view([0, 1]));
   assert.equal(p.state.z, face + PLAYER_RADIUS);
@@ -210,9 +213,11 @@ interface Session {
 
 // A scripted 400-frame session driven through the REAL device service and
 // the REAL loop pump: W held toward the back-wall cabinets, a click-granted
-// pointer lock (aim deltas flow from there on), a backgrounded-tab 10s gap
-// (bounded catch-up), a canvas click while locked (changes nothing
-// observable), a stop once the cabinet is in center-of-view reach (target
+// pointer lock (aim deltas flow from there on), a 10s wall-clock pump gap
+// (models the loop's catch-up bound only — the device-buffer half of the
+// "Backgrounded tab resume" row is the visibility clear at f=390 here plus
+// the input suite's buffer-clear pin), a canvas click while locked (changes
+// nothing observable), a stop once the cabinet is in center-of-view reach (target
 // set), a look off center in place (target clears), a re-center (target
 // re-arms), an E press with the cabinet centered (no consumer this story),
 // and a visibility clear. Identical scripted device events must yield
@@ -228,7 +233,7 @@ function scriptedSession(): Session {
   for (let f = 0; f < 400; f++) {
     if (f === 0) input.key("KeyW", true); // walk the -Z line at x=0
     if (f === 60) input.pointerLockChanged(true); // lock granted: aim deltas now flow
-    if (f === 200) wall += 10_000; // backgrounded-tab 10s gap
+    if (f === 200) wall += 10_000; // 10s pump gap: catch-up bound only, no visibility event here
     if (f === 300) input.canvasClick(); // click changes nothing observable
     if (f === 310) input.key("KeyW", false); // stop in place once the cabinet is in reach
     if (f === 320) input.mouseMove(150, 0); // look 0.375 rad off center — target clears

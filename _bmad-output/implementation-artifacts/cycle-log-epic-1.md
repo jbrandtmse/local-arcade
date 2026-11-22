@@ -44,3 +44,8 @@
 2026-11-22T03:41:30Z	Story 1.2	stage_spawned	stage=qa	spawn_at=2026-11-22T03:41:30Z	agent_name=1-2-walk-qa-1	cycle_iteration=1
 2026-11-22T04:15:31Z	Story 1.2	qa_complete	spawn_at=2026-11-22T03:41:30Z	tests_added=7	mutations_demonstrated=7	qa_files=core/player-qa.test.ts,core/main-glue.test.ts	suite=113/113	note=X-face-clamp_gap_found;browser_half_deferred_DW-11
 2026-11-22T04:15:31Z	Story 1.2	stage_spawned	stage=code-review	spawn_at=2026-11-22T04:15:31Z	agent_name=1-2-walk-cr-1	cycle_iteration=1
+2026-11-22T07:04:01Z	Story 1.2	cr_complete	spawn_at=2026-11-22T04:15:31Z	resolved=6	fixed_at_source=6	by_design=0	wontfix=2	routed=1	occurrence=1	escalated=0	decision_pending=0	high=0	med=2	low=10	rows=22	unresolved_high_med=1	clarifications=0	closing_sections_present=true	cycle_iteration=1	respawn=0	note=unresolved_MED=DW-12_main-glue_test_host_routed_burndown_epic3_harness
+2026-11-22T07:04:01Z	Story 1.2	ledger_adjudicated	owned=0	resolved=0	reowned=0	terminal=0	load_after=total=14_routed=8_escalated=1_terminal=5
+2026-11-22T07:07:39Z	Story 1.2	spine_updated	conv=room-geometry-collision-aabb-list	reason=rule20_design_notes_9	by=lead	memlog=64	lint=ok
+2026-11-22T07:17:35Z	Story 1.2	smoke_complete	method=browser	result=pass	iterations=1	defects_caught=0	evidence=_bmad-output/implementation-artifacts/evidence/story-1-2-smoke-chrome.png,story-1-2-smoke-edge.txt	ruling=none	note=Chrome+Edge parity bit-identical; walk-stub-target, drag-look, lock-grant, E no-op, blur clear, mouseleave guard all observed live
+2026-11-22T07:20:42Z	Story 1.2	fresh_check	env=clean-checkout-node-26.13.1	tests=46	result=pass	order=forward,reverse

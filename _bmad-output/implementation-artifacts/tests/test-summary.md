@@ -1,3 +1,59 @@
+# Test Automation Summary — Story 1.2 (QA stage, 2026-11-21)
+
+Target: the implemented deliverable of Story 1.2 (`git diff --name-only 56765fa..HEAD` —
+`core/input/`, `core/player.ts`, `core/room/collision-volumes.ts`, `core/loop.ts`,
+`core/main.ts`, and the story's own test files).
+Framework: the project's existing convention — `node --test` with native TS type-stripping
+(`*.test.ts` under `core/`, `ci/`, `tools/`). No new dependency; the in-browser halves of the
+no-UI law and Chrome/Edge parity stay the lead's per-story browser smoke (DW-11), as an added
+browser harness would be a spine-pinned-set escalation.
+
+## Generated Tests
+
+### Controller / device-view QA pins
+- [x] `core/player-qa.test.ts` (QA) — X-face circle-vs-AABB clamp + wall slide (side walls
+  block and sliding along them keeps walking); targeting-ray pitch term (looking steeply up
+  past a cabinet stub clears the target); aim-delta consumption exactly once through the real
+  input service + real loop (no carry into the next tick); the AC7 determinism seam —
+  `core/player.ts`/`core/input/index.ts` use contract math only, never wall-clock or
+  engine-variable intrinsics.
+
+### Browser-glue static-contract pins (no browser harness this story)
+- [x] `core/main-glue.test.ts` (QA) — `frame()` reads player tick state only (camera position
+  = x/z + eye height + the bob term, rotation = pitch/yaw, YXZ order, no wall-clock reads in
+  render — AD-3); pointer-lock denial swallowed silently and visibility/blur clear the device
+  buffer (AC3, UX-DR18); device listeners are pure forwarders and the lock check compares
+  `document.pointerLockElement` to the canvas (AD-7 thin glue, AC4).
+
+## Coverage
+- AC1: existing DOM pins (implement suite + real dev-serve) + lead's html-body-hud-div mutation — no QA addition needed.
+- AC2: look-sign and walk pins (implement) + QA: consumed-once through the real loop, camera-Y bob term in the render read.
+- AC3: aim-channel pin (implement) + QA: silent denial catch, blur/visibility glue, lock-element compare.
+- AC4: E-edge, click-inert, reach pins (implement) + QA: targeting-ray pitch term.
+- AC5/AC6: placeholder-data and blocking pins (implement) + QA: X-face clamp/slide — the pre-QA suite was blind to an inverted X pushout face.
+- AC7: replay-identity pin (implement) + QA: determinism-seam construction pin.
+- The rendered (in-view) half of AC5/no-UI and Chrome-vs-Edge equality remain the lead's smoke (DW-11, Epic 3 CI matrix).
+
+## Verification run (post-QA)
+- `npm test`: 113/113 pass (106 pre-QA + 7 QA).
+- `npm run typecheck`: 0. `node ci/depcheck.mjs`: 0. `node ci/lint-bans.mjs`: 0.
+- `node tools/gen-registry.mjs && git diff --exit-code -- generated/`: byte-identical.
+- QA files pass standalone in both orders (hermeticity spot-check).
+- Rule 19: 7 QA mutation demonstrations — one per QA pin, none re-running the 13 already
+  demonstrated (6 implement + 7 lead gate); each red observed, reverted, tree byte-identical.
+  Recorded in the spec's `## Verification` QA block. Notable: the consumed-once claim got its
+  first demonstrated red (mutation 3), and the X-face inversion (mutation 1) red was invisible
+  to the entire pre-QA suite.
+
+## Next Steps
+- Lead commits the QA test files (stage forbids this agent from committing).
+- 1.3 rewrites `core/room/collision-volumes.ts`: QA pins cite volume ids and derive faces from
+  the data, so they move with the data per the spec's Shared surfaces line, not before it.
+- When a browser harness decision lands (Epic 3 CI matrix), the glue pins here are the static
+  contract it must reproduce live.
+
+---
+
 # Test Automation Summary — Story 1.1 (QA stage, 2026-11-21)
 
 Target: the implemented deliverable of Story 1.1 (`git diff --name-only 22602bc..HEAD`).

@@ -3,7 +3,7 @@ title: 'Story 1.2: First-person walk — look and move, no prompts'
 type: 'feature'
 created: '2026-11-21'
 status: 'done'
-review_loop_iteration: 0
+review_loop_iteration: 1
 followup_review_recommended: true
 baseline_revision: '56765fab8405a9e7fe0be8bc7031ca9a82a6cbc9'
 context:
@@ -41,6 +41,8 @@ deferred:
 | Pointer-lock granted | click on canvas grants lock; mouse moves; W held | per-tick look {dx,dy} consumed exactly once per tick; yaw/pitch advance (pitch clamped ±85°); position advances 1.4 m/s along facing at eye height 1.60m | lock release re-arms on next click, silently |
 | Pointer-lock denied/released | lock never granted or lost (Esc, tab hide) | drag-look: mouse-drag deltas feed the same aim channel; WASD unaffected; no message, prompt, or style change anywhere (silent, device-layer only) | n/a |
 | Backgrounded tab resume | loop resume semantics (≤ MAX_CATCHUP_STEPS) + hidden device buffer | no look/teleport burst: per-tick deltas consumed per tick; buffer cleared on visibility change; player advances ≤ catch-up ticks | leftover wall delta dropped (loop's existing behavior) |
+| Window blur (focus loss, tab still visible) | window blur with keys/buttons still down | device buffer cleared like a hidden tab — no stuck walk or drag; mouseleave off the document also ends a drag | n/a |
+| Auto-repeat keydown | OS repeats keydown while a key is held | axis level unchanged; press edge belongs to the fresh keydown only (E edges once per physical press) | n/a |
 | Walk into wall/pillar/cabinet stub | scripted W toward a placeholder volume | position stops at the face minus player radius; strafing still slides along the wall; blocking derived from tick state | n/a |
 | Diagonal walk | W+D same ticks | speed magnitude stays 1.4 m/s (input vector normalized before scaling) | n/a |
 | Head bob | moving N ticks | camera Y = 1.60m + sin(phase)·0.04m, phase advances with distance travelled; standing settles to 1.60m | n/a |
@@ -81,7 +83,37 @@ deferred:
 - Given any scripted movement, then walls, pillars, and cabinet stubs block position changes via collision resolved inside the global tick — a scripted run reproduces identical player transcripts headlessly (AC6)
 - Given the same scripted device views, then observable behavior is constructed to be engine-identical (pure math module, tick-driven); evergreen Chrome + Edge equality is verified at the lead's browser smoke until the Epic 3 CI matrix (AC7; NFR-7)
 
+### Review Findings — 2026-11-21 code-review pass (layers: blind-hunter, edge-case-hunter, verification-gap, acceptance-auditor; rows=22, HIGH=0)
+
+Scope: `git diff 56765fa` + untracked QA tests (`core/player-qa.test.ts`, `core/main-glue.test.ts`). First full review of the story; every patchable in-story MED/LOW patched. Verdict: **done** — no HIGH; one MED routed with an owner (DW-12). Note: edge-case-hunter and verification-gap layers timed out on first launch and were re-run fresh.
+
+Rule 6 re-check: implementation matches AD-1/3/6/7/13/14/15/17/24/26 Rule text (DeviceView == AD-7 slot grammar; systems supervisor-wrapped inside `runGlobalTick`; render reads tick state only; zero UI surfaces; `window.arcadeDebug = { player, loop }` is non-visual — nothing rendered, announced, or exposed beyond state; replay transcript shape identical on both lock paths). Rule 1: Integration AC exercised (scriptedSession through real service+loop). Rule 2: `addSystem` extends the loop, no sibling copies. Rule 3: real-runtime evidence = dev-serve HTTP pins (project's designated app-serve pattern); browser-execution tier is the lead's smoke this epic and lands with Epic 3 CI — depth gap routed as DW-12.
+
+| sev | finding (layer order) | disposition |
+|-----|----------------------|-------------|
+| med | core/main.ts glue never executed by any test — view-hoisting/listener-misattachment mutations keep 113/113 green (verification-gap) | routed: DW-12 owner=burndown (fix = browser harness, new dep, Epic 3 infra; lead smoke is this epic's gate) — non-blocking |
+| med (re-sights) | AC5 numbering still cited in Tasks line, cycle-log rows, and test-summary Coverage wording; AC1 parenthetical "pinned by test" overstates the in-view half (blind, acceptance-auditor) | occurrence=DW-11 (existing routed entry, note already covers AC5 drift + in-view pin); spec-body wording is a spec edit — skill rule keeps it out of scope here |
+| low | `SECONDS_PER_TICK = 1/60` duplicated between core/player.ts and loop's `MS_PER_TICK` — dual source of truth for tick rate, walk speed could desync from kernel clock (blind) | patched: player derives it from imported `MS_PER_TICK / 1000` (bit-exact, `=== 1/60` verified); suite green |
+| low | head bob at full amplitude while pinned at a blocking face — commanded distance counted as travelled, contradicting matrix "Head bob: phase advances with distance travelled" (edge) | patched: `travelled` = actual displacement after `resolveMove` + new `bobAmp === 0` assertion in the wall-block pin (mutation-observed red on old behaviour) |
+| low | stuck drag-look: mouseup outside the window never arrives; re-entry injects a look jump (edge) | patched: `document.documentElement` mouseleave → `input.mouseUp(0)` glue + new main-glue assertion (mutation-observed red) |
+| low | loop `addSystem` pins (AC6/AD-15) had no `mutation:` line in `## Verification`; `ac6b:system-call-unwrapped` lived only in the cycle-log gate row (blind, verification-gap) | closed in-pass: mutation re-demonstrated red, line written under `## Verification` |
+| low | `pointerLocked` test title claims a "glue" consumer; the glue compares `document.pointerLockElement` and `arcadeDebug` exposes no input handle (blind) | patched: test retitled to the truthful QA/debug-surface contract |
+| low | integration session labels its f=200 wall-clock gap "backgrounded-tab" but fires no visibility event; walk-through-gap transcript mislabels the scenario (blind) | patched: comments restated — gap models the catch-up bound only; buffer-clear half pinned at f=390 + input suite |
+| low | requestPointerLock synchronous throw would escape the promise catch (AC3 silent denial) (edge) | terminal `wontfix-theoretical` DW-13: AD-17 target engines never throw sync; reopen condition in note |
+| low | DOM-free / banned-token pins scan dotted literals only — `globalThis.document`, aliased `document`, `eval` bypass (blind) | occurrence adjacent to DW-10's class but distinct gate (test pin vs ci/depcheck): covered by DW-10's adjudication pattern; Epic 3 L0 static analyzer is the real fix |
+| low | dev-serve strictPorts 4641/4639 can collide on a busy machine (acceptance-auditor) | terminal `wontfix-accepted` DW-14: reopen_if=observed port-collision red; Epic 3 CI needs ephemeral port/lock |
+| low (re-sights, rejections stand) | player pre-inside inflated AABB (edge; prior `[low][reject]` — unreachable: 0.023 m/tick vs ≥0.4 m stub faces, 1.3 rewrites volumes); addSystem dup-id/mid-tick guard (edge; prior reject — sole caller registers at boot); targeting ray origin ignores ±0.04 m bob (auditor; prior reject — divergence only at stub rims 1.3 rewrites) | rejected — prior adjudications re-checked against current code, hold |
+| false | cycle-log `adr_verifications_complete` mutation names contradict spec `## Verification` (blind) — the cycle-log row names the lead's AD-tooled gate mutations (the seven in the gate commit); `## Verification` records implement/QA pinning mutations: separate gates, both records accurate | rejected |
+| false | `collision-volumes.ts` "not literally pure data, no logic" (auditor) — `cabinetStub` builds data rows at module load; no runtime logic, state, or per-frame behaviour; reads true under the spec phrase | rejected |
+| false | follow-up-review named-risk list stale post-QA (blind) — Auto Run Result covers its own pass by rule (Rule 14); QA pins postdate it | rejected |
+| — | cycle-log frontmatter `review_loop_iteration=0` vs dev_complete row `=1`; cycle-log row-grammar drift (qa_complete missing `cycle_iteration`; `ledger_routed_planned` `story=` key) (blind) | lead-owned artifacts — not story work, no source edit; noted for the lead's bookkeeping |
+| — | shipped blur-glue + `!e.repeat` filter exceed the frozen I/O matrix rows (auditor) | fix is a spec-intent edit (skill rule: out of review scope); suggested amendment for the lead at commit: extend the "Backgrounded tab resume" row with blur, and add an auto-repeat row — apply-and-report tier, intent unchanged |
+
+**Verification after this pass:** `npm run typecheck` 0; `npm test` 113/113 (counts unchanged; two assertions added inside existing pins); `node ci/depcheck.mjs` 0; `node ci/lint-bans.mjs` 0; registry re-emit byte-identical; three CR mutation demonstrations (loop unwrap, bob distance, mouseleave listener) each observed red then reverted.
+
 ## Spec Change Log
+
+- 2026-11-22 (lead, apply-and-report per CR): I/O matrix gained two rows — window-blur buffer clear and auto-repeat press-edge — pinning behavior the CR patches shipped. `review_loop_iteration` 0→1 (lead). Design Notes 9 recorded into the spine as a Consistency Conventions row (`spine_updated`, memlog #64); spine newer than epic-1 context → pre-warm re-run before Story 1.3 plan.
 
 ## Review Triage Log
 
@@ -143,6 +175,21 @@ deferred:
 - AC4 pin `E press with a registered handler fires exactly on the press edge, once` (core/player.test.ts) — mutation: `view.interact.pressed` → `view.interact.down` → that pin red; reverted.
 - AC6 pin `wall block: stop at face minus player radius; strafing still slides` (core/player.test.ts) — mutation: z-pushout face `nz = dz > 0 ? lo : hi` → `? hi : lo` → that pin red (stub/E pins as knock-on); reverted.
 - AC7 pin `Integration: two headless loop runs, identical scripted device views -> identical transcripts` (core/player.test.ts) — mutation: injected `state.bobPhase += Math.random() * 1e-9` into step() → transcript equality red; reverted.
+
+**QA stage additions (2026-11-21, `bmad-qa-generate-e2e-tests`):**
+- Files (QA): `core/player-qa.test.ts` (4 pins), `core/main-glue.test.ts` (3 pins) — the implemented surface the 31 implement pins leave unobserved: X-face collision clamp + slide-along, targeting-ray pitch term, per-tick aim consumption through the real loop, the determinism seam (contract math; no wall-clock or `Math.*` transcendentals in `core/player.ts`/`core/input/index.ts`), render-reads-tick-state-only (camera position incl. the bob term, rotation pitch/yaw, no wall-clock in `frame()` — the camera-Y half of the Head-bob matrix row; the *rendered* half stays deferred per frontmatter), silent pointer-lock denial + blur/visibility buffer-clear glue, and thin device glue (forward-only listeners; lock-element-vs-canvas compare). QA file placement decided in-stage: concern-named QA files co-located under `core/`; implement-owned test files untouched.
+- mutation: X pushout face `nx = dx > 0 ? lo : hi` → `? hi : lo` (core/player.ts) → QA pin `side walls block…` red; existing suite unaffected (112/113) — the X-face inversion was invisible to the whole pre-QA suite; reverted, suite re-green.
+- mutation: targeting ray `dirY = math.sin(state.pitch)` → `dirY = 0` → QA pin `targeting respects pitch…` red; existing suite unaffected; reverted.
+- mutation: dropped `takeView()`'s aim reset (`aimDx/aimDy = 0`) → QA pin `aim deltas land exactly once…` red plus existing `pointer-locked aim: … consumed once per tick` and `drag-look fallback…` pins — this mutation supplies the first demonstrated red for the consumed-once claim (prior AC3 mutation hit the capture gate only); reverted.
+- mutation: player basis `math.sin` → `Math.sin` (core/player.ts) → QA pin `determinism seam (AC7)…` red (contract sin is a Taylor approximation ≠ libm; behavioral pins stay green because every existing scenario sits at yaw-0/exact values where they agree — the pin binds the seam itself); reverted.
+- mutation: `+ math.sin(p.bobPhase) * p.bobAmp` removed from `camera.position.set` (core/main.ts) → QA pin `render reads tick state only…` red; reverted.
+- mutation: silent-denial catch removed — `void Promise.resolve(….requestPointerLock()).catch(() => {})` → `void ….requestPointerLock()` → QA pin `pointer-lock denial is silent…` red; reverted.
+- mutation: `input.pointerLockChanged(document.pointerLockElement === canvas)` → `input.pointerLockChanged(true)` → QA pin `device glue is thin…` red; reverted.
+- code-review pass mutations (2026-11-21, each observed red, reverted, suite re-green):
+  - mutation: kernel-system call unwrapped from `supervisor.invoke` (`sys.fn()` direct) in core/loop.ts runGlobalTick → pin `addSystem: a throwing system is supervisor-logged; the tick, the loop and neighbours keep running` red (doesNotThrow catches "system boom"); reverted. (This closes the Rule-19 record gap for the three loop `addSystem` pins, previously named only in the `adr_verifications_complete` cycle-log row.)
+  - mutation: bob distance reverted to commanded (`travelled = dist`) in core/player.ts → `wall block…` pin's new `bobAmp === 0` assertion red (amplitude held at 0.04 while pinned); reverted by re-applying the actual-displacement fix.
+  - mutation: `document.documentElement.addEventListener("mouseleave", …)` listener removed from core/main.ts → QA `device glue is thin…` pin's new mouseleave assertion red; reverted.
+- All seven mutations reverted with `git status --short`/`git diff --stat` byte-identical; post-QA `npm test` 113/113; typecheck/depcheck/lint-bans/registry-drift all green; the two QA files pass standalone in either order (hermeticity).
 
 **Shared surfaces:** `core/room/` placeholder collision volume list — this story's tests assert its volume ids/positions; Story 1.3 rewrites that data and the tests that pin placeholder positions move with it (pin ids, not raw coords, wherever a test can). `generated/game-registry.ts` entry count (0, unchanged); root `package.json` scripts set (unchanged — no new scripts). Standing criterion: every test added or changed passes on a fresh environment, in either order.
 

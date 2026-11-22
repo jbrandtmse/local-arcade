@@ -59,3 +59,19 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: story 1.2 implement; spec-1-2 frontmatter deferred (medium) | severity: medium | fix-risk: medium | footprint: test+CI
 - evidence: verification-gap demo in spec-1-2 deferred.evidence: crosshair mesh in core/main.ts scene assembly -> npm test stays green; core/no-ui-dom.test.ts pins the DOM half
 - 2026-11-22T03:30:17Z status=routed owner=burndown by=harvest note=routed from spec-1-2 deferred 2026-11-22; Epic 3 owns the machine lint (3.1/3.2 L0, 3.7 L2 audit) - route-to-story or own at the Epic 1 burn-down gate; also fixes the AC5 numbering drift (epics AC5 folded into spec AC1 bullet)
+- 2026-11-22T06:53:55Z occurrence=1-2-first-person-walk-look-and-move-no-prompts
+
+### DW-12: core/main.ts glue has no executed test host: addSystem takeView wiring, device listeners, silent-denial path pinned only by source-text and dev-serve text asserts
+- source: _bmad-output/implementation-artifacts/spec-1-2-first-person-walk-look-and-move-no-prompts.md | severity: med | fix-risk: high | footprint: in-story
+- evidence: verification-gap demo: hoisting input.takeView() out of the addSystem callback -> page cannot walk/look; npm test stays 113/113; no test imports or executes core/main.ts
+- 2026-11-22T06:53:54Z status=routed owner=burndown by=cr note=browser harness = new dep, Epic 3 scope; lead Chrome+Edge smoke is the Epic 1 gate; distinct from DW-11 in-view half
+
+### DW-13: requestPointerLock synchronous throw escapes the promise catch, logging to console and breaking AC3 silent denial; no target engine throws synchronously
+- source: _bmad-output/implementation-artifacts/spec-1-2-first-person-walk-look-and-move-no-prompts.md | severity: low | fix-risk: low | footprint: in-story
+- evidence: main.ts wraps the call in Promise.resolve(...).catch(() => {}); a sync throw would bypass it; AD-17 targets (Chrome/Edge) return promise/undefined
+- 2026-11-22T06:53:55Z status=wontfix-theoretical owner=1-2-first-person-walk-look-and-move-no-prompts by=cr note=makes it real: an AD-17 target engine throwing synchronously from requestPointerLock
+
+### DW-14: dev-serve pins hold strict ports 4641 (no-ui-dom) and 4639 (app-serve): a port busy on a shared machine turns the suite red
+- source: _bmad-output/implementation-artifacts/spec-1-2-first-person-walk-look-and-move-no-prompts.md | severity: low | fix-risk: med | footprint: in-story
+- evidence: two strictPort dev-serve tests; external port use fails them independent of code
+- 2026-11-22T06:53:55Z status=wontfix-accepted owner=1-2-first-person-walk-look-and-move-no-prompts by=cr note=reopen_if=EADDRINUSE/port-collision red observed in a suite run; Epic 3 CI needs ephemeral port or lock

@@ -74,6 +74,9 @@ document.addEventListener("pointerlockchange", () =>
 window.addEventListener("mousemove", (e) => input.mouseMove(e.movementX, e.movementY));
 window.addEventListener("mousedown", (e) => input.mouseDown(e.button));
 window.addEventListener("mouseup", (e) => input.mouseUp(e.button));
+// mouseup fired outside the window never reaches us: leaving the document
+// ends the drag, so re-entering never injects a stale-drag look jump.
+document.documentElement.addEventListener("mouseleave", () => input.mouseUp(0));
 window.addEventListener("keydown", (e) => {
   if (!e.repeat) input.key(e.code, true);
 });
