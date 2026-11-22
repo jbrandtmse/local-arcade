@@ -175,6 +175,86 @@ test("the start() pump re-arms after a throw outside the supervisor-wrapped call
   assert.equal(loop.tickCount, 3); // frames 1, 3, 4 ticked; the clock fault cost one frame, not the clock
 });
 
+test("addSystem: a kernel system runs exactly once per global tick, after instance sites", () => {
+  const order: string[] = [];
+  let wall = 0;
+  const loop = createKernelLoop({ now: () => wall });
+  loop.addInstance("sim-a", {
+    tick: () => {
+      order.push("tick");
+    },
+    events: () => {
+      order.push("events");
+      return [];
+    },
+    snapshot: () => ({}),
+    stateHash: () => "0".repeat(16),
+    attract: () => {},
+    autoplay: () => {},
+    mode: () => "attract" as const,
+  });
+  let runs = 0;
+  loop.addSystem("player", () => {
+    runs += 1;
+    order.push("system");
+  });
+  for (let i = 0; i < 4; i++) {
+    wall += 17;
+    loop.step();
+  }
+  assert.equal(runs, loop.tickCount);
+  assert.deepEqual(order, ["tick", "events", "system", "tick", "events", "system", "tick", "events", "system", "tick", "events", "system"]);
+});
+
+test("addSystem: a throwing system is supervisor-logged; the tick, the loop and neighbours keep running (AD-15)", () => {
+  let wall = 0;
+  const logged: string[] = [];
+  const loop = createKernelLoop({ now: () => wall, onFault: (e) => logged.push(`${e.tick}/${e.errorId}`) });
+  const simTicks: number[] = [];
+  loop.addInstance("steady", {
+    tick: () => {
+      simTicks.push(1);
+    },
+    events: () => [],
+    snapshot: () => ({}),
+    stateHash: () => "0".repeat(16),
+    attract: () => {},
+    autoplay: () => {},
+    mode: () => "attract" as const,
+  });
+  let goodRuns = 0;
+  loop.addSystem("bad", () => {
+    throw new Error("system boom");
+  });
+  loop.addSystem("good", () => {
+    goodRuns += 1;
+  });
+  for (let i = 0; i < 3; i++) {
+    wall += 17;
+    assert.doesNotThrow(() => loop.step()); // the room never crashes
+  }
+  assert.equal(loop.tickCount, 3);
+  assert.equal(simTicks.length, 3); // the instance sites kept ticking
+  assert.equal(goodRuns, 3); // and the neighbouring system kept running
+  assert.equal(loop.supervisor.faults.length, 3); // one fault per tick, not silence
+  assert.equal(loop.supervisor.faults[0]?.hook, "tick");
+  assert.deepEqual(logged, ["1/core.system.bad.tick#1", "2/core.system.bad.tick#2", "3/core.system.bad.tick#3"]);
+});
+
+test("addSystem: backgrounded-tab resume bounds kernel systems to MAX_CATCHUP_STEPS like instances", () => {
+  const h = harness();
+  let runs = 0;
+  h.loop.addSystem("player", () => {
+    runs += 1;
+  });
+  h.advance(17);
+  h.loop.step();
+  h.advance(10_000); // 10 s wall gap
+  const ran = h.loop.step();
+  assert.ok(ran <= MAX_CATCHUP_STEPS);
+  assert.equal(runs, 1 + ran); // system ran exactly the catch-up ticks, then a clean resume
+});
+
 test("sim time = tick count: sim's own tick count always equals loop.tickCount", () => {
   const h = harness();
   let stepsSum = 0;

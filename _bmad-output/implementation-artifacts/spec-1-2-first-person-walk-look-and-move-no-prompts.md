@@ -2,14 +2,22 @@
 title: 'Story 1.2: First-person walk — look and move, no prompts'
 type: 'feature'
 created: '2026-11-21'
-status: 'ready-for-dev'
+status: 'done'
 review_loop_iteration: 0
-followup_review_recommended: false
+followup_review_recommended: true
+baseline_revision: '56765fab8405a9e7fe0be8bc7031ca9a82a6cbc9'
 context:
   - _bmad-output/planning-artifacts/architecture/architecture-local-arcade-2026-11-19/ARCHITECTURE-SPINE.md
   - _bmad-output/specs/spec-local-arcade/room-layout.md
 warnings: ['oversized']
-deferred: []
+deferred:
+  - summary: >-
+      AC5 is referenced in the story's Tasks line and the spec_validated cycle-log row, but the spec defines no AC5; the in-view (rendered) half of the no-UI law (no HUD/crosshair/waypoint/minimap/tooltip in the 3D view) has no automated pin until the Epic 3 machine lint — currently held by the lead's per-story Chrome+Edge smoke.
+    evidence: |-
+      verification-gap layer demonstration: adding a camera-parented crosshair mesh in core/main.ts leaves the whole suite green — no test observes scene contents; the DOM half is pinned (core/no-ui-dom.test.ts) but the rendered half is not.
+    location: >-
+      core/main.ts (frame()/scene assembly); spec Tasks & Acceptance Execution line
+    severity: medium
 ---
 
 <intent-contract>
@@ -77,6 +85,26 @@ deferred: []
 
 ## Review Triage Log
 
+### 2026-11-21 — Review pass
+- verdicts: 16 findings — high 0, medium 7, low 7, false 2, maybe-false 0
+- findings:
+  - `[medium]` `[patch]` Scripted integration session dropped its look events — session never engaged pointer lock or drag, so both `mouseMove` calls were silently discarded and the "target clears then re-arms" narrative was unexercised — fixed: lock engaged, walk stops in reach, scripted look-off/re-center; assertions now pin set→clear→re-arm order (observed at f≈306/320/355).
+  - `[medium]` `[patch]` Denied pointer-lock rejection not silenced — `void el.requestPointerLock()` leaks an unhandled promise rejection on denial (Esc cooldown, gesture policy), breaking the silent-fallback contract at the console — fixed: `Promise.resolve(...).catch(() => {})` in the glue.
+  - `[medium]` `[defer]` AC5 dangles — Tasks line and the `spec_validated` cycle-log row cite AC5, but the spec defines no AC5; the in-view (rendered) half of the no-UI law has no automated pin until the Epic 3 machine lint — grouped with the verification-gap finding below; recorded in frontmatter `deferred:`.
+  - `[false]` `[reject]` Stale Auto Run Result / empty triage log mid-run — the finalize step of this same pass writes these; workflow state, not a defect.
+  - `[false]` `[reject]` loop.ts systems comment "asserts a nonexistent event-dispatch phase" — the comment quotes AD-23's binding in-tick phase order verbatim from the spine; the claim misreads a spine citation as a code claim.
+  - `[low]` `[reject]` `addSystem` duplicate-id / mid-tick registration guard — one boot-registered system this story; the fix adds a guard for a state no caller can reach.
+  - `[low]` `[reject]` `bobPhase` unbounded growth — same-engine replays are bit-identical regardless; wrapping changes recorded transcript values and re-pins the bob test for no demonstrated harm.
+  - `[low]` `[reject]` Targeting ray origin ignores ±0.04m head bob — diverges only at the top/bottom rims of placeholder stubs, which 1.3 rewrites; the finding's own alternative fix was a Design Notes edit (spec edit).
+  - `[medium]` `[patch]` Window blur (focus to another window, tab visible) drops pending keyup/mouseup — stuck walk/drag — fixed: `window.addEventListener("blur", () => input.visibilityChanged())` in the glue (service method already pinned).
+  - `[medium]` `[patch]` requestPointerLock promise rejection (edge-case layer) — same root cause as the blind-hunter finding above; shared entry, same fix.
+  - `[low]` `[reject]` Player pre-inside an inflated AABB — unreachable with this story's spawn and per-tick step (0.023m/tick vs ≥0.75m faces); 1.3 authors real volumes and will face it with its own tests.
+  - `[low]` `[reject]` `step(dt>1)` tunneling — no caller passes dt>1 (the loop steps dt=1 only); future scheduler callers pin their own substepping.
+  - `[low]` `[reject]` Two E presses inside one tick collapse to one edge — physically implausible at 16.7ms, and the AD-7 view grammar carries one button slot per tick.
+  - `[medium]` `[patch]` Once-per-press law rested on the untested `!e.repeat` glue line in a module no test executes — service re-armed the edge on every repeat keydown — fixed: repeat-down dedup in `key()` plus a headless pin (input suite 10→11).
+  - `[medium]` `[defer]` AC5 / in-view no-UI half has no pinning test or mutation line — grouped with the blind-hunter AC5 row above; deferral recorded in frontmatter `deferred:`.
+  - `[low]` `[reject]` Constant-equality assertions (`EYE_HEIGHT 1.6`, `TARGET_REACH 2.0`) couple to tuning churn — both numbers are stated in the intent contract (Always numbers; matrix row 7 "within 2.0m"), so pinning them is per-spec, intentional.
+
 ## Design Notes
 
 **Governing ADs (Rule 6):** AD-3 (Core owns the clock; motion derives from tick state, none from render), AD-6 (no new canonical event names; E-targeting stays kernel state this story), AD-7 (Core owns ALL device capture — pointer lock, keys, mouse buttons; slot grammar axis/button/aim; adapter half never sees devices), AD-15 (player state mutates only inside the tick; systems run supervisor-wrapped; the room never crashes), AD-17 (desktop mouse-look + WASD only), AD-24 (diegetic integrity: zero non-diegetic UI; nothing text-bearing is rendered), AD-26 (per-tick device views are the replay currency — fallback must not change the recorded shape), AD-1 (new core files import nothing from games; depcheck stays green), AD-13/AD-14 (monorepo, TS at Core).
@@ -108,6 +136,14 @@ deferred: []
 - `node tools/gen-registry.mjs && git diff --exit-code -- generated/` (loop) -- byte-identical (no registry change this story)
 - `npm run build` (once) -- Vite build exit 0
 
+**Pinning tests & demonstrated mutations (Rule 19; each reverted, tree byte-identical, suite re-green):**
+- AC1 pin `core/main.ts builds no DOM surface…` (core/no-ui-dom.test.ts) — mutation: appended `document.body.appendChild(document.createElement("div"))` after the canvas append in core/main.ts → that pin red, siblings green; reverted.
+- AC2 pin `pitch clamps at ±85° … yaw turns with mouse-x` (core/player.test.ts) — mutation: look sign `state.yaw -=` → `+=` in core/player.ts → that pin red; reverted.
+- AC3 pin `drag-look fallback: button-down drag feeds the same aim channel…` (core/input/input.test.ts) — mutation: aim gate `if (locked || dragging)` → `if (locked)` → that pin red; reverted.
+- AC4 pin `E press with a registered handler fires exactly on the press edge, once` (core/player.test.ts) — mutation: `view.interact.pressed` → `view.interact.down` → that pin red; reverted.
+- AC6 pin `wall block: stop at face minus player radius; strafing still slides` (core/player.test.ts) — mutation: z-pushout face `nz = dz > 0 ? lo : hi` → `? hi : lo` → that pin red (stub/E pins as knock-on); reverted.
+- AC7 pin `Integration: two headless loop runs, identical scripted device views -> identical transcripts` (core/player.test.ts) — mutation: injected `state.bobPhase += Math.random() * 1e-9` into step() → transcript equality red; reverted.
+
 **Shared surfaces:** `core/room/` placeholder collision volume list — this story's tests assert its volume ids/positions; Story 1.3 rewrites that data and the tests that pin placeholder positions move with it (pin ids, not raw coords, wherever a test can). `generated/game-registry.ts` entry count (0, unchanged); root `package.json` scripts set (unchanged — no new scripts). Standing criterion: every test added or changed passes on a fresh environment, in either order.
 
 **Manual checks (lead's per-story browser smoke, Chrome AND Edge — Rule 3 real-runtime + NFR-7 until Epic 3 CI):**
@@ -116,7 +152,26 @@ deferred: []
 
 ## Auto Run Result
 
-Status: ready-for-dev
+Status: done
 Blocking condition: none
 
-Plan-stage halt per the dispatch ("Halt after planning."). Epic context reused from the committed `epic-1-context.md` (not recompiled); Story 1.1 loaded for continuity; spine AD blocks mapped; `LEDGER slice` empty and recorded in Design Notes. Spec meets the READY FOR DEVELOPMENT standard on first pass; `oversized` warning set (body above the 900-1600 token target — the I/O matrix, per-AC tasks, and the in-stage decision register carry the implement stage without a codebase re-investigation). Not committed: the plan stage leaves the spec uncommitted for the lead's validation gate.
+Implement pass (this section covers this pass only). Handoff subagent implemented the spec; the stage verified the diff against spec and spine, ran the Matrix Test Audit, demonstrated six pinning mutations (one per AC — all red, all reverted, suite re-green), ran the four review layers in parallel, and applied the patched findings.
+
+**Summary:** first-person visit shell — Core device service (`core/input/`, DOM-free, AD-7 slot grammar with silent drag-look fallback on the same aim channel), first-person controller (`core/player.ts`: 1.4 m/s walk at 1.60m eye height, ±85° pitch clamp, ±0.04m bob by distance with 0.25s settle, circle(r=0.25)-vs-AABB pushout with wall slide, center-of-view targeting reach 2.0m, empty `registerInteractable` registry), loop gains supervisor-wrapped `addSystem`, placeholder collision volumes close the 19m×12.5m envelope, and the camera only reads tick state at render.
+
+**Files changed:**
+- `core/room/collision-volumes.ts` (new) — authored placeholder AABB data, ids stable for 1.3
+- `core/input/index.ts` + `core/input/input.test.ts` (new) — device capture service, 11 pins
+- `core/player.ts` + `core/player.test.ts` (new) — controller + 13 pins incl. headless replay integration session
+- `core/loop.ts` + `core/loop.test.ts` — `addSystem(id, fn)` supervisor-wrapped as `core.system.<id>`; 3 new pins
+- `core/main.ts` — glue: input service, player system, camera-from-state render, `window.arcadeDebug`; silent denial (promise catch), blur buffer clear
+- `core/no-ui-dom.test.ts` (new) — DOM-surface pins incl. real dev-serve (port 4641) check
+- spec (this file) — frontmatter, Rule 19 mutation lines, triage log, this result
+
+**Review findings breakdown:** 16 findings — 0 high; 7 medium, 7 low, 2 false. Patched (4 entries): scripted-session look events were dead code (now pins target set→clear→re-arm); unhandled pointer-lock rejection silenced in glue; window-blur stuck-input fix; service-level auto-repeat edge dedup + new pin. Deferred (1 grouped entry): AC5 dangles in Tasks/cycle-log and the in-view no-UI half has no automated pin until Epic 3 machine lint (lead's Chrome+Edge smoke holds it now) — in frontmatter `deferred:`. Rejected lows (7, reasons in triage log): theoretical-hardening and placeholder-geometry edge cases not reachable this story, plus intentional intent-pinned constant assertions. Rejected false (2): mid-run workflow state; a comment that correctly quotes AD-23.
+
+**Follow-up review recommendation: true** — patched entries include two-or-more mediums. Unverified risk it names: the browser-glue half of `core/main.ts` (pointer-lock grant/denial path, blur/visibility listeners, camera-from-state render line, in-view no-UI half, Chrome-vs-Edge parity) is exercised by no automated suite — it rests on the lead's per-story browser smoke on both browsers.
+
+**Verification performed:** `npm run typecheck` exit 0; `npm test` 106/106 (existing 75 green + 31 new); `node ci/depcheck.mjs` exit 0; `node ci/lint-bans.mjs` exit 0; `node tools/gen-registry.mjs` + registry byte-identical (0 entries); `npm run build` exit 0 once (pre-existing three.js chunk-size warning); Matrix Test Audit: all 11 rows covered, row "Chrome vs Edge" per spec is the lead's manual smoke; six Rule 19 mutation demonstrations recorded under ## Verification, each reverted with suite re-green.
+
+**Residual risks:** local Node is 24.16 against the spine's `engines: >=26` — suite green on 24, but the pinned-LTS fresh environment is the standing-criterion check; `window.arcadeDebug` is a mutable state handle (non-visual; review re-checked it is not a UI surface — nothing rendered or announced); in-view no-UI deferral as above.

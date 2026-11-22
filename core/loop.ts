@@ -38,6 +38,13 @@ export interface EventRecord {
 
 export interface KernelLoop {
   addInstance(id: string, instance: GameInstance, input?: TickInput): void;
+  /**
+   * Register a kernel-owned system (player controller, scheduler later).
+   * It runs every global tick inside supervisor.invoke as
+   * `core.system.<id>` — a throwing system is logged as a fault and the
+   * tick keeps running (AD-15: the room never crashes).
+   */
+  addSystem(id: string, fn: () => void): void;
   /** Advance the clock by one frame; returns the number of ticks run. */
   step(): number;
   /** Pump step() via config.schedule (the render loop stays separate). */
@@ -53,6 +60,7 @@ export function createKernelLoop(config: LoopConfig): KernelLoop {
   const maxCatchupSteps = config.maxCatchupSteps ?? MAX_CATCHUP_STEPS;
   const supervisor = createSupervisor(config.onFault);
   const registered: Registered[] = [];
+  const systems: Array<{ id: string; fn: () => void }> = [];
   const eventQueue: EventRecord[] = [];
   let lastWall = config.now();
   let accumulator = 0;
@@ -95,6 +103,18 @@ export function createKernelLoop(config: LoopConfig): KernelLoop {
         }
       }
     }
+    // Kernel systems run last (AD-23 fixed order: sim ticks -> event
+    // dispatch -> scheduler/input routing); each call is supervisor-wrapped
+    // under gameId `core.system.<id>` so a fault is a logged Dead-Machine-
+    // style defect, never a crashed room (AD-15).
+    for (const sys of systems) {
+      supervisor.invoke({
+        tick: tickCount,
+        gameId: `core.system.${sys.id}`,
+        hook: "tick",
+        call: sys.fn,
+      });
+    }
   }
 
   function stepOnce(): number {
@@ -119,6 +139,9 @@ export function createKernelLoop(config: LoopConfig): KernelLoop {
   return {
     addInstance(id, instance, input) {
       registered.push({ id, instance, input: input ?? { controls: {} } });
+    },
+    addSystem(id, fn) {
+      systems.push({ id, fn });
     },
     step: stepOnce,
     start(): void {

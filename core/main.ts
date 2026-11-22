@@ -1,12 +1,27 @@
 // Browser entry: the render side only (AD-3 — render is decoupled from the
-// fixed-tick kernel). Scene is the empty Room Black envelope; geometry and
-// the first-person shell arrive in Story 1.3/1.2. The kernel loop is
-// instantiated here and drives instances from the build-generated registry.
+// fixed-tick kernel). Story 1.2 makes it a first-person visit: the Core
+// input service (AD-7) captures devices, the player controller runs as a
+// kernel system inside the global tick (AD-15), and the camera merely READS
+// player tick state at render — no motion is computed in render. Nothing
+// here creates any DOM besides the canvas the renderer owns: no lock prompt,
+// no HUD, no overlay of any kind (UX-DR18, AD-24, NFR-8). Pointer-lock
+// denial falls back silently to drag-look inside the input service.
 
 import * as THREE from "three";
-import { createKernelLoop } from "./loop.ts";
-import { createGameInstance } from "./contract/index.ts";
+import { createKernelLoop, type KernelLoop } from "./loop.ts";
+import { createGameInstance, math } from "./contract/index.ts";
+import { createInputService } from "./input/index.ts";
+import { createPlayerController, EYE_HEIGHT, type PlayerController } from "./player.ts";
+import { collisionVolumes } from "./room/collision-volumes.ts";
 import { gameRegistry } from "../generated/game-registry.ts";
+
+declare global {
+  interface Window {
+    /** Non-visual state handle for headless QA and the lead's console
+     * smoke (Design Notes item 6) — nothing is rendered or announced. */
+    arcadeDebug: { player: PlayerController; loop: KernelLoop };
+  }
+}
 
 // Design token: Room Black (UX DESIGN.md) — the dark the glow sits against.
 const ROOM_BLACK = 0x15110e;
@@ -19,8 +34,10 @@ document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.set(0, 1.7, 0); // seated-eye placeholder; shell arrives in 1.2
+camera.rotation.order = "YXZ"; // yaw then pitch, matching the player controller's convention
 
+// The kernel loop drives instances from the build-generated registry plus
+// the player system; wall-clock only feeds the accumulator (AD-3).
 const loop = createKernelLoop({
   now: () => performance.now(),
   schedule: (cb) => requestAnimationFrame(cb),
@@ -30,9 +47,49 @@ const loop = createKernelLoop({
 for (const entry of gameRegistry) {
   loop.addInstance(entry.id, createGameInstance(entry.createSim, entry.seed ?? 0));
 }
+
+// First-person shell: the placeholder collision stubs from core/room drive
+// blocking; the real room geometry is Story 1.3's job and replaces this
+// data in place.
+const player = createPlayerController(collisionVolumes);
+const input = createInputService({
+  requestPointerLock: () => {
+    // Denial (Esc cooldown, gesture policy) must stay silent at every layer,
+    // console included (AC3): newer engines return a promise that rejects.
+    void Promise.resolve(renderer.domElement.requestPointerLock()).catch(() => {});
+  },
+});
+loop.addSystem("player", () => {
+  player.step(1, input.takeView());
+});
+
+// Thin browser glue -> device service (AD-7: Core owns capture; the glue
+// only forwards events and (re)arms pointer lock). Silent by construction:
+// no prompt, no style change, no message anywhere on lock denial/loss.
+const canvas = renderer.domElement;
+canvas.addEventListener("click", () => input.canvasClick());
+document.addEventListener("pointerlockchange", () =>
+  input.pointerLockChanged(document.pointerLockElement === canvas),
+);
+window.addEventListener("mousemove", (e) => input.mouseMove(e.movementX, e.movementY));
+window.addEventListener("mousedown", (e) => input.mouseDown(e.button));
+window.addEventListener("mouseup", (e) => input.mouseUp(e.button));
+window.addEventListener("keydown", (e) => {
+  if (!e.repeat) input.key(e.code, true);
+});
+window.addEventListener("keyup", (e) => input.key(e.code, false));
+document.addEventListener("visibilitychange", () => input.visibilityChanged());
+// Window blur (focus to another window, tab still visible) drops pending
+// keyup/mouseup: clear the buffer like a hidden tab, so no walk/drag sticks.
+window.addEventListener("blur", () => input.visibilityChanged());
+
 loop.start();
 
+// Render reads tick state; all motion already happened inside step().
 function frame(): void {
+  const p = player.state;
+  camera.position.set(p.x, EYE_HEIGHT + math.sin(p.bobPhase) * p.bobAmp, p.z);
+  camera.rotation.set(p.pitch, p.yaw, 0);
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }
@@ -43,3 +100,6 @@ window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
 });
+
+// Non-visual debug handle for QA/browser smoke — state only, zero UI.
+window.arcadeDebug = { player, loop };
