@@ -106,6 +106,13 @@ const built = (() => {
       fillText(t) {
         texts.push(t);
       },
+      // Deterministic generous per-character estimate (0.92em of the set
+      // font) - same fake-metric family as surfaces.test.ts (rework 1).
+      measureText(text) {
+        const m = /(\d+(?:\.\d+)?)px/.exec(ctx.font);
+        if (!m) throw new Error("fake measureText: font string carries no px size");
+        return { width: text.length * 0.92 * Number(m[1]) };
+      },
     };
     return { width, height, getContext: (kind) => (kind === "2d" ? ctx : null) };
   };
@@ -146,7 +153,15 @@ test("build-time one-surface law: across every injected canvas the only painted 
   const DOT = String.fromCharCode(0xb7);
   const withText = built.canvasTexts.filter((t) => t.length > 0);
   assert.equal(withText.length, 1, "exactly one canvas carries text (the carpet canvas carries none)");
-  assert.deepEqual(withText[0]!.join(` ${DOT} `), WELCOME_FLYER.text, "verbatim, byte for byte");
+  // Verbatim in the metric-robust form (rework pass 1 word-wrap moved the
+  // split points): substring membership + character order, nothing invented.
+  const painted = withText[0]!;
+  for (const t of painted) assert.ok(WELCOME_FLYER.text.includes(t), `painted line "${t}" is a substring of the verbatim string`);
+  assert.equal(
+    painted.join("").replace(/\s+/g, ""),
+    WELCOME_FLYER.text.split(` ${DOT} `).join("").replace(/\s+/g, ""),
+    "painted characters rebuild the verbatim string in order",
+  );
   assert.equal(signSurfaces.length, 1, "the signage whitelist still holds exactly one surface");
 });
 

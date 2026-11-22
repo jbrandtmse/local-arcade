@@ -25,6 +25,7 @@ import {
 import { ROADMAP_STRETCH_SLOTS, WALL_SLOT_REVISION, wallSlots, type WallSlot } from "./slot-config.ts";
 import { CASUAL_ALLEY, roadmap, zones } from "./zones.ts";
 import { paintFlyer, type PaintContext, type PaintSurface } from "./surfaces.ts";
+import { WELCOME_FLYER } from "./signage.ts";
 import { CARD_INK, PAPER_CARD, toCss } from "./tokens.ts";
 
 const EPS = 1e-9;
@@ -353,14 +354,21 @@ test("paintFlyer prints only the injected string, split on the middot separator 
       texts.push(text);
       styles.push(ctx.fillStyle);
     },
+    // Deterministic generous per-character estimate (0.92em of the set
+    // font) - the same fake-metric family as surfaces.test.ts (rework 1).
+    measureText(text) {
+      const m = /(\d+(?:\.\d+)?)px/.exec(ctx.font);
+      if (!m) throw new Error("fake measureText: font string carries no px size");
+      return { width: text.length * 0.92 * Number(m[1]) };
+    },
   };
-  const factory = (): PaintSurface => {
+  const factory = (width: number, height: number): PaintSurface => {
     canvases += 1;
-    return { width: 210, height: 300, getContext: (kind) => (kind === "2d" ? ctx : null) };
+    return { width, height, getContext: (kind) => (kind === "2d" ? ctx : null) };
   };
   const DOT = String.fromCharCode(0xb7);
   const sentinel = `ALPHA ${DOT} BETA ${DOT} GAMMA`;
-  paintFlyer(factory, sentinel, toCss(PAPER_CARD), toCss(CARD_INK), 0.06);
+  paintFlyer(factory, sentinel, toCss(PAPER_CARD), toCss(CARD_INK), 0.06, WELCOME_FLYER.width, WELCOME_FLYER.height);
   assert.equal(canvases, 1, "the painter takes exactly one canvas from the factory");
   assert.deepEqual(texts, ["ALPHA", "BETA", "GAMMA"], "printed lines = the injected string split on ' middot ' - nothing else");
   assert.deepEqual(new Set(styles), new Set([toCss(PAPER_CARD), toCss(CARD_INK)]), "only the two injected colours are ever used");

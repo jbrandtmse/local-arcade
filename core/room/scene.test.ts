@@ -152,6 +152,13 @@ function fakeWorld(): {
       fillText(text) {
         texts.push(text);
       },
+      // Deterministic generous per-character estimate (0.92em of the set
+      // font) - same fake-metric family as surfaces.test.ts (rework 1).
+      measureText(text) {
+        const m = /(\d+(?:\.\d+)?)px/.exec(ctx.font);
+        if (!m) throw new Error("fake measureText: font string carries no px size");
+        return { width: text.length * 0.92 * Number(m[1]) };
+      },
     };
     return { width: w, height: h, getContext: (kind) => (kind === "2d" ? ctx : null) };
   };
@@ -265,7 +272,16 @@ test("empty Wall Slots get baseplate meshes (20, Wall Panel, raised), and the on
   const tex = built.textures.find((t) => t === map);
   assert.ok(tex, "the flyer texture came from an injected canvas");
   const texts = built.canvasTexts.find((list) => list.length > 0);
-  assert.ok(texts && texts.join(` ${DOT} `) === flyer.text, "verbatim text lands on the texture");
+  assert.ok(texts && texts.length > 0, "the painter drew onto the injected canvas");
+  // Verbatim, in the metric-robust form (rework pass 1 word-wrap): every
+  // painted line is a substring of the authored string, and the painted
+  // characters rebuild it in order (wrap points are font-dependent).
+  for (const t of texts) assert.ok(flyer.text.includes(t), `painted line "${t}" is a substring of the verbatim text`);
+  assert.equal(
+    texts.join("").replace(/\s+/g, ""),
+    flyer.text.split(` ${DOT} `).join("").replace(/\s+/g, ""),
+    "painted characters are the verbatim control line in order",
+  );
   assert.equal(built.canvasTexts.length, 2, "exactly two painted canvases: carpet + flyer");
 });
 

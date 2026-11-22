@@ -24,7 +24,10 @@ export interface SignSurface {
   position: { x: number; y: number; z: number };
   /** Which way the readable face points (XZ normal). */
   facing: { x: number; z: number };
-  /** Sheet size in metres (A5 proportions, inference Design Notes item 8). */
+  /** Sheet size in metres (0.40 x 0.60, inference - rework pass 1: sized
+   * from worst-case fallback-font word widths + margin, height for the
+   * 6-line narrow-font wrap at the leading floor; supersedes the A5 sheet
+   * of Design Notes item 8, whose canvas clipped the longest split line). */
   width: number;
   height: number;
   /** Minimum legible cap height in metres (room-sign floor >= 60mm). */
@@ -43,8 +46,8 @@ export const WELCOME_FLYER: SignSurface = {
   // centre (1.15, 1.45, 6.24), facing into the room (-Z).
   position: { x: 1.15, y: 1.45, z: 6.24 },
   facing: { x: 0, z: -1 },
-  width: 0.21,
-  height: 0.3,
+  width: 0.4,
+  height: 0.6,
   capHeight: 0.06, // room-sign floor: cap >= 60mm (DESIGN.md typography)
   text: "MOVE: W A S D \u00b7 LOOK: MOUSE \u00b7 DO: E",
 };

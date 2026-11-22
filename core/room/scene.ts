@@ -213,10 +213,20 @@ export function buildRoomScene(THREE: Three, scene: RoomScene, makeCanvas: Canva
   }
 
   // The one Welcome Flyer: painted on an injected canvas, texture-mapped,
-  // never a DOM node (AD-24 room-sign whitelist, AC6).
+  // never a DOM node (AD-24 room-sign whitelist, AC6). The painter takes the
+  // sheet metres from the record, so the canvas aspect matches the mesh
+  // aspect exactly - no texture stretch (rework pass 1).
   for (const surface of signSurfaces) {
     const paper = THREE.canvasTexture(
-      paintFlyer(makeCanvas, surface.text, toCss(surface.stockHex), toCss(CARD_INK), surface.capHeight),
+      paintFlyer(
+        makeCanvas,
+        surface.text,
+        toCss(surface.stockHex),
+        toCss(CARD_INK),
+        surface.capHeight,
+        surface.width,
+        surface.height,
+      ),
     );
     const flyerMat = THREE.standardMaterial({ color: PAPER_CARD, map: paper, roughness: 0.95 });
     const facesX = surface.facing.x !== 0;

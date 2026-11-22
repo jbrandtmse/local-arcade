@@ -2,10 +2,10 @@
 title: 'Story 1.3: The Arcade Room — slots, pillars, zones, and the roadmap wall'
 type: 'feature'
 created: '2026-11-21'
-status: 'in-progress'
+status: 'done'
 review_loop_iteration: 1
-followup_review_recommended: true
-baseline_revision: 'cbc66b65bc5e26ec52ff4ad8b9a5c2f4cc5b6b21'
+followup_review_recommended: false
+baseline_revision: 'ef103129356a46f53f8c7383b042590c8ce4c4d4'
 baseline_commit: 'cbc66b65bc5e26ec52ff4ad8b9a5c2f4cc5b6b21'
 context:
   - _bmad-output/planning-artifacts/architecture/architecture-local-arcade-2026-11-19/ARCHITECTURE-SPINE.md
@@ -15,6 +15,7 @@ context:
 warnings: ['oversized']
 deferred:
   - 'main.ts real-THREE adapter executed coverage — lands with the Epic 3 browser harness (DW-12 tier); the source-pin tier (main-glue.test.ts 1.3 wiring test) was added in story 1.3 review pass 1'
+  - 'tests/test-summary.md flyer-probe descriptions (lines 23/31) still describe the pre-rework paintFlyer pins after rework pass 1 (wrap + measureText + sheet widening); the QA skill regenerates that artifact on its next pass — the implement stage never hand-edits it; severity low'
 ---
 
 <intent-contract>
@@ -59,7 +60,7 @@ deferred:
 - `core/room/signage.ts` (new) -- the single Welcome Flyer record (AD-24 kind `room-sign`); the whitelist home the Epic-3 character lint will read
 - `core/room/tokens.ts` (new) -- DESIGN.md hex tokens as numbers (ROOM_BLACK…, glow anchors, paper-card/card-ink); `core/main.ts:27` imports ROOM_BLACK from here instead of its inline constant
 - `core/room/scene.ts` (new) -- `buildRoomScene(THREE, scene)`: extrudes the volume list to meshes, walls/ceiling/carpet/pillars/door/street, zone lights + door glow-red (#FF6B5E) above the door; reads only authored data (no geometry literals) — the "visual extrusion" leg of the spine row
-- `core/room/surfaces.ts` (new) -- injected-canvas painters: `paintFlyer(makeCanvas, text)`, `paintCarpet(makeCanvas, baseHex, patternHex)`; DOM-free like `core/input/index.ts`'s injectable-source pattern (Rule 2: extends that sibling's pattern, no copy of the input service)
+- `core/room/surfaces.ts` (new) -- injected-canvas painters: `paintFlyer(makeCanvas, text, paperCss, inkCss, capMeters, sheetWidthM, sheetHeightM)` (sheet metres from the signage record; word-wrap + measureText fit law per Rework pass 1; exports FLYER_PX_PER_M/FLYER_MARGIN_PX/FLYER_LEADING_MIN_RATIO), `paintCarpet(makeCanvas, baseHex, patternHex)`; DOM-free like `core/input/index.ts`'s injectable-source pattern (Rule 2: extends that sibling's pattern, no copy of the input service)
 - `core/main.ts` -- wire: `buildRoomScene`, pass authored volumes + `entrySpawn` to the controller, inject real canvas factories for flyer/carpet textures; DOM append stays exactly one (the canvas)
 - `core/player.test.ts` / `core/player-qa.test.ts` -- UPDATE SHARED-SURFACE PINS (1.2 pre-authorized this: "Story 1.3 rewrites that data and the tests that pin placeholder positions move with it"): the exact-ids pin (:58), the pitch pin via stubs (:73-74, moves to slot-config), the default-spawn-walks-into-cabinet-2 pin (:133 and qa :62-63) and the targeting/E-press pins that target `cabinet-2` (:156-202, :263-267) move to authored room volumes (walk/block) or test-local targetable fixtures (targeting is controller behavior — pass a synthetic volume list to the injectable constructor); wall/pillar pins stay via `volById`
 - `core/no-ui-dom.test.ts` -- extend: dev-serve module-resolution list gains the new `core/room/*` modules; new source-scan pins for the room modules (no `document.`/`window.`; entry append count still 1)
@@ -79,7 +80,9 @@ deferred:
 - `core/player.test.ts`, `core/player-qa.test.ts` -- move the listed shared-surface pins to authored volumes / test-local fixtures (Code Map) -- regression of the 1.2 contract on real room data
 - `core/no-ui-dom.test.ts` -- extend scans + dev-serve module list -- fiction-pure law survives
 - tests for every I/O matrix row above (Rules 1/19), incl. the scripted real-controller walk (Integration) -- pinning tests + demonstrated mutations
-- [ ] [Smoke] The Welcome Flyer's painted lines overflow the 210×300 paint canvas and clip at both edges in the browser smoke — core/room/surfaces.ts (paintFlyer) — the fix must keep every line of the verbatim string inside the canvas with margin at a legible cap while honouring AC6 (verbatim text, Paper Card/Card Ink, cap ≥60mm read at ~1m from the flyer); reversible inference choices allowed (wrap/split lines, shrink the per-line cap within the 60mm floor, or widen the canvas at the same PX_PER_M density), recorded in the spec
+- [x] [Smoke] The Welcome Flyer's painted lines overflow the 210×300 paint canvas and clip at both edges in the browser smoke — core/room/surfaces.ts (paintFlyer) — the fix must keep every line of the verbatim string inside the canvas with margin at a legible cap while honouring AC6 (verbatim text, Paper Card/Card Ink, cap ≥60mm read at ~1m from the flyer); reversible inference choices allowed (wrap/split lines, shrink the per-line cap within the 60mm floor, or widen the canvas at the same PX_PER_M density), recorded in the spec
+  - Fix decided for this pass (see Design Notes "Rework pass 1"): `PaintContext` gains `measureText`; `paintFlyer` takes the sheet metres from the signage record and word-wraps each `" · "` split line so every painted line measures ≤ sheet width − 2×margin on the sheet (fit law throws when a single word still overflows, and when the wrapped line count no longer fits the sheet height at the legibility leading floor); the sheet widens 0.21×0.30 → 0.40×0.60 at the unchanged PX_PER_M 1000, cap stays 0.06m. `scene.ts` passes the sheet size; the four fake `PaintContext`s (surfaces/room-qa/scene/scene-qa) gain `measureText` with a deterministic generous metric and honour the requested size.
+  - Fresh-environment pin (Rule 19): `surfaces.test.ts` gains a containment pin — for every recorded painted line, the fake-measured width fits inside the canvas width with the margin, and the baselines stay in canvas with non-overlapping leading — red if a painted line's measured width exceeds the canvas width again; verbatim pins reshaped to char-order + substring membership (wrap points are font-dependent); demonstrated mutation recorded in ## Verification.
 
 **Acceptance Criteria:**
 - Given the authored room data, then the interior is 19m × 12.5m, the front door sits bottom-center closed and blocking, and street-side geometry exists beyond the front wall (AC1; FR-2, UX-DR3)
@@ -121,6 +124,21 @@ deferred:
   - [rejected] "ids stable" read retrospectively (wall-front, cabinet-1..3 kept) — the spine row's paren is the forward pin law (tests pin ids, not coords); 1.2's shared-surface row pre-authorized exactly these test moves for this rewrite; AC1 pins the authored id set.
   - [rejected] spec status/baseline block in the diff — workflow-owned run state, not code (this skill writes it by design).
   - [note] local runs used Node 24 while engines pins 26 — environmental, not introduced by the diff; suite green on both (type-stripping).
+
+### 2026-11-22 — review pass 3 (rework implement pass, build-auto; layers: blind-hunter, edge-case-hunter, verification-gap, intent-alignment)
+
+- verdicts: 13 findings — high 0, medium 7, low 4, false 2
+- findings:
+  - [medium] [patch] fit-law throws unpinned: neither `paintFlyer` throw (word-too-wide / leading-floor) had any test constructing its condition — deleting both throw sites kept 156 green (verification-gap demonstrated) — blind-hunter + verification-gap grouped; surfaces.test.ts gained two `assert.throws` pins (0.28m sheet trips the word law; 0.40x0.50m sheet trips the height law; the word pin's 1.0m height keeps the height law out of reach so the pin is discriminating). Mutations: word check `> maxLineWidth`->`> Infinity` -> word side red; `if (leading < ...)`->`if (false)` -> height side red; both reverted byte-identical (sha f1b839da..).
+  - [medium] [patch] the rework bullet promised "demonstrated mutation recorded in ## Verification" and none was recorded, and the old AC6 middot-drop record no longer holds for the painter-side pins (post-reshape they compare against the live record; only room.test.ts:444's byte literal trips) — blind-hunter + verification-gap grouped (the gap layer re-ran the middot mutation to establish this); ## Verification gained the Rework pass 1 block with five observed red->revert->byte-identical demonstrations, and the AC6 record carries the rework note.
+  - [medium] [patch] substring + char-order verbatim pins tolerate mid-word wrapping (a char-by-char wrap rebuilds the string exactly) — blind-hunter + edge-case-hunter grouped; surfaces.test.ts now pins that every token of every painted line is a whole word of the verbatim string (middle-dot-free word split built via code point, Rule 14). Mutation `segment.split(" ")`->`segment.split("")` -> verbatim + containment pins red (painter throws the 11-line layout); reverted.
+  - [medium] [patch] the containment pin could not observe the margin term of the fit contract: at 1em/char the fake only paints 60px multiples, no width can land in (sheetW-24, sheetW], and dropping `2 * FLYER_MARGIN_PX` from the wrap budget kept 156 green (verification-gap ran the mutation) — the fake metric is now 0.92em/char (still generous vs any real face, fine enough to decide the window) and the same loud no-zero metric replaces the silent zero fallback (edge-case-hunter grouped); mutation `maxLineWidth = canvas.width - 2*margin`->`canvas.width` -> containment red ("MOVE: W" measures 386.4px must fit 400 minus 2x12 margin); reverted.
+  - [low] [patch] painter density re-declared test-side (`const PX_PER_M = 1000` in surfaces.test.ts) — a density change would mis-pin instead of turning the pin red — surfaces.ts now exports FLYER_PX_PER_M and the test imports it (blind-hunter + edge-case-hunter).
+  - [false] [reject] empty/whitespace flyer text paints a blank sheet silently — unreachable data: the single record's verbatim text and capHeight==0.06 are byte-pinned by room.test.ts AC6 pins; theoretical hardening only.
+  - [false] [reject] capHeight <= 0 degenerates both fit-law floors — same refutation: room.test.ts pins `capHeight === 0.06`.
+  - [low] [reject] spec Code Map still sketches `paintFlyer(makeCanvas, text)` — the fix is an edit to this build's spec (rejected per triage rule); the Code Map line was refreshed as stage bookkeeping anyway.
+  - [low] [defer] `tests/test-summary.md` lines 23/31 describe the pre-rework flyer probes — the QA skill owns that artifact and the implement stage never hand-edits it; recorded in frontmatter `deferred:` for the next QA pass to refresh.
+  - (intent-alignment: descriptive audit, zero findings; it confirmed the rework-pass reading, the record-level verbatim relocation, and the pending browser-smoke tier.)
 
 ### 2026-11-22 — review pass 2 (`bmad-code-review` under epic-cycle; layers: blind-hunter, edge-case-hunter, verification-gap, acceptance-auditor)
 
@@ -166,6 +184,8 @@ deferred:
 9. Entry spawn (0, 5.6), yaw 0 (facing the back wall), authored in room data; the 1.2 default-spawn parameter stays untouched for tests.
 10. The candidate "signature of the one volume list = walls+pillars+door+street, occluder subset = pillar-kind entries" needs no spine write: the Conventions row added 2026-11-22 already states it (the 1.2 item 9 convention landed as a spine row; this story is its first consumer).
 
+**Rework pass 1 — decided in-stage (smoke: flyer text clipped at the paint canvas):** item 8's A5 sheet is superseded for the sheet size only — at the AC6 cap floor (0.06m) the longest split line measures ~0.50m wide even in a condensed stack and ~0.64m in a plain sans fallback, so no A5-width canvas holds it at a legible cap; shrinking the cap below 60mm is barred by AC6. The chosen fix: `PaintContext` gains `measureText` (the real 2D API already has it — OffscreenCanvas satisfies the seam); `paintFlyer` takes the sheet metres from the signage record, splits on `" · "` as before, word-wraps each split line at spaces so every painted line measures ≤ sheet width − 2×12px margin (inference: margin), and lays baselines at `height/(lines+1)` requiring ≥ 1.35×cap leading (inference: legibility leading); a single word too wide for the sheet, or a wrapped layout that no longer fits the height, throws loudly (the need2d law's sibling — smoke fails visibly instead of clipping silently). Sheet becomes 0.40 × 0.60 m (inference — sized from worst-case fallback-font word widths + margin: widest wrapped word ~0.32m; height sized for the 6-line narrow-font wrap at the leading floor); centre stays (1.15, 1.45, 6.24), cap 0.06m, stock/ink/verbatim unchanged. The mesh follows the signage size so canvas and mesh aspects match (no texture stretch). Reversible: a later token or story can retune the sheet; the revision-free authored data moves with it. Fake test contexts model text width with a deterministic generous per-character estimate so the containment pin guards the contract (measured ≤ canvas) regardless of the estimate's realism.
+
 ## Verification
 
 **Commands:**
@@ -208,6 +228,15 @@ deferred:
 - need2d non-surface pin (surfaces.test.ts): guard reverted to null-only check -> the `{}`-factory case died with a raw TypeError -> /no 2d context/ red; reverted.
 - Post-review: `npm test` 155/155 green, `npm run typecheck` exit 0 (full suite re-run after all review patches; new pins extend existing tests — test count unchanged).
 
+**Rework pass 1 pins + demonstrated mutations (2026-11-22 implement rework; each applied -> observed red in the named pin -> reverted byte-identical by sha256 -> file re-green; all on `core/room/surfaces.ts`, pre-mutation sha f1b839dac96d0e0ae08916b90fa46c19c5a2fbc91aeeb94b844157575ecd881b):**
+- containment pin (surfaces.test.ts; Rule 19 target of the smoke item): wrap-join condition forced always-true (the split lines paint whole - the exact smoke defect) -> containment pin red: `painted line "MOVE: W A S D" measures 717.6px - must fit 400px minus 2x12px margin`; also the wrapped-count assertion red; reverted sha-identical.
+- fit-law throw pins (surfaces.test.ts, new): word check `> maxLineWidth` -> `> Infinity` -> the word-law `assert.throws` red; height check `if (leading < ...)` -> `if (false)` -> the height-law `assert.throws` red; each reverted.
+- word-boundary pin (surfaces.test.ts): wrap `segment.split(" ")` -> `segment.split("")` (mid-word wrap) -> the verbatim test and containment pin red (the char-split layout trips the height law first; the word-token assertion is the dedicated leg for mid-word splits that fit the sheet); reverted.
+- margin-term observability (fake metric 1em/char -> 0.92em/char in all four fakes): `maxLineWidth = canvas.width - 2 * FLYER_MARGIN_PX` -> `canvas.width` -> containment red (`"MOVE: W" measures 386.4px`); the window (sheetW-24, sheetW] is now decidable at the fake; reverted.
+- fake metric loudness: regex-miss now throws in all four fake `measureText`s (the zero-width silent fallback is gone; review pass 3 finding).
+- AC6 record correction (verification-gap demonstrated): after the wrap reshape, the middot-drop mutation trips ONLY `core/room/room.test.ts:444`'s byte-for-byte record pin - the painter-side pins compare against the live record by design. The pre-rework AC6 line above ("room.test.ts / surfaces.test.ts fake canvas") reads true only of the record pin after this pass.
+- Post-rework: `npm run typecheck` exit 0; `npm test` 157/157 green (155 + containment pin + fit-law throw pins); `node ci/depcheck.mjs` / `node ci/lint-bans.mjs` / registry-drift exit 0; `npm run build` exit 0 (chunk-size warning = the three.js bundle, expected).
+
 **Shared surfaces:** `core/room/collision-volumes.ts` id set (1.2 pins that address `wall-front`, `cabinet-1..3` and the default-spawn line move with this rewrite — list in the Code Map; the exact-ids pin is rewritten to the authored set), `INTERIOR` export (pins keep), player default-spawn test fixture (untouched), `core/no-ui-dom.test.ts` dev-serve module list (extended), `generated/game-registry.ts` entry count (0, unchanged), root `package.json` scripts (unchanged — no new scripts). Standing criterion: every test added or changed passes on a fresh environment, in either order.
 
 **Manual checks (lead's per-story browser smoke, Chrome AND Edge — Rule 3 tier until Epic 3 CI; evidence saved to `evidence/story-1-3-smoke-*`):**
@@ -233,3 +262,13 @@ Status: done
 Blocking condition: none
 
 Plan pass (this section covers this pass only). Epic context reused (valid, not recompiled); 1.2 continuity loaded; spine consulted — AD-7/AD-10/AD-24/AD-25 governed, the "Room geometry & collision" Conventions row is this story's binding form; room-layout.md + DESIGN.md tokens + floor-plan measurements loaded once; geometry authored and pre-measured (both sampled sightlines blocked, roadmap sightlines clear, aisle minima ≥1.20m, min pillar↔cabinet 5.05m — computed, not assumed); ledger inbox empty (nothing to address or decline).
+
+Rework pass 1, iteration 1, trigger=smoke (this paragraph covers this pass only). Worked the single open `[Smoke]` item: the Welcome Flyer's painted lines are no longer clipped — `paintFlyer` now measures through the seam's `measureText`, word-wraps each split line inside the sheet with margin, and dies loudly when a word or the wrapped layout no longer fits (fit law); the sheet widened 0.21×0.30 -> 0.40×0.60 m at unchanged density with cap 0.06m untouched; the mesh follows the record so canvas and mesh aspects match.
+
+Files changed this pass: `core/room/surfaces.ts` (measureText leg, word-wrap + fit law, exported FLYER_PX_PER_M/FLYER_MARGIN_PX/FLYER_LEADING_MIN_RATIO), `core/room/signage.ts` (sheet metres), `core/room/scene.ts` (sheet metres passed through), `core/room/surfaces.test.ts` (containment pin, word-boundary pin, two fit-law throw pins, loud 0.92em fake metric), `core/room/room-qa.test.ts` / `core/room/scene.test.ts` / `core/room/scene-qa.test.ts` (fake contexts gain the loud measureText; verbatim pins reshaped to substring + char-order), this spec. `main.ts`/`main-glue.test.ts` unchanged (the OffscreenCanvas factory already satisfies the widened seam; the wiring source pins still match).
+
+Review findings breakdown (pass 3, four layers, 13 findings): high 0; medium 7 (all patched in-stage: fit-law throw pins, Verification-record completion + AC6 record correction, word-boundary pin, fake-metric margin-window + loud-fallback fix); low 4 (1 patched: density export; 1 rejected spec-edit-only with the line refreshed as bookkeeping; 1 deferred to the next QA pass; 1 inside the patched fake-metric entry); false 2 (empty-text / cap<=0 guards — unreachable, data pinned). Follow-up review recommendation: no — this was a follow-up pass and no `high` was patched; the work has converged.
+
+Verification performed this pass: typecheck exit 0; `npm test` 157/157; depcheck/lint-bans/registry-drift exit 0; `npm run build` exit 0; five new demonstrated mutations (see ## Verification "Rework pass 1" block) each observed red then reverted byte-identical (sha f1b839da..); Matrix Test Audit unchanged green (the Welcome Flyer row now carries the containment pin plus the untouched record-level verbatim pin); Rule 14: one literal-em-dash regression introduced by the handoff was repaired to the `—` escape via node (the Edit tool's fuzzy non-ASCII matching documented in the AC6 record).
+
+Residual risks: the browser-tier proof (Chrome+Edge, flyer legible at ~1m, screenshots to `evidence/story-1-3-smoke-*`) awaits the lead's iteration-2 smoke — the fit law guarantees in-browser fit only up to what the real font's `measureText` returns (the fake metric is generous vs known stacks); the sheet size stays a labelled inference retunable by data alone.
