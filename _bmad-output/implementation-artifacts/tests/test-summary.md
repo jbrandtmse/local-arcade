@@ -20,15 +20,19 @@ no browser harness this epic).
   blocking volume); aisle probes (main aisle >=1.20, pillar->cabinet-box >=5.0 recorded
   5.05, per-slot approach clears every blocker >=0.70); sampled sightlines + the
   ear-blocks-eye occluder-subset pin (test-local slab clip, AD-7 keeps the production
-  raycast in Epic 2); paintFlyer sentinel probe (the painter prints only the injected
-  string, in only the injected colours, on one injected canvas).
+  raycast in Epic 2); paintFlyer sentinel + containment probes (the painter prints only
+  the injected string — word-wrapped at spaces inside the sheet — in only the injected
+  colours, on one injected canvas; every painted line must MEASURE within the sheet
+  minus 2x the margin, and the fit law throws on a word or leading that no longer fits —
+  rework pass 1).
 
 ### Scene-builder QA probes through the injected Three seam
 - [x] `core/room/scene-qa.test.ts` (QA) — the envelope-spanning ceiling slab carries the
   Room Black token and rests above the wall top; the front-wall wainscot bands never
   intrude into the door opening (1.9's swing clearance — the review pass fixed this but no
   probe held it); the build-time one-surface law (the only painted text across every
-  injected canvas is the flyer record's verbatim string); the scene consumes the authored
+  injected canvas is the flyer record's string — checked by substring + character
+  order across the wrapped lines since rework pass 1, not by exact wrap points); the scene consumes the authored
   zone/roadmap/door lighting with hues drawn only from zone tokens + amber + door glow.
 
 ## Coverage

@@ -6,7 +6,7 @@ status: 'done'
 review_loop_iteration: 1
 followup_review_recommended: false
 baseline_revision: 'ef103129356a46f53f8c7383b042590c8ce4c4d4'
-baseline_commit: 'cbc66b65bc5e26ec52ff4ad8b9a5c2f4cc5b6b21'
+baseline_commit: 'ef103129356a46f53f8c7383b042590c8ce4c4d4'
 context:
   - _bmad-output/planning-artifacts/architecture/architecture-local-arcade-2026-11-19/ARCHITECTURE-SPINE.md
   - _bmad-output/specs/spec-local-arcade/room-layout.md

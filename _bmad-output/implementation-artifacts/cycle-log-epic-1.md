@@ -67,3 +67,6 @@
 2026-11-22T14:17:46Z	Story 1.3	smoke_complete	method=browser result=fail iterations=1 defects_caught=1 evidence=_bmad-output/implementation-artifacts/evidence/story-1-3-smoke-*.png+story-1-3-smoke-edge.txt note=chrome+edge_parity_spawn+door_stop+six_vantages_pass;flyer_text_clipped_at_paint_canvas
 2026-11-22T14:19:01Z	Story 1.3	rework_opened	cycle_iteration=2 iteration=1 trigger=smoke items=flyer-text-clipped-at-paint-canvas scope_baseline=7eb42dd
 2026-11-22T14:20:34Z	Story 1.3	stage_spawned	stage=implement spawn_at=2026-11-22T14:20:34Z	agent_name=1-3-room-implement-2	cycle_iteration=2
+2026-11-22T16:31:09Z	Story 1.3	dev_complete	spawn_at=2026-11-22T14:20:34Z build_sha=a85fa07 baseline_revision=ef10312 review_loop_iteration=1 followup_review_recommended=false deferred=1 files=9 loc_added=307 loc_removed=42 cycle_iteration=2 note=DW-18_harvested;deferred_bullet1_already_DW-12_tier
+2026-11-22T16:36:43Z	Story 1.3	adr_verifications_complete	tool=node_cli	acs=ac6,ac7	result=pass	mutations=ac6:signage-drop-first-middle-dot,ac7:scene-sheet-metres-swapped	reverts=byte-identical	suite=157/157	cycle_iteration=2	note=rework_pass1_touched_surfaces+signage+scene;scoped_to_touched_ACs
+2026-11-22T16:38:09Z	Story 1.3	stage_spawned	stage=code-review	spawn_at=2026-11-22T16:38:09Z	agent_name=1-3-room-cr-2	cycle_iteration=2
