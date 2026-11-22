@@ -7,8 +7,11 @@
 // silent at the console and lock-loss/blur/visibility all drop the device
 // buffer (AC3, UX-DR18); (3) every device listener forwards to the input
 // service and the pointerlockchange glue compares the lock element to the
-// canvas (AD-7: the glue keeps no device state of its own). Pins the
-// source contract; the lead's Chrome+Edge smoke covers in-browser behaviour.
+// canvas (AD-7: the glue keeps no device state of its own); (4) Story 1.3's
+// room wiring: the authored room is built into the page scene exactly once
+// through the real Three adapter with injected OffscreenCanvas painters, and
+// the player starts on the authored volumes at ENTRY_SPAWN. Pins the source
+// contract; the lead's Chrome+Edge smoke covers in-browser behaviour.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -71,4 +74,13 @@ test("device glue is thin and forwards to the input service; the lock check comp
   assert.ok(MAIN.includes("if (!e.repeat) input.key(e.code, true);"), "keydown keeps one fresh press edge per physical press");
   assert.ok(MAIN.includes("input.key(e.code, false)"), "keyup releases the level");
   assert.ok(!MAIN.includes("addEventListener(\"wheel\""), "no undocumented device channel");
+});
+
+test("the authored room reaches the page once: buildRoomScene through the real Three adapter + injected OffscreenCanvas factory, spawn on the authored volumes at ENTRY_SPAWN, clear colour from the token (1.3 AC1/AC2/AC7 wiring)", () => {
+  assert.equal((MAIN.match(/buildRoomScene\(/g) ?? []).length, 1, "the room is built exactly once into the page scene");
+  assert.ok(MAIN.includes("buildRoomScene(three, scene, makeCanvas);"), "built through the injected seam, not a second inline copy");
+  assert.ok(MAIN.includes("new THREE.BoxGeometry("), "the Three adapter maps the seam to real three primitives");
+  assert.ok(MAIN.includes("new OffscreenCanvas(width, height)"), "painters get OffscreenCanvas factories (the page still grows one DOM node)");
+  assert.ok(MAIN.includes("createPlayerController(collisionVolumes, ENTRY_SPAWN)"), "the visitor spawns at the authored door spawn on the authored volume list");
+  assert.ok(MAIN.includes("renderer.setClearColor(ROOM_BLACK, 1)"), "clear colour comes from tokens.ts, never a retyped hex");
 });

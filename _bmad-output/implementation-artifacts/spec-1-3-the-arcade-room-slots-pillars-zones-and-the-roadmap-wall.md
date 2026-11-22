@@ -2,16 +2,18 @@
 title: 'Story 1.3: The Arcade Room — slots, pillars, zones, and the roadmap wall'
 type: 'feature'
 created: '2026-11-21'
-status: 'ready-for-dev'
-review_loop_iteration: 0
-followup_review_recommended: false
+status: 'done'
+review_loop_iteration: 1
+followup_review_recommended: true
+baseline_revision: 'cbc66b65bc5e26ec52ff4ad8b9a5c2f4cc5b6b21'
 context:
   - _bmad-output/planning-artifacts/architecture/architecture-local-arcade-2026-11-19/ARCHITECTURE-SPINE.md
   - _bmad-output/specs/spec-local-arcade/room-layout.md
   - _bmad-output/planning-artifacts/ux-designs/ux-local-arcade-2026-11-20/DESIGN.md
   - _bmad-output/planning-artifacts/ux-designs/ux-local-arcade-2026-11-20/imports/arcade-floor-plan.html
 warnings: ['oversized']
-deferred: []
+deferred:
+  - 'main.ts real-THREE adapter executed coverage — lands with the Epic 3 browser harness (DW-12 tier); the source-pin tier (main-glue.test.ts 1.3 wiring test) was added in story 1.3 review pass 1'
 ---
 
 <intent-contract>
@@ -92,7 +94,31 @@ deferred: []
 
 ## Review Triage Log
 
-(empty — first review pass pending)
+### 2026-11-22 — review pass 1 (blind-hunter, edge-case-hunter, verification-gap, intent-alignment)
+
+- verdicts: 21 findings — high 1, medium 6, low 6, deferred 1, rejected 6, note 1
+- findings:
+  - [high] [patch] main.ts's 1.3 room/spawn wiring (buildRoomScene call, Three adapter, OffscreenCanvas factory, ENTRY_SPAWN arg, token clear-colour) reached no test, while scene.test.ts's header claimed main-glue pinned it — blind-hunter + verification-gap; main-glue.test.ts gained a 4th source-pin test (repo's designated tier per the 1.2 precedent), demonstrated red by deleting the build call, restored byte-identical; the header claim is now true.
+  - [medium] [patch] Rule 14 literal non-ASCII in string literals: U+00B7 in surfaces.ts split separator, U+2014 in five test-name strings — replaced with `\u00b7` / `\u2014` escape sequences; literal em-dash/middot remain only in comments (committed convention).
+  - [medium] [patch] scene.test.ts "no volume gets a second copy and no mesh drifts off its volume" was tautological (meshes filtered against the seam's own geometry list) — replaced with a real per-volume footprint+dims copy count (must be exactly 1).
+  - [medium] [patch] occlusion.test.ts sampled every blocksMovement volume, so 1.4 shells placed at the sightline endpoints would flip the 1.3 design pins with no occlusion change — blockers() now samples the kind-pillar occluder subset the story designed.
+  - [medium] [patch] room.test.ts flyer-beside-door assertion was dead arithmetic (`max.x - 0.5 + 0.5` cancels to a centre test, ignores the sheet width) — now edge-based: the sheet's near edge must clear the door volume's face.
+  - [medium] [patch] AC5 test title overclaimed ("all circulation probes >= the contract 1.20m" while the approach bound is 0.70m) — title rewritten to what it pins; the 1.20 contract binds via the main-aisle record + per-slot corridor depths. Reading recorded: the spec's Never bars the Epic-3 lint TOOLS, and co-located data pins are the only binding surface that exists pre-CI.
+  - [medium] [patch] authored constants retyped across modules/tests (ceiling 3.0-vs-WALL_TOP, glow Y vs DOOR_TOP, 0.25 wall/player radius) — collision-volumes now exports WALL_TOP and DOOR_TOP; scene.ts derives ceiling Y and DOOR_GLOW_Y from them; room.test.ts imports WALL_T and PLAYER_RADIUS; scene.test ceiling pin derives from WALL_TOP.
+  - [low] [patch] door-glow intensity/reach were bare literals in the builder while zone lights are named constants — DOOR_GLOW_INTENSITY/DOOR_GLOW_REACH named, labelled (inference, Design Notes 7).
+  - [low] [patch] wainscot band's +0.01 along-wall widening crossed into the door gap (5mm floating jambs exactly where 1.9's door-open beat swings) — front-wall bands now widen away from the opening.
+  - [low] [patch] surfaces.ts need2d guarded ctx only; a factory handing back a non-surface died with a raw TypeError — guard now throws the loud error.
+  - [low] [patch] sign-facing branch treated zero/diagonal facing implicitly as ±X/±Z — scene.ts throws unless a surface faces exactly one axis.
+  - [low] [patch] paintFlyer font stack was the one authored choice with no (inference) label — labelled.
+  - [low] [patch] zones.ts comment called the identity light "down-facing" (a PointLight cannot face) — reworded to "hung at ceiling height".
+  - [deferred] [owner: Epic 3] executed coverage of main.ts's real-THREE adapter (the seam's mapping to real THREE.*) — the browser harness tier (DW-12 precedent); the source-pin tier was added this pass instead, executed browser coverage lands with Epic 3 CI.
+  - [rejected] player.test.ts 500-tick walk has ~0.07m slack — the tightness is the pin's purpose: retuned step constants SHOULD surface as red.
+  - [rejected] incidental composition counts pinned (38 meshes, 2 canvases, 7 lights) — deliberate falsifiable composition pins; 1.4 edits them knowingly.
+  - [rejected] source-grep enforcement of no-emissive/no-curved-primitives duplicates the behavioral pins — defense-in-depth by design (the AC names both the material law and the hard-corners law).
+  - [rejected] test-local occlusion/measurement helpers duplicated between room.test.ts and occlusion.test.ts — the production raycaster is barred this story (AD-7/Epic 2 Never); Design Notes "Extend, don't copy" records the choice.
+  - [rejected] "ids stable" read retrospectively (wall-front, cabinet-1..3 kept) — the spine row's paren is the forward pin law (tests pin ids, not coords); 1.2's shared-surface row pre-authorized exactly these test moves for this rewrite; AC1 pins the authored id set.
+  - [rejected] spec status/baseline block in the diff — workflow-owned run state, not code (this skill writes it by design).
+  - [note] local runs used Node 24 while engines pins 26 — environmental, not introduced by the diff; suite green on both (type-stripping).
 
 ## Design Notes
 
@@ -127,13 +153,14 @@ deferred: []
 - `npm run build` (once) -- Vite build exit 0
 
 **Pinning tests & demonstrated mutations (Rule 19; each to be observed red, reverted, tree byte-identical, suite re-green at implement time):**
-- AC1 pin: authored id set + door blocks the gap + street beyond the front wall (room.test.ts) — planned mutation: delete the `door-front` entry → the walk-through-door and id-set pins red.
-- AC2 pin: consecutive slot pitch == 1.40 + revision id present (room.test.ts) — planned mutation: change one L-run center by 0.05 → pitch pin red, aisle probe still green (proves the pins are independent).
-- AC3 pin: sightline spawn→L0 blocked by exactly `pillar-1` (occlusion.test.ts) — planned mutation: move `pillar-1` 1m in +x → roadmap-clear pins stay green, L0 sightline turns unblocked → red.
-- AC4 pin: hues === DESIGN token hexes per zone; amber lights outside snack/casual rects (room.test.ts) — planned mutation: swap the workshop hue to the green hex → hue pin red.
-- AC5 pin: aisle probes ≥1.20 (room.test.ts) — planned mutation: move `pillar-1` to (−8.0, slot-L2.z) → pillar↔cabinet clearance probe red.
-- AC6 pin: exactly one text surface, verbatim string incl. `·` (room.test.ts / surfaces.test.ts fake canvas) — planned mutation: drop the middle dot in the source string → verbatim pin red.
-- AC7 pin: zero emissive on wall/pillar materials + BoxGeometry-only scan (scene pins) — planned mutation: set emissive on the wall material → pin red.
+- AC1 pin: authored id set + door blocks the gap + street beyond the front wall (room.test.ts) — demonstrated: deleted the `door-front` entry -> room.test.ts id-set pin, AC6 door pin, and player.test.ts walk-into-door pin went red (exit 1); reverted byte-identical.
+- AC2 pin: consecutive slot pitch == 1.40 + revision id present (room.test.ts) — demonstrated: moved one L-run center 0.05 (L2 x -0.7 -> -0.65) -> pitch pin red, aisle probes stayed green (pins independent); reverted byte-identical.
+- AC3 pin: sightline spawn->L0 blocked by exactly `pillar-1` (occlusion.test.ts) — demonstrated: moved `pillar-1` 1m in +x -> L0 sightline pin red, roadmap-clear pins green; reverted byte-identical.
+- AC4 pin: hues === DESIGN token hexes per zone; amber lights outside snack/casual rects (room.test.ts) — demonstrated: swapped the WORKSHOP hue to the green token -> hue pin red; reverted byte-identical.
+- AC5 pin: aisle probes (room.test.ts) — demonstrated: moved `pillar-1` to (-8.0, the L2-row z) -> recorded pillar->slot clearance pin red ("recorded pillar->slot min 0.55"); reverted byte-identical.
+- AC6 pin: exactly one text surface, verbatim string incl. `·` (room.test.ts / surfaces.test.ts fake canvas) — demonstrated: dropped the middle dot in the source string -> verbatim pin red. Revert needed a byte-exact node repair (the Edit tool's fuzzy non-ASCII matching had written a literal U+00B7 where the source keeps `\u00b7` escapes); sha256 restored to the pre-mutation record. Rule 14 tightened in the review pass: the surfaces.ts split separator now uses an escape too.
+- AC7 pin: zero emissive on wall/pillar materials + BoxGeometry-only scan (scene pins) — demonstrated: added `emissive: 0xff6b5e` to the wall material -> zero-emissive pin red; reverted byte-identical.
+- 1.3 entry-wiring pin (main-glue.test.ts, added by review pass 1) — demonstrated: removed the `buildRoomScene(three, scene, makeCanvas);` line from core/main.ts -> the wiring pin went red (nothing else in the suite failed — the gap the pin closes); restored byte-identical (sha256 match).
 
 **Shared surfaces:** `core/room/collision-volumes.ts` id set (1.2 pins that address `wall-front`, `cabinet-1..3` and the default-spawn line move with this rewrite — list in the Code Map; the exact-ids pin is rewritten to the authored set), `INTERIOR` export (pins keep), player default-spawn test fixture (untouched), `core/no-ui-dom.test.ts` dev-serve module list (extended), `generated/game-registry.ts` entry count (0, unchanged), root `package.json` scripts (unchanged — no new scripts). Standing criterion: every test added or changed passes on a fresh environment, in either order.
 
@@ -144,7 +171,19 @@ deferred: []
 
 ## Auto Run Result
 
-Status: ready-for-dev
+Summary: the authored Arcade Room delivered per the Code Map — one authored AABB volume list rewritten in place (envelope walls with the bottom-center door gap, closed blocking door, two occluder pillars, street side), 20-slot Wall Slot config under revision `wallslots-r1-2026-11-21` with fill-scan indices and roadmap stretch, four fixed zones with DESIGN-exact hues plus roadmap amber, the one Welcome Flyer surface, design tokens, injected-canvas painters, a fake-Seam-pinned scene builder extruding one box per volume, and main.ts wiring onto it with ENTRY_SPAWN; the 1.2 resolver untouched. Review pass 1 (four layers) triaged 21 grouped findings: 13 patched inline, 1 deferred (Epic-3 harness tier), 6 rejected with reasons, 1 environmental note.
+
+Files changed: `core/room/collision-volumes.ts` (rewritten in place; now exports WALL_T/WALL_TOP/DOOR_TOP/INTERIOR/ENTRY_SPAWN), `core/room/slot-config.ts`, `core/room/zones.ts`, `core/room/signage.ts`, `core/room/tokens.ts`, `core/room/surfaces.ts`, `core/room/scene.ts`, `core/room/room.test.ts`, `core/room/occlusion.test.ts`, `core/room/surfaces.test.ts`, `core/room/scene.test.ts` (all new), `core/main.ts` (room build + entry spawn), `core/main-glue.test.ts` (1.3 wiring pin added in review pass 1), `core/player.test.ts` + `core/player-qa.test.ts` (Code-Map-preauthorized pin moves only), `core/no-ui-dom.test.ts` (room-module scan extended), this spec.
+
+Review findings breakdown: 21 findings — high 1 (patched), medium 6 (patched), low 6 (patched), deferred 1 (frontmatter `deferred:`), rejected 6, note 1. Full rows in the Review Triage Log.
+
+Follow-up review recommendation: yes — this pass patched a high finding (entry-wiring coverage gap); a fresh pass at the next epic-cycle encounter of this diff is warranted.
+
+Verification performed: `npm run typecheck` exit 0; `npm test` 141/141 green (140/140 before the review patches; the new main-glue wiring pin is the +1); `node ci/depcheck.mjs` exit 0; `node ci/lint-bans.mjs` exit 0; `node tools/gen-registry.mjs && git diff --exit-code -- generated/` byte-identical; `npm run build` exit 0 (chunk-size warning = the three.js bundle, expected, no gate). Matrix Test Audit: all 12 I/O rows mapped to executed green tests; the Chrome-vs-Edge row is the lead's designated smoke tier (DW-12 precedent). Rule 19: all seven planned AC mutations observed red then reverted byte-identical (sha256), plus the added wiring-pin mutation (delete buildRoomScene call -> only the new pin red, restored byte-identical). Rule 3 manual browser checks NOT executed by this stage — no browser harness; they are the lead's per-story smoke listed under Manual checks.
+
+Residual risks: real-browser runtime evidence (hue readability at 6m, flyer legibility, screenshots to `evidence/story-1-3-smoke-*`) rests with the lead's Chrome+Edge smoke this story; the Three seam's mapping to real THREE.* runs only in the browser (source-pinned, not executed — deferred); local verification ran on Node 24 while `engines` pins 26 (type-stripping works both; environment, not the diff).
+
+Status: done
 Blocking condition: none
 
 Plan pass (this section covers this pass only). Epic context reused (valid, not recompiled); 1.2 continuity loaded; spine consulted — AD-7/AD-10/AD-24/AD-25 governed, the "Room geometry & collision" Conventions row is this story's binding form; room-layout.md + DESIGN.md tokens + floor-plan measurements loaded once; geometry authored and pre-measured (both sampled sightlines blocked, roadmap sightlines clear, aisle minima ≥1.20m, min pillar↔cabinet 5.05m — computed, not assumed); ledger inbox empty (nothing to address or decline).

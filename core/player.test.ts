@@ -1,12 +1,16 @@
-// Story 1.2 AC2/AC4/AC6/AC7: first-person controller pins, one per I/O
-// matrix row — walk at 1.4 m/s along facing with eye height 1.60m, pitch
-// clamp ±85°, diagonal speed magnitude, circle-vs-AABB blocking against
-// placeholder walls/pillars/cabinet stubs with wall slide, head bob by
-// distance with settle to 1.60m, center-of-view targeting (reach 2.0m,
-// targetable volumes only), E-press edges once with no consumer -> no state
-// change and no event, and the "Integration" row: two headless loop runs
-// with identical scripted device views produce identical player transcripts.
+// Story 1.2 AC2/AC4/AC6/AC7 pins, moved onto the authored 1.3 room per
+// story 1.2's pre-authorization ("Story 1.3 rewrites that data and the
+// tests that pin placeholder positions move with it"): walk at 1.4 m/s
+// along facing with eye height 1.60m, pitch clamp ±85°, diagonal speed
+// magnitude, circle-vs-AABB blocking against the AUTHORED walls/pillars/
+// door with wall slide, head bob by distance with settle to 1.60m,
+// center-of-view targeting against test-local targetable fixtures
+// (targeting is controller behaviour; the authored room has no cabinets
+// until 1.4), E-press edges once with no consumer -> no state change and
+// no event, and the "Integration" row: two headless loop runs with
+// identical scripted device views produce identical player transcripts.
 // Tests pin volume IDS, not raw coords, wherever they can (Shared surfaces).
+// Data-shape pins for the authored room itself live in core/room/room.test.ts.
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -25,7 +29,7 @@ import {
 } from "./player.ts";
 import type { DeviceView } from "./input/index.ts";
 import { createInputService } from "./input/index.ts";
-import { collisionVolumes, INTERIOR, type CollisionVolume } from "./room/collision-volumes.ts";
+import { collisionVolumes, ENTRY_SPAWN, type CollisionVolume } from "./room/collision-volumes.ts";
 import { createKernelLoop, MAX_CATCHUP_STEPS, MS_PER_TICK, type KernelLoop } from "./loop.ts";
 import { math } from "./contract/index.ts";
 
@@ -43,7 +47,7 @@ function view(
 
 function volById(id: string): CollisionVolume {
   const v = collisionVolumes.find((c) => c.id === id);
-  assert.ok(v, `placeholder volume "${id}" must exist (1.3 keeps the id)`);
+  assert.ok(v, `authored volume "${id}" must exist`);
   return v;
 }
 
@@ -51,32 +55,19 @@ function stepN(p: PlayerController, n: number, v: DeviceView): void {
   for (let i = 0; i < n; i++) p.step(1, v);
 }
 
-test("placeholder collision data: authored ids, envelope contract numbers, pure-data sanity (AC6)", () => {
-  const ids = collisionVolumes.map((v) => v.id);
-  assert.deepEqual(
-    [...ids].sort(),
-    ["cabinet-1", "cabinet-2", "cabinet-3", "pillar-1", "pillar-2", "wall-back", "wall-front", "wall-left", "wall-right"],
-  );
-  // Envelope: four walls close the 19m x 12.5m interior (room-layout.md).
-  assert.equal(INTERIOR.width, 19);
-  assert.equal(INTERIOR.depth, 12.5);
-  assert.equal(volById("wall-back").max.z, -INTERIOR.depth / 2);
-  assert.equal(volById("wall-front").min.z, INTERIOR.depth / 2);
-  assert.equal(volById("wall-left").max.x, -INTERIOR.width / 2);
-  assert.equal(volById("wall-right").min.x, INTERIOR.width / 2);
-  // Blocking and targeting grammar: everything blocks; only cabinets target.
-  for (const v of collisionVolumes) assert.equal(v.blocksMovement, true, v.id);
-  for (const v of collisionVolumes) {
-    assert.equal(v.targetable, v.kind === "cabinet", `${v.id} targetable`);
-  }
-  // Cabinet stubs sit at 1.40m pitch along the back wall (slot pitch).
-  const c2 = volById("cabinet-2");
-  const c3 = volById("cabinet-3");
-  assert.ok(Math.abs(c3.min.x - c2.min.x - 1.4) < 1e-9, "slot pitch 1.40m");
-  for (const v of collisionVolumes) {
-    assert.ok(v.min.x < v.max.x && v.min.y < v.max.y && v.min.z < v.max.z, `${v.id} min<max`);
-  }
-});
+// Test-local targetable fixture (Code Map: targeting is controller behaviour
+// — pass a synthetic volume list to the injectable constructor; the authored
+// room has no cabinets until 1.4 places shells into slots).
+function fixtureCabinet(id: string, faceZ: number): CollisionVolume {
+  return {
+    id,
+    min: { x: -0.35, y: 0, z: faceZ - 0.6 },
+    max: { x: 0.35, y: 1.8, z: faceZ },
+    blocksMovement: true,
+    targetable: true,
+    kind: "cabinet",
+  };
+}
 
 test("walk: 1.4 m/s along facing at eye height, straight ahead (yaw 0 -> -Z)", () => {
   const p = createPlayerController(collisionVolumes, { x: 3, z: 0 });
@@ -118,20 +109,32 @@ test("wall block: stop at face minus player radius; strafing still slides", () =
   stepN(p, 60, view([0, 1]));
   assert.equal(p.state.z, face + PLAYER_RADIUS);
   assert.ok(p.state.x > 3 + 1);
-  // front wall from the other side
-  const p2 = createPlayerController(collisionVolumes, { x: 0, z: 0 });
-  stepN(p2, 500, view([-1, 0]));
-  assert.equal(p2.state.z, volById("wall-front").min.z - PLAYER_RADIUS);
+  // from the entry spawn, walking forward (toward the street-side door)
+  // presses against the closed door, never through it
+  const p2 = createPlayerController(collisionVolumes, ENTRY_SPAWN);
+  stepN(p2, 100, view([-1, 0])); // S held: +Z into door-front
+  assert.equal(p2.state.z, volById("door-front").min.z - PLAYER_RADIUS);
 });
 
-test("pillar and cabinet stubs block: circle pushout stops the center at face minus r", () => {
-  const p = createPlayerController(collisionVolumes, { x: 4, z: 2.5 });
-  stepN(p, 300, view([1, 0])); // into pillar-2
+test("authored room, real consumer (Rule 1): scripted W from the entry spawn stops at the wall-back face minus the player radius", () => {
+  const p = createPlayerController(collisionVolumes, ENTRY_SPAWN);
+  assert.deepEqual({ x: p.state.x, z: p.state.z, yaw: p.state.yaw }, ENTRY_SPAWN);
+  stepN(p, 500, view([1, 0])); // straight to the back wall at x=0
+  assert.equal(p.state.z, volById("wall-back").max.z + PLAYER_RADIUS);
+  assert.equal(p.state.x, ENTRY_SPAWN.x);
+});
+
+test("authored pillars block and slide: circle pushout stops at the face minus r; a diagonal into pillar-1 stops on one axis and keeps sliding (matrix Real-consumer row)", () => {
+  const p = createPlayerController(collisionVolumes, { x: 3.9, z: 3.2 });
+  stepN(p, 300, view([1, 0])); // -Z into pillar-2's south face
   assert.equal(p.state.z, volById("pillar-2").max.z + PLAYER_RADIUS);
 
-  const c = createPlayerController(collisionVolumes, { x: 0, z: 3.5 });
-  stepN(c, 500, view([1, 0])); // default spawn line walks into cabinet-2
-  assert.equal(c.state.z, volById("cabinet-2").max.z + PLAYER_RADIUS);
+  // diagonal: blocked on X against pillar-1's west face, Z keeps sliding
+  const d = createPlayerController(collisionVolumes, { x: -5.0, z: 0.8 });
+  stepN(d, 100, view([-1, 1])); // normalized (+X, +Z) toward the pillar face
+  assert.equal(d.state.x, volById("pillar-1").min.x - PLAYER_RADIUS);
+  assert.ok(d.state.z > volById("pillar-1").min.z - PLAYER_RADIUS, "slid along the face");
+  assert.ok(d.state.z < volById("pillar-1").max.z + PLAYER_RADIUS, "still mid-face");
 });
 
 test("head bob: amplitude holds while walking, phase rides distance, settles to 1.60m in <=0.25s", () => {
@@ -149,17 +152,17 @@ test("head bob: amplitude holds while walking, phase rides distance, settles to 
   assert.equal(cameraY(p.state), EYE_HEIGHT);
 });
 
+// Targeting pins run against a test-local targetable fixture (Code Map:
+// targeting is controller behaviour — the authored room's targetable set is
+// empty until 1.4's shells).
 test("targeting: center-of-view within reach sets targetId; turning/moving off clears to null", () => {
-  const p = createPlayerController(collisionVolumes, { x: 0, z: 3.5 });
+  const p = createPlayerController([fixtureCabinet("qa-cabinet", -4.0)], { x: 0, z: -1.9 });
   stepN(p, 1, view());
-  assert.equal(p.state.targetId, null); // ~9m away, past reach
-  p.state.z = -3.6; // scripted: just outside 2.0m of the cabinet-2 face
-  stepN(p, 1, view());
-  assert.equal(p.state.targetId, null);
+  assert.equal(p.state.targetId, null); // 2.1m to the face, past reach
   assert.ok(TARGET_REACH === 2.0);
-  p.state.z = -3.6 - 0.2; // step in: 1.85m from the face, inside reach
+  p.state.z = -3.6; // 0.4m from the face, inside reach
   stepN(p, 1, view());
-  assert.equal(p.state.targetId, "cabinet-2");
+  assert.equal(p.state.targetId, "qa-cabinet");
   // turn 180° via the aim channel — center of view no longer aims at it
   p.step(1, view([0, 0], [-math.PI / MOUSE_SENSITIVITY, 0]));
   assert.ok(Math.abs(Math.abs(p.state.yaw) - math.PI) < 1e-6);
@@ -173,9 +176,9 @@ test("targeting ignores non-targetable volumes: a wall at point-blank never sets
 });
 
 test("E press with a target and no registered handler: no state change, no event, no fault (AC4)", () => {
-  const p = createPlayerController(collisionVolumes, { x: 0, z: 3.5 });
-  stepN(p, 400, view([1, 0])); // walk to the cabinet and target it
-  assert.equal(p.state.targetId, "cabinet-2");
+  const p = createPlayerController([fixtureCabinet("qa-cabinet", -4.0)], { x: 0, z: -1.9 });
+  stepN(p, 400, view([1, 0])); // walk to the cabinet face and target it
+  assert.equal(p.state.targetId, "qa-cabinet");
   stepN(p, 20, view()); // stand still: bob settles, phase freezes -> state is static
   assert.equal(p.state.bobAmp, 0);
   const before = p.snapshot();
@@ -191,15 +194,15 @@ test("E press with a target and no registered handler: no state change, no event
 });
 
 test("E press with a registered handler fires exactly on the press edge, once", () => {
-  const p = createPlayerController(collisionVolumes, { x: 0, z: 3.5 });
+  const p = createPlayerController([fixtureCabinet("qa-cabinet", -4.0)], { x: 0, z: -1.9 });
   const seen: string[] = [];
-  p.registerInteractable("cabinet-2", (id) => seen.push(id));
+  p.registerInteractable("qa-cabinet", (id) => seen.push(id));
   stepN(p, 400, view([1, 0]));
-  assert.equal(p.state.targetId, "cabinet-2");
+  assert.equal(p.state.targetId, "qa-cabinet");
   p.step(1, view([0, 0], [0, 0], [true, true]));
   p.step(1, view([0, 0], [0, 0], [true, false]));
   p.step(1, view([0, 0], [0, 0], [true, false]));
-  assert.deepEqual(seen, ["cabinet-2"]); // once, on the edge tick
+  assert.deepEqual(seen, ["qa-cabinet"]); // once, on the edge tick
 });
 
 // --- Integration (Rule 1): real input service, real loop, real volumes ----
@@ -212,7 +215,8 @@ interface Session {
 }
 
 // A scripted 400-frame session driven through the REAL device service and
-// the REAL loop pump: W held toward the back-wall cabinets, a click-granted
+// the REAL loop pump over the REAL authored volumes (plus the one fixture
+// shell): W held down the -Z line, a click-granted
 // pointer lock (aim deltas flow from there on), a 10s wall-clock pump gap
 // (models the loop's catch-up bound only — the device-buffer half of the
 // "Backgrounded tab resume" row is the visibility clear at f=390 here plus
@@ -222,11 +226,17 @@ interface Session {
 // re-arms), an E press with the cabinet centered (no consumer this story),
 // and a visibility clear. Identical scripted device events must yield
 // identical observable player transcripts.
+// The real authored volume list plus one test-local targetable shell
+// (the authored room has no cabinets until 1.4; targeting is controller
+// behaviour, so the scripted session drives it with a fixture the room
+// data would legitimately hold once shells land).
+const sessionVolumes: CollisionVolume[] = [...collisionVolumes, fixtureCabinet("qa-shell", -4.95)];
+
 function scriptedSession(): Session {
   let wall = 0;
   const loop = createKernelLoop({ now: () => wall });
   const input = createInputService({ requestPointerLock: () => {} });
-  const player = createPlayerController(collisionVolumes);
+  const player = createPlayerController(sessionVolumes);
   loop.addSystem("player", () => player.step(1, input.takeView()));
   const transcript: PlayerState[] = [];
   let events = 0;
@@ -260,11 +270,11 @@ test("Integration: two headless loop runs, identical scripted device views -> id
   const first = a.transcript[0]!;
   const last = a.transcript[a.transcript.length - 1]!;
   assert.notDeepEqual(first, last);
-  const firstSet = a.transcript.findIndex((s) => s.targetId === "cabinet-2");
-  assert.ok(firstSet >= 0, "target appears once the cabinet enters center-of-view reach");
+  const firstSet = a.transcript.findIndex((s) => s.targetId === "qa-shell");
+  assert.ok(firstSet >= 0, "target appears once the shell enters center-of-view reach");
   const cleared = a.transcript.findIndex((s, i) => i > firstSet && s.targetId === null);
   assert.ok(cleared > firstSet, "the scripted look-off clears the target");
-  const rearmed = a.transcript.findIndex((s, i) => i > cleared && s.targetId === "cabinet-2");
+  const rearmed = a.transcript.findIndex((s, i) => i > cleared && s.targetId === "qa-shell");
   assert.ok(rearmed > cleared, "the scripted re-center re-arms it");
   assert.equal(a.faults, 0);
   assert.equal(a.events, 0); // E press has no consumer this story: no events

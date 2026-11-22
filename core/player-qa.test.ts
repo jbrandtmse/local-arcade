@@ -57,13 +57,23 @@ test("side walls block: X-face clamp stops the center at face minus radius; walk
   assert.equal(q.state.x, volById("wall-left").max.x + PLAYER_RADIUS);
 });
 
+// Targeting is controller behaviour — run against a test-local targetable
+// fixture (the authored room has no cabinets until 1.4's shells).
 test("targeting respects pitch: looking steeply up past the cabinet top clears the target (AC4)", () => {
-  const p = createPlayerController(collisionVolumes, { x: 0, z: 3.5 });
-  stepN(p, 400, mv([1, 0])); // walk to cabinet-2's face, centered
-  assert.equal(p.state.targetId, "cabinet-2");
+  const fixture: CollisionVolume = {
+    id: "qa-cabinet",
+    min: { x: -0.35, y: 0, z: -4.6 },
+    max: { x: 0.35, y: 1.8, z: -4.0 },
+    blocksMovement: true,
+    targetable: true,
+    kind: "cabinet",
+  };
+  const p = createPlayerController([fixture], { x: 0, z: -1.9 });
+  stepN(p, 400, mv([1, 0])); // walk to the cabinet face, centered
+  assert.equal(p.state.targetId, "qa-cabinet");
   p.step(1, mv([0, 0], [0, -0.8 / MOUSE_SENSITIVITY])); // pitch rises to +0.8 rad
   assert.ok(Math.abs(p.state.pitch - 0.8) < 1e-9);
-  assert.equal(p.state.targetId, null); // the center of view clears the 1.8m stub top
+  assert.equal(p.state.targetId, null); // the center of view clears the 1.8m top
 });
 
 test("aim deltas land exactly once through the real loop: the next tick sees zero, not a carry (AC2)", () => {

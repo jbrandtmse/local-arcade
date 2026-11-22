@@ -12,7 +12,7 @@
 // dep is added here.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { createServer } from "vite";
 
@@ -53,6 +53,22 @@ test("core/input/index.ts is DOM-free: device capture never paints a prompt or o
   }
 });
 
+// Story 1.3: the whole authored-room layer (data + scene builder + canvas
+// painters) must be DOM-free the same way the input service is — the room
+// grows meshes and injected-canvas textures, never markup (AD-24: the
+// Welcome Flyer is a texture-mapped surface, not a DOM overlay).
+test("core/room modules are DOM-free: room data, scene builder, and painters never touch the DOM", () => {
+  const roomDir = path.join(REPO, "core", "room");
+  const sources = readdirSync(roomDir).filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"));
+  assert.ok(sources.length >= 6, "the authored-room modules exist to scan");
+  for (const file of sources) {
+    const src = readFileSync(path.join(roomDir, file), "utf8");
+    for (const banned of ["document.", "window.", "localStorage", "navigator.", "createElement", "style."]) {
+      assert.ok(!src.includes(banned), `core/room/${file} must not touch ${banned}`);
+    }
+  }
+});
+
 test("dev serve (real HTTP): the served body is unchanged, the 1.2 shell modules resolve", async () => {
   const server = await createServer({
     configFile: CONFIG,
@@ -68,7 +84,18 @@ test("dev serve (real HTTP): the served body is unchanged, the 1.2 shell modules
     const tags = [...bodyInner(html).matchAll(/<([a-zA-Z][a-zA-Z0-9-]*)/g)].map((m) => m[1]);
     assert.deepEqual(tags, ["script"], "served DOM grows nothing beyond the entry script");
 
-    for (const moduleUrl of ["/core/main.ts", "/core/player.ts", "/core/input/index.ts", "/core/room/collision-volumes.ts"]) {
+    for (const moduleUrl of [
+      "/core/main.ts",
+      "/core/player.ts",
+      "/core/input/index.ts",
+      "/core/room/collision-volumes.ts",
+      "/core/room/slot-config.ts",
+      "/core/room/zones.ts",
+      "/core/room/signage.ts",
+      "/core/room/tokens.ts",
+      "/core/room/scene.ts",
+      "/core/room/surfaces.ts",
+    ]) {
       const res = await fetch(`http://127.0.0.1:${DEV_PORT}${moduleUrl}`);
       assert.equal(res.status, 200, `${moduleUrl} resolves in the dev graph`);
     }

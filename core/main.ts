@@ -12,7 +12,10 @@ import { createKernelLoop, type KernelLoop } from "./loop.ts";
 import { createGameInstance, math } from "./contract/index.ts";
 import { createInputService } from "./input/index.ts";
 import { createPlayerController, EYE_HEIGHT, type PlayerController } from "./player.ts";
-import { collisionVolumes } from "./room/collision-volumes.ts";
+import { ENTRY_SPAWN, collisionVolumes } from "./room/collision-volumes.ts";
+import { buildRoomScene, type Three } from "./room/scene.ts";
+import { ROOM_BLACK } from "./room/tokens.ts";
+import type { CanvasFactory } from "./room/surfaces.ts";
 import { gameRegistry } from "../generated/game-registry.ts";
 
 declare global {
@@ -23,9 +26,6 @@ declare global {
   }
 }
 
-// Design token: Room Black (UX DESIGN.md) — the dark the glow sits against.
-const ROOM_BLACK = 0x15110e;
-
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setClearColor(ROOM_BLACK, 1);
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -35,6 +35,21 @@ document.body.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.rotation.order = "YXZ"; // yaw then pitch, matching the player controller's convention
+
+// Story 1.3: the authored room — volumes/zones/slots/signage/tokens extruded
+// to meshes and lights ONCE here (static authored scene, AD-3/AD-15). The
+// painters take injected OffscreenCanvas factories, so the page still grows
+// exactly one DOM node: the renderer canvas below (no-ui-dom pin).
+const makeCanvas: CanvasFactory = (width, height) => new OffscreenCanvas(width, height);
+const three: Three = {
+  boxGeometry: (w, h, d) => new THREE.BoxGeometry(w, h, d),
+  standardMaterial: (params) => new THREE.MeshStandardMaterial(params as THREE.MeshStandardMaterialParameters),
+  mesh: (geometry, material) => new THREE.Mesh(geometry as THREE.BufferGeometry, material as THREE.Material),
+  pointLight: (color, intensity, distance) => new THREE.PointLight(color, intensity, distance),
+  ambientLight: (color, intensity) => new THREE.AmbientLight(color, intensity),
+  canvasTexture: (source) => new THREE.CanvasTexture(source as CanvasImageSource),
+};
+buildRoomScene(three, scene, makeCanvas);
 
 // The kernel loop drives instances from the build-generated registry plus
 // the player system; wall-clock only feeds the accumulator (AD-3).
@@ -48,10 +63,10 @@ for (const entry of gameRegistry) {
   loop.addInstance(entry.id, createGameInstance(entry.createSim, entry.seed ?? 0));
 }
 
-// First-person shell: the placeholder collision stubs from core/room drive
-// blocking; the real room geometry is Story 1.3's job and replaces this
-// data in place.
-const player = createPlayerController(collisionVolumes);
+// First-person shell: the authored Arcade Room AABB list (1.3) drives
+// blocking through the untouched 1.2 resolver, and the visitor spawns just
+// inside the street-side door facing the room (ENTRY_SPAWN, room data).
+const player = createPlayerController(collisionVolumes, ENTRY_SPAWN);
 const input = createInputService({
   requestPointerLock: () => {
     // Denial (Esc cooldown, gesture policy) must stay silent at every layer,

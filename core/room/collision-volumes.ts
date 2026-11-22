@@ -1,19 +1,24 @@
-// Story 1.2 (AC6): authored placeholder collision volumes — the first
-// occupant of core/room. Pure data, no logic. The player resolver
-// (core/player.ts) reads this list; Story 1.3 replaces/extends the entries
-// in place, and the occluder collider set and visual geometry (1.3, Epic 2
-// audio) reuse the same list shape — one authored AABB list serves collision
-// now and occluder/render geometry later.
+// Story 1.3 (AC1/AC3): the authored Arcade Room AABB list — the 1.2
+// placeholder data rewritten IN PLACE (spine Conventions row "Room geometry
+// & collision"): this one list is the single source for movement blocking,
+// the occluder collider set for Epic 2's Audio Manager raycasts (AD-7:
+// "what blocks the ear blocks the eye"), and visual extrusion (scene.ts).
+// Collision/render code never hardcodes geometry; the resolver (1.2,
+// untouched) is code, these volumes are data.
 //
-// Contract numbers from room-layout.md: interior ~19m x 12.5m, Wall Slot
-// pitch ~1.40m, stand-up footprint ~0.60m, eye height 1.60m, aisles >=1.20m.
-// The two pillar stubs and the three cabinet stubs' exact positions are
-// placeholder (spec Design Notes item 3, inference) — tests pin ids, not
-// raw coords, so 1.3's rewrite moves the data without rework.
+// Contract numbers from room-layout.md (that file wins over the floor plan):
+// interior 19m x 12.5m, slot pitch 1.40m, aisles never <1.20m. Front door
+// bottom-center, closed and blocking (the open beat is 1.9); street-side
+// geometry beyond it. The two occluder pillars are authored by measurement,
+// NOT plan pixels (spec Design Notes item 2, inference): both sampled
+// door->backmost-side-slot sightlines break on exactly one pillar, both
+// door->frontmost-slot roadmap sightlines stay clear (the CAP-2 success),
+// and every pillar->cabinet-box gap is >=5m.
 //
 // Coordinates: X across the room, Z from the front door (+Z) to the back
-// wall (-Z), Y up. Collision resolves in the XZ plane; the Y extents exist
-// for the future render/occluder reuse.
+// wall (-Z), Y up. Collision resolves in the XZ plane; Y extents serve the
+// render/occluder reuse. Wall thickness 0.25 and wall height 3.0 are
+// (inference); the interior envelope is contract.
 
 export interface Vec3 {
   x: number;
@@ -21,7 +26,9 @@ export interface Vec3 {
   z: number;
 }
 
-export type VolumeKind = "wall" | "pillar" | "cabinet";
+// "cabinet" stays in the vocabulary: 1.4's stand-up shells enter this list
+// as targetable cabinet volumes; the authored room itself has none yet.
+export type VolumeKind = "wall" | "pillar" | "door" | "street" | "cabinet";
 
 export interface CollisionVolume {
   id: string;
@@ -35,30 +42,27 @@ export interface CollisionVolume {
 /** Interior envelope contract dimensions (room-layout.md). */
 export const INTERIOR = { width: 19, depth: 12.5 } as const;
 
+// Authored entry spawn: just inside the front door, facing the back wall
+// (spec Design Notes item 9; the 1.2 controller default spawn stays for
+// tests). yaw 0 looks toward -Z.
+export const ENTRY_SPAWN = { x: 0, z: 5.6, yaw: 0 } as const;
+
 const HALF_X = INTERIOR.width / 2; // 9.5
 const HALF_Z = INTERIOR.depth / 2; // 6.25
-const WALL_T = 0.25; // placeholder thickness; visual extrusion is 1.3's job
-const WALL_TOP = 3; // placeholder height; real wall art is 1.3's job
-
-// Wall Slot pitch 1.40m along the back wall; ~0.60m stand-up footprint depth.
-const CABINET_PITCH = 1.4;
-const CABINET_W = 0.75;
-const CABINET_D = 0.6;
-const CABINET_H = 1.8;
-
-function cabinetStub(id: string, center: number): CollisionVolume {
-  return {
-    id,
-    min: { x: center - CABINET_W / 2, y: 0, z: -HALF_Z },
-    max: { x: center + CABINET_W / 2, y: CABINET_H, z: -HALF_Z + CABINET_D },
-    blocksMovement: true,
-    targetable: true, // E-targeting (UX-DR18): the coin door's consumer is 1.4
-    kind: "cabinet",
-  };
-}
+/** Wall thickness, metres — (inference); scene.ts reads it, never retypes. */
+export const WALL_T = 0.25;
+/** Wall height, metres — (inference, spec Design Notes item 6); scene.ts
+ * rests the ceiling on it, never retypes it. */
+export const WALL_TOP = 3.0;
+const DOOR_T = 0.12; // door panel thickness (inference, Design Notes item 6)
+/** Door head height (inference, Design Notes item 6); the door glow sits
+ * above it, never retyped. */
+export const DOOR_TOP = 2.1;
+const DOOR_HALF_W = 0.5; // 1.0m bottom-center gap (inference, Design Notes item 6)
 
 export const collisionVolumes: readonly CollisionVolume[] = [
-  // Four wall boxes closing the 19m x 12.5m interior envelope.
+  // Wall boxes closing the 19m x 12.5m interior envelope. wall-front is
+  // replaced by two segments leaving the bottom-center door gap.
   {
     id: "wall-back",
     min: { x: -(HALF_X + WALL_T), y: 0, z: -(HALF_Z + WALL_T) },
@@ -68,8 +72,16 @@ export const collisionVolumes: readonly CollisionVolume[] = [
     kind: "wall",
   },
   {
-    id: "wall-front",
+    id: "wall-front-left",
     min: { x: -(HALF_X + WALL_T), y: 0, z: HALF_Z },
+    max: { x: -DOOR_HALF_W, y: WALL_TOP, z: HALF_Z + WALL_T },
+    blocksMovement: true,
+    targetable: false,
+    kind: "wall",
+  },
+  {
+    id: "wall-front-right",
+    min: { x: DOOR_HALF_W, y: 0, z: HALF_Z },
     max: { x: HALF_X + WALL_T, y: WALL_TOP, z: HALF_Z + WALL_T },
     blocksMovement: true,
     targetable: false,
@@ -91,27 +103,52 @@ export const collisionVolumes: readonly CollisionVolume[] = [
     targetable: false,
     kind: "wall",
   },
-  // Two occluder-pillar stubs break sightlines on purpose (room-layout.md);
-  // positions placeholder (inference), ids stable for 1.3.
+  // The street-side door, closed (the door-open beat is Story 1.9).
+  {
+    id: "door-front",
+    min: { x: -DOOR_HALF_W, y: 0, z: HALF_Z },
+    max: { x: DOOR_HALF_W, y: DOOR_TOP, z: HALF_Z + DOOR_T },
+    blocksMovement: true, // closed: walking forward presses against it, never through
+    targetable: false,
+    kind: "door",
+  },
+  // Two occluder pillars, 0.5m squares centered (±3.5, 2.1) — ids kept from
+  // 1.2. This set serves sight now (sampled sightlines break on exactly one
+  // pillar) and Epic 2 audio raycasts later (AD-7).
   {
     id: "pillar-1",
-    min: { x: -4.2, y: 0, z: -1.2 },
-    max: { x: -3.8, y: WALL_TOP, z: -0.8 },
+    min: { x: -3.75, y: 0, z: 1.85 },
+    max: { x: -3.25, y: WALL_TOP, z: 2.35 },
     blocksMovement: true,
     targetable: false,
     kind: "pillar",
   },
   {
     id: "pillar-2",
-    min: { x: 3.8, y: 0, z: 0.8 },
-    max: { x: 4.2, y: WALL_TOP, z: 1.2 },
+    min: { x: 3.25, y: 0, z: 1.85 },
+    max: { x: 3.75, y: WALL_TOP, z: 2.35 },
     blocksMovement: true,
     targetable: false,
     kind: "pillar",
   },
-  // Three cabinet stubs at 1.40m pitch along the back wall, kept clear of
-  // the Pinball Corner (back-left) and Workshop (back-right) zones.
-  cabinetStub("cabinet-1", -CABINET_PITCH),
-  cabinetStub("cabinet-2", 0),
-  cabinetStub("cabinet-3", CABINET_PITCH),
+  // Street side beyond the front wall (spec Design Notes item 6): the floor
+  // is walkable-looking but not yet walkable — the load beat is 1.9 — and a
+  // far wall bounds the strip. Volumes outside the room envelope use kind
+  // "street".
+  {
+    id: "street-floor",
+    min: { x: -4, y: 0, z: 6.5 },
+    max: { x: 4, y: 0.05, z: 8.25 },
+    blocksMovement: false, // visible geometry; not a blocker
+    targetable: false,
+    kind: "street",
+  },
+  {
+    id: "street-wall",
+    min: { x: -4, y: 0, z: 8.25 },
+    max: { x: 4, y: WALL_TOP, z: 8.5 },
+    blocksMovement: true,
+    targetable: false,
+    kind: "street",
+  },
 ];
