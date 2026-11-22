@@ -54,3 +54,8 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: _bmad-output/implementation-artifacts/spec-1-1-project-bootstrap-and-the-deterministic-kernel-core.md | severity: low | fix-risk: med | footprint: ci/
 - evidence: CR edge layer; depcheck reads static specifier strings, no module graph
 - 2026-11-21T23:06:39Z status=wontfix-accepted owner=1-1-project-bootstrap-and-the-deterministic-kernel-core by=cr note=sufficient while core/ is hand-written small; reopen_if=a non-literal import appears in core/ or games/ before the Epic 3 L0 static analyzer exists
+
+### DW-11: in-view half of the no-UI law unpinned: a camera-parented mesh (crosshair/HUD) added in core/main.ts keeps the suite green; DOM half pinned only
+- source: story 1.2 implement; spec-1-2 frontmatter deferred (medium) | severity: medium | fix-risk: medium | footprint: test+CI
+- evidence: verification-gap demo in spec-1-2 deferred.evidence: crosshair mesh in core/main.ts scene assembly -> npm test stays green; core/no-ui-dom.test.ts pins the DOM half
+- 2026-11-22T03:30:17Z status=routed owner=burndown by=harvest note=routed from spec-1-2 deferred 2026-11-22; Epic 3 owns the machine lint (3.1/3.2 L0, 3.7 L2 audit) - route-to-story or own at the Epic 1 burn-down gate; also fixes the AC5 numbering drift (epics AC5 folded into spec AC1 bullet)

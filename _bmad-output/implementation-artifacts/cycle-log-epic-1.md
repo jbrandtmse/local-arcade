@@ -38,3 +38,5 @@
 2026-11-22T00:19:14Z	Story 1.2	story_created	spawn_at=2026-11-21T23:53:46Z	path=_bmad-output/implementation-artifacts/spec-1-2-first-person-walk-look-and-move-no-prompts.md	build_status=ready-for-dev	spec_tokens=4132	epic_context=compiled
 2026-11-22T00:19:14Z	Story 1.2	spec_validated	spawn_at=2026-11-21T23:53:46Z	service_introducing=true	integration_ac=present	adr_constrained_acs=ac1,ac2,ac3,ac4,ac5,ac6,ac7	decision_dependency=none	sections_created=none	owned_ledger=none	addressed=0	declined=0	mutates_shared_runtime=false	cycle_iteration=1
 2026-11-22T00:21:09Z	Story 1.2	stage_spawned	stage=implement	spawn_at=2026-11-22T00:21:09Z	agent_name=1-2-walk-implement-1	cycle_iteration=1	story_base=56765fa
+2026-11-22T03:28:29Z	Story 1.2	dev_complete	spawn_at=2026-11-22T00:21:09Z	build_sha=a358fce	baseline_revision=56765fab8405a9e7fe0be8bc7031ca9a82a6cbc9	story_base=56765fa	review_loop_iteration=1	followup_review_recommended=true	deferred=1	files=10	loc_added=1251	loc_removed=11
+2026-11-22T03:30:30Z	Story 1.2	ledger_routed_planned	story=1-2-first-person-walk-look-and-move-no-prompts	entries=1	DW=DW-11	owner=burndown	by=harvest
