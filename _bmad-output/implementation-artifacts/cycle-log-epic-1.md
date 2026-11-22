@@ -49,3 +49,5 @@
 2026-11-22T07:07:39Z	Story 1.2	spine_updated	conv=room-geometry-collision-aabb-list	reason=rule20_design_notes_9	by=lead	memlog=64	lint=ok
 2026-11-22T07:17:35Z	Story 1.2	smoke_complete	method=browser	result=pass	iterations=1	defects_caught=0	evidence=_bmad-output/implementation-artifacts/evidence/story-1-2-smoke-chrome.png,story-1-2-smoke-edge.txt	ruling=none	note=Chrome+Edge parity bit-identical; walk-stub-target, drag-look, lock-grant, E no-op, blur clear, mouseleave guard all observed live
 2026-11-22T07:20:42Z	Story 1.2	fresh_check	env=clean-checkout-node-26.13.1	tests=46	result=pass	order=forward,reverse
+2026-11-22T07:21:08Z	Story 1.2	committed	sha=a33d15d	submodules=	ci=none
+2026-11-22T07:21:08Z	Story 1.2	story_cycle	plan_to_commit_min=447	implement_passes=1	reviews=1	rework=0	first_ci=none

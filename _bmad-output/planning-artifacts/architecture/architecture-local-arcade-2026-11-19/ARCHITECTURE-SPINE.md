@@ -7,7 +7,7 @@ paradigm: 'microkernel (plugin architecture)'
 scope: 'Local Arcade v1 (M0-M6): Arcade Core, Games, Game Factory, deployment envelope'
 status: final
 created: 2026-11-19
-updated: 2026-11-20
+updated: 2026-11-22
 binds: []
 sources:
   - '_bmad-output/planning-artifacts/prds/prd-local-arcade-2026-11-19/prd.md'
@@ -256,6 +256,7 @@ flowchart TD
 | Faults | Core supervisor catches sim faults → Dead-Machine defect logged; Cabinet keeps performing via kernel fallback (AD-15) |
 | Identity & storage | Visitor id = UUIDv4 in `localStorage` under `arcade.*`; Personal Best keyed (gameId, visitorId) with initials + score; games use the Core storage service only |
 | Attribution flow | Manifest `attribution` is the single source; build generates Instruction Cards and nameplates from it (AD-24) |
+| Room geometry & collision | `core/room/` owns the room as authored data: one AABB volume list (ids stable, `{id, min, max, blocksMovement, targetable, kind}`) is the single source for movement blocking (1.2 placeholders → 1.3 authored room), the occluder set for audio raycasts, and visual extrusion — collision/render code never hardcodes geometry; the resolver is code, the volumes are data, and 1.3 rewrites the data in place |
 | Auth | None anywhere |
 
 ## Stack
