@@ -51,3 +51,4 @@
 2026-11-22T07:20:42Z	Story 1.2	fresh_check	env=clean-checkout-node-26.13.1	tests=46	result=pass	order=forward,reverse
 2026-11-22T07:21:08Z	Story 1.2	committed	sha=a33d15d	submodules=	ci=none
 2026-11-22T07:21:08Z	Story 1.2	story_cycle	plan_to_commit_min=447	implement_passes=1	reviews=1	rework=0	first_ci=none
+2026-11-22T07:29:21Z	Epic 1	epic_context_compiled	reason=planning_artifact_newer	agent=epic-1-context-compile-2	note=spine_conventions_row_included_as_technical_decision
