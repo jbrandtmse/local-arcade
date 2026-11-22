@@ -95,3 +95,9 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: spec-1-3-the-arcade-room-slots-pillars-zones-and-the-roadmap-wall.md | severity: low | fix-risk: low | footprint: in-story
 - evidence: spec frontmatter deferred bullet 2; stale lines 23/31 describe pre-rework paintFlyer pins
 - 2026-11-22T16:30:58Z status=routed owner=1-3-the-arcade-room-slots-pillars-zones-and-the-roadmap-wall by=harvest note=QA regenerates the artifact on its next pass; implement stage never hand-edits it
+- 2026-11-22T18:45:03Z status=routed owner=1-3-the-arcade-room-slots-pillars-zones-and-the-roadmap-wall by=cr note=23/31 already refreshed by rework commit; residual: header baseline, stale 155 count, room-qa containment misattribution
+
+### DW-19: fake 0.92em measureText metric duplicated across room-qa/scene/scene-qa fakes; surfaces.test.ts holds the helper
+- source: spec-1-3-the-arcade-room-slots-pillars-zones-and-the-roadmap-wall.md | severity: low | fix-risk: low | footprint: in-story
+- evidence: 4 test fakes carry the identical metric body; review pass 3 had to edit all four at once - drift risk on the next metric change
+- 2026-11-22T18:45:08Z status=wontfix-accepted owner=1-3-the-arcade-room-slots-pillars-zones-and-the-roadmap-wall by=cr note=reopen_if=next pass that must change the fake metric meets the 4 copies first; extract a shared test-support helper then

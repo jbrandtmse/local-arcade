@@ -71,3 +71,6 @@
 2026-11-22T16:36:43Z	Story 1.3	adr_verifications_complete	tool=node_cli	acs=ac6,ac7	result=pass	mutations=ac6:signage-drop-first-middle-dot,ac7:scene-sheet-metres-swapped	reverts=byte-identical	suite=157/157	cycle_iteration=2	note=rework_pass1_touched_surfaces+signage+scene;scoped_to_touched_ACs
 2026-11-22T16:38:09Z	Story 1.3	stage_spawned	stage=code-review	spawn_at=2026-11-22T16:38:09Z	agent_name=1-3-room-cr-2	cycle_iteration=2
 2026-11-22T17:29:53Z	Story 1.3	hold_ordered	reason=owner_restart_llm_server via=owner_message
+2026-11-22T18:52:29Z	Story 1.3	cr_complete	spawn_at=2026-11-22T16:38:09Z	resolved=4	fixed_at_source=3	by_design=0	wontfix_theoretical=0	routed=0	escalated=0	decision_pending=0	deferred=1	dismissed=4	high=0	med=1	low=4	rows=17	unresolved_high_med=0	clarifications=0	closing_sections_present=true	cycle_iteration=2	note=exit_condition_no_HIGH;DW-19_terminal_by=cr;DW-18_trailer_restated;tracker_already_done_by_reviewer
+2026-11-22T18:52:56Z	Story 1.3	hold_saved	story=1-3-the-arcade-room-slots-pillars-zones-and-the-roadmap-wall	stage=code-review	patch=_bmad-output/unattended/patches/epic-1/1-3-the-arcade-room-slots-pillars-zones-and-the-roadmap-wall-code-review.patch	tree=clean
+2026-11-22T18:52:56Z	Epic 1	hold_complete	shas=973cbf0 story=1-3 stage_after=code-review next=ledger_adjudicated
