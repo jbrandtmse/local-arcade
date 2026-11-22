@@ -9,6 +9,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  DOOR_HALF_W,
+  DOOR_T,
+  DOOR_TOP,
   ENTRY_SPAWN,
   INTERIOR,
   WALL_T,
@@ -79,18 +82,18 @@ test("authored id set, envelope faces, closed door in the bottom-center gap, str
   assert.equal(vol("wall-front-left").min.z, INTERIOR.depth / 2);
   assert.equal(vol("wall-front-left").max.z, INTERIOR.depth / 2 + WALL_T);
   assert.equal(vol("wall-front-left").min.x, -(INTERIOR.width / 2 + WALL_T));
-  assert.equal(vol("wall-front-left").max.x, -0.5);
-  assert.equal(vol("wall-front-right").min.x, 0.5);
+  assert.equal(vol("wall-front-left").max.x, -DOOR_HALF_W);
+  assert.equal(vol("wall-front-right").min.x, DOOR_HALF_W);
   assert.equal(vol("wall-front-right").max.x, INTERIOR.width / 2 + WALL_T);
   // Door closed in the gap, blocking.
   const door = vol("door-front");
   assert.equal(door.kind, "door");
-  assert.equal(door.min.x, -0.5);
-  assert.equal(door.max.x, 0.5);
+  assert.equal(door.min.x, -DOOR_HALF_W);
+  assert.equal(door.max.x, DOOR_HALF_W);
   assert.equal(door.min.z, INTERIOR.depth / 2);
-  assert.ok(Math.abs(door.max.z - (INTERIOR.depth / 2 + 0.12)) < EPS, "0.12m panel");
+  assert.ok(Math.abs(door.max.z - (INTERIOR.depth / 2 + DOOR_T)) < EPS, "panel thickness derived, not retyped");
   assert.equal(door.min.y, 0);
-  assert.equal(door.max.y, 2.1);
+  assert.equal(door.max.y, DOOR_TOP);
   assert.equal(door.blocksMovement, true);
   assert.equal(door.targetable, false);
   // Street side beyond the front wall.

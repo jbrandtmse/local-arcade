@@ -29,7 +29,8 @@ export type CanvasFactory = (width: number, height: number) => PaintSurface;
 function need2d(surface: PaintSurface): PaintContext {
   // An injected factory that hands back a non-surface dies here, with the
   // loud guard, not with a raw TypeError two calls later.
-  const ctx = surface == null ? null : surface.getContext("2d");
+  const ctx =
+    surface != null && typeof surface.getContext === "function" ? surface.getContext("2d") : null;
   if (ctx == null) throw new Error("paint surface has no 2d context");
   return ctx;
 }

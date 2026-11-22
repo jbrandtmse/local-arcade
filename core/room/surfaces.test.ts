@@ -119,4 +119,10 @@ test("painters take the canvas ONLY from the injected factory (injectable-source
   // A factory that returns nothing usable trips the loud guard instead of
   // falling back to any global canvas.
   assert.throws(() => paintCarpet(() => ({ width: 4, height: 4, getContext: () => null }), "#111111", "#222222"), /no 2d context/);
+  // A factory handing back a non-surface (no getContext at all) also dies
+  // with the loud guard — never with a raw TypeError two calls later.
+  assert.throws(
+    () => paintFlyer(() => ({ width: 4, height: 4 }) as unknown as PaintSurface, WELCOME_FLYER.text, "#ffffff", "#000000", WELCOME_FLYER.capHeight),
+    /no 2d context/,
+  );
 });

@@ -1,3 +1,79 @@
+# Test Automation Summary — Story 1.3 (QA stage, 2026-11-22)
+
+Target: the implemented deliverable of Story 1.3 (`git diff --name-only cbc66b65..HEAD` —
+the rewritten `core/room/collision-volumes.ts`, new authored modules
+`slot-config/zones/signage/tokens/surfaces/scene`, `core/main.ts` wiring, and the story's
+own test files). Framework: the project's existing convention — `node --test` with native
+TS type-stripping (`*.test.ts` under `core/`, `ci/`, `tools/`); no new dependency. The
+"Chrome vs Edge" matrix row stays the lead's browser smoke tier (DW-12/DW-15 precedent —
+no browser harness this epic).
+
+## Generated Tests
+
+### Authored-room data + real-resolver QA probes
+- [x] `core/room/room-qa.test.ts` (QA) — front-facade seams (the two front-wall segments plug
+  the door exactly, street-floor/street-wall share one bounding seam); street-volume
+  passability through the real 1.2 resolver (cross the strip sideways, walk its depth, an
+  outside walk presses the door's street face); entry-spawn clearance + wiring + yaw-0
+  facing; fill-scan order re-derived independently from run membership; roadmap stretch
+  membership and amber positions; Casual Alley kept-clean law BOTH ways (no slot, no
+  blocking volume); aisle probes (main aisle >=1.20, pillar->cabinet-box >=5.0 recorded
+  5.05, per-slot approach clears every blocker >=0.70); sampled sightlines + the
+  ear-blocks-eye occluder-subset pin (test-local slab clip, AD-7 keeps the production
+  raycast in Epic 2); paintFlyer sentinel probe (the painter prints only the injected
+  string, in only the injected colours, on one injected canvas).
+
+### Scene-builder QA probes through the injected Three seam
+- [x] `core/room/scene-qa.test.ts` (QA) — the envelope-spanning ceiling slab carries the
+  Room Black token and rests above the wall top; the front-wall wainscot bands never
+  intrude into the door opening (1.9's swing clearance — the review pass fixed this but no
+  probe held it); the build-time one-surface law (the only painted text across every
+  injected canvas is the flyer record's verbatim string); the scene consumes the authored
+  zone/roadmap/door lighting with hues drawn only from zone tokens + amber + door glow.
+
+## Coverage
+- AC1: id-set/door/street pins (implement) + QA: facade seam contiguity, street-volume
+  passability, closed door from BOTH sides, entry-spawn clearance.
+- AC2: pitch/order/roadmap pins (implement) + QA: fill order re-derived from runs, stretch
+  membership (side runs, front half).
+- AC3: implement sightlines + QA: independent slab-clip sightlines, occluder-subset
+  ear-blocks-eye law.
+- AC4: hues/lights pins (implement) + QA: Casual Alley kept-clean BOTH ways, amber never
+  crossing zones.
+- AC5: implement probes + QA: independent aisle probe set incl. per-slot approach against
+  EVERY blocker.
+- AC6: verbatim record + fake-canvas pins (implement) + QA: painter prints only the
+  injected string (sentinel), build-time one-surface law.
+- AC7: extrusion/emissive/BoxGeometry pins (implement) + QA: ceiling Room Black
+  token-specific, wainscot never crosses the door gap.
+- Real dev-serve + DOM scans stay as the implement extended them (`core/no-ui-dom.test.ts`);
+  Chrome-vs-Edge stays the lead's smoke.
+
+## Verification run (post-QA)
+- `npm test`: 155/155 pass (141 pre-QA + 14 QA).
+- `npm run typecheck`: 0. `node ci/depcheck.mjs`: 0. `node ci/lint-bans.mjs`: 0.
+- `node tools/gen-registry.mjs && git diff --exit-code -- generated/`: byte-identical.
+- QA files green in one run forward and reverse order (hermeticity spot-check).
+- Rule 19: 9 QA mutation demonstrations — 1-2 per AC, each a mutation CLASS the lead's
+  gate list (door delete, L2 0.05, pillar-1 +1x, workshop hue, pillar-1 into L-aisle,
+  middot drop, emissive add, build-call delete) did not cover: street-floor flip,
+  spawn-into-door-clearance, index swap, pillar-2 z-shift, alley-rect swallow, pillar
+  widening, painter invented copy, ceiling token swap, wainscot sign flip. Each red
+  observed, reverted byte-identical (sha256), QA file re-green. Pin-independence shown
+  where probes overlap (e.g. the index swap reddened fill order only; the pillar widening
+  reddened aisles only). Recorded in the spec's `## Verification` QA block.
+- Gap hunt finding: none blocking. The pre-QA suite's wainscot/door-gap law (fixed in
+  review pass 1) had no pin holding it — now pinned by scene-qa; no implementation change
+  was needed to make any QA probe pass.
+
+## Next Steps
+- Lead commits the QA test files (this stage forbids committing).
+- 1.4's shells entering the volume list will move QA's kept-clean and approach probes only
+  if they legitimately violate the authored minima; sightline pins sample the pillar-kind
+  subset on purpose (Epic 2 widens its own set on its own pins).
+
+---
+
 # Test Automation Summary — Story 1.2 (QA stage, 2026-11-21)
 
 Target: the implemented deliverable of Story 1.2 (`git diff --name-only 56765fa..HEAD` —

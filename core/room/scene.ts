@@ -116,7 +116,8 @@ function inwardNormal(v: CollisionVolume): { x: number; z: number } {
   if (v.max.x === -halfX) return { x: 1, z: 0 }; // left wall faces +X
   if (v.min.x === halfX) return { x: -1, z: 0 }; // right wall faces -X
   if (v.max.z === -halfZ) return { x: 0, z: 1 }; // back wall faces +Z
-  return { x: 0, z: -1 }; // front-wall segments face into the room (-Z)
+  if (v.min.z === halfZ) return { x: 0, z: -1 }; // front-wall segments face into the room (-Z)
+  throw new Error("inwardNormal: wall volume sits on no named interior face");
 }
 
 /**
@@ -155,7 +156,11 @@ export function buildRoomScene(THREE: Three, scene: RoomScene, makeCanvas: Canva
       // crosses the door gap: front-wall bands widen away from the opening
       // (1.9's door-open beat needs the gap clear at low height).
       const n = inwardNormal(v);
-      const dw = n.x !== 0 ? 0 : 0.01;
+      // A FRONT segment straddling the gap centre (a future lintel) must not
+      // widen at all — Math.sign(c.x) alone would leave the band crossing the
+      // opening on both sides. Back-wall bands straddle the centre legitimately
+      // and keep their corner-closing widening.
+      const dw = n.x !== 0 || (n.z < 0 && Math.abs(c.x) < w / 2) ? 0 : 0.01;
       const dd = n.z !== 0 ? 0 : 0.01;
       const away = n.x !== 0 ? 0 : Math.sign(c.x); // front segments: off the gap
       addBox(

@@ -2,7 +2,7 @@
 title: 'Story 1.3: The Arcade Room — slots, pillars, zones, and the roadmap wall'
 type: 'feature'
 created: '2026-11-21'
-status: 'done'
+status: 'in-progress'
 review_loop_iteration: 1
 followup_review_recommended: true
 baseline_revision: 'cbc66b65bc5e26ec52ff4ad8b9a5c2f4cc5b6b21'
@@ -79,6 +79,7 @@ deferred:
 - `core/player.test.ts`, `core/player-qa.test.ts` -- move the listed shared-surface pins to authored volumes / test-local fixtures (Code Map) -- regression of the 1.2 contract on real room data
 - `core/no-ui-dom.test.ts` -- extend scans + dev-serve module list -- fiction-pure law survives
 - tests for every I/O matrix row above (Rules 1/19), incl. the scripted real-controller walk (Integration) -- pinning tests + demonstrated mutations
+- [ ] [Smoke] The Welcome Flyer's painted lines overflow the 210×300 paint canvas and clip at both edges in the browser smoke — core/room/surfaces.ts (paintFlyer) — the fix must keep every line of the verbatim string inside the canvas with margin at a legible cap while honouring AC6 (verbatim text, Paper Card/Card Ink, cap ≥60mm read at ~1m from the flyer); reversible inference choices allowed (wrap/split lines, shrink the per-line cap within the 60mm floor, or widen the canvas at the same PX_PER_M density), recorded in the spec
 
 **Acceptance Criteria:**
 - Given the authored room data, then the interior is 19m × 12.5m, the front door sits bottom-center closed and blocking, and street-side geometry exists beyond the front wall (AC1; FR-2, UX-DR3)
@@ -121,6 +122,28 @@ deferred:
   - [rejected] spec status/baseline block in the diff — workflow-owned run state, not code (this skill writes it by design).
   - [note] local runs used Node 24 while engines pins 26 — environmental, not introduced by the diff; suite green on both (type-stripping).
 
+### 2026-11-22 — review pass 2 (`bmad-code-review` under epic-cycle; layers: blind-hunter, edge-case-hunter, verification-gap, acceptance-auditor)
+
+- verdicts: 20 raw layer findings grouped to 9 root-cause entries (high 0, med 3, low 6) + 7 rejected; 6 entries patched in-pass, 2 closed `by-design` (DW-16, DW-17), 1 entry confirmed against the already-routed DW-15 (not re-filed)
+- findings:
+  - [med] [patch] Three-seam adapter legs unpinned at the source-pin tier: deleting or arg-swapping the `pointLight`/`ambientLight`/`canvasTexture`/`standardMaterial`/`mesh` mappings in `core/main.ts` kept the suite green — main-glue.test.ts now forwards-pins every seam method the room consumes to its real THREE constructor + parameter order; the executed tier stays DW-15 (Epic-3 browser harness, already routed).
+  - [med] [patch] wainscot inset placement was falsifiable only on the two front bands: dropping or sign-flipping `WAINSCOT_INSET` shipped the side/back bands coplanar with (or buried in) their walls with the suite green — scene.test.ts bands test now pins per-wall placement (inset toward each wall's own room face, on-footprint widening bound).
+  - [med] [by-design DW-16] front wall is open above the door head (no lintel volume; 13cm recess behind the panel) — the spec's I/O matrix row + Design Notes 6 author exactly this volume set; all AC1 pins are 2D XZ; reopen at the lead's door-front smoke (lintel volume or taller door via spec amendment).
+  - [low] [patch] `inwardNormal`'s catch-all silently treated any unknown wall-kind volume as a front segment — now matches the front plane explicitly and throws otherwise (same law pass 1 applied to the sign-facing branch).
+  - [low] [patch] the wainscot widening law was incomplete for a FRONT segment straddling the gap centre (`Math.sign(c.x)` = 0 → band crosses the opening both sides, the very 1.9 swing law pass 1 fixed for off-centre bands) — such a band no longer widens at all; back-wall corner widening untouched.
+  - [low] [patch] `need2d`'s comment promised a loud death for a non-surface factory; a `{}`-shaped return still died with a raw TypeError — the guard now checks `getContext` callability and surfaces.test.ts pins the `{}` case.
+  - [low] [patch] pass 1's derive-from-constants fix was half done: `DOOR_T`/`DOOR_HALF_W` stayed module-private while room.test.ts and scene-qa.test.ts retyped 0.12/±0.5/2.1 — both exported now; pins derive from them (and from `DOOR_TOP`).
+  - [low] [patch] door-glow plan position unpinned (`DOOR_GLOW_Z` unchecked — a glow moved into the street kept all 155 green) — scene.test.ts pins x-centred on the gap and room-side of the front wall face.
+  - [low] [by-design DW-17] the ambient is coloured with the Room Black SURFACE token (near-no-op fill) — Design Notes item 7 authors exactly this value ("tuned by eye at the smoke"); reopen at the 6m smoke if unlit faces read too dark.
+- rejected:
+  - [false] street strip unbounded at the sides + "QA overclaims bounds" — the comment's "past it" reads in the asserted +Z direction only; the two street volumes are what the spec's matrix row authors (lateral street bounds are 1.9's beat); no walk-through exists while the door blocks.
+  - [low-noise] Snack-Bar front-stop clearance (z >= 4.5 rationale) unpinned — a labelled-inference authoring constraint; slot data moves only under a revision-id bump, which the AC2 pins guard; pinning the inference bakes it into the suite.
+  - [false] collision-volumes header "door->backmost sightlines" vs ENTRY_SPAWN sampling — the header mirrors the spec's own Design Notes item 2 wording; the sampled geometry is identical.
+  - [spec-edit] AC5 wording vs the 0.70m approach probe — fix is editing the spec under review; pass 1 recorded the reading (never-bar blocks the Epic-3 lint tools; data pins bind the measurements).
+  - [false] seam type permits `emissive` on standardMaterial — the law is wall/pillar-specific and enforced by behavioural pin + source grep; 1.4's marquees/screens legitimately need emissive, so tightening the seam would break the next story.
+  - [false] slot footprint 0.70 vs room-layout "~0.60m" — spec-sanctioned labelled inference (Design Notes 3); the "~" is approximate, the 1.40 pitch is the exact contract.
+  - [false] spine "ids stable" vs `wall-front` split / `cabinet-*` removal — pass 1 adjudicated; the spine row's paren is the forward pin law and 1.2 pre-authorized these test moves.
+
 ## Design Notes
 
 **Governing ADs (Rule 6):** AD-7 (the dedicated occluder collider set in `core/room` — one geometry for audio raycasts and sightlines; the story's "(AD-7)" citation checks against the AD Rule verbatim), AD-10 (Wall Slot config pre-declared + revision id; the Layout System is a later pure build function — this story authors only its inputs), AD-24 (text-surface whitelist: the flyer is `room-sign`; zero UI), AD-25 (Zones are `core/room`-owned; interactions/fixtures later — data now), AD-3/AD-15 (scene is static authored data; render assembles meshes once, no motion in render, no tick mutation), AD-1/AD-13/AD-14 (new files in `core/`, TypeScript, import no games), AD-18 (no new dependencies), AD-17 (browser parity is the lead's smoke this epic, CI in Epic 3).
@@ -162,6 +185,28 @@ deferred:
 - AC6 pin: exactly one text surface, verbatim string incl. `·` (room.test.ts / surfaces.test.ts fake canvas) — demonstrated: dropped the middle dot in the source string -> verbatim pin red. Revert needed a byte-exact node repair (the Edit tool's fuzzy non-ASCII matching had written a literal U+00B7 where the source keeps `\u00b7` escapes); sha256 restored to the pre-mutation record. Rule 14 tightened in the review pass: the surfaces.ts split separator now uses an escape too.
 - AC7 pin: zero emissive on wall/pillar materials + BoxGeometry-only scan (scene pins) — demonstrated: added `emissive: 0xff6b5e` to the wall material -> zero-emissive pin red; reverted byte-identical.
 - 1.3 entry-wiring pin (main-glue.test.ts, added by review pass 1) — demonstrated: removed the `buildRoomScene(three, scene, makeCanvas);` line from core/main.ts -> the wiring pin went red (nothing else in the suite failed — the gap the pin closes); restored byte-identical (sha256 match).
+
+**QA pass additions (2026-11-22, `bmad-qa-generate-e2e-tests`; independent matrix walk + new mutation classes, none duplicating the eight above):**
+- `core/room/room-qa.test.ts` (QA) — 10 probes written from the spec's I/O matrix against the data: front-facade seams (wall segments plug the door exactly, street-floor/street-wall share one bounding seam); street-volume passability through the real 1.2 resolver (cross it sideways, walk its depth, outside walk presses the door's street face); entry-spawn clearance (>PLAYER_RADIUS vs every blocker) + wiring + yaw-0-into-the-room; fill-scan order re-derived independently from run membership; roadmap stretch membership (side runs, front half) + matrix-stated amber positions + hues never crossing zones; Casual Alley kept-clean BOTH ways (no slot footprint AND no blocking volume); aisle probes (main aisle >=1.20, pillar->cabinet-box >=5.0 recorded 5.05, per-slot approach clears EVERY blocker >=0.70); sampled sightlines + occluder-subset/ear-eye pin with a test-local slab clip; paintFlyer sentinel (prints ONLY the injected string, two injected colours, one canvas).
+- `core/room/scene-qa.test.ts` (QA) — 4 fake-Seam probes: the envelope-spanning ceiling slab carries Room Black and rests above the wall top; front-wall wainscot bands never intrude into the door opening (1.9 swing clearance); build-time one-surface law (the only painted text across all injected canvases is the flyer record's verbatim string); the scene consumes authored zone/roadmap/door lighting (hues drawn only from zone tokens + amber + door glow, one ambient).
+- QA mutations (Rule 19; each applied -> observed red in the named QA pin -> reverted byte-identical by sha256 -> QA file re-green):
+  - AC1: `street-floor` blocksMovement -> true -> room-qa street-passability, facade-seam, and outside-door-walk pins red.
+  - AC1 (spawn wiring): ENTRY_SPAWN z 5.6 -> 6.05 (inside door clearance) -> room-qa entry-spawn pin red.
+  - AC2: fill-scan indices of L5/R4 swapped (17<->16) -> room-qa fill-order pin red; pitch/membership pins stayed green (independence shown).
+  - AC3: pillar-2 z center 2.1 -> 2.8 -> room-qa spawn->R0 sightline pin red; L0 + roadmap-clear pins stayed green.
+  - AC4: Casual Alley rect minX 4.5 -> 3.6 (swallows pillar-2) -> room-qa kept-clean pin red.
+  - AC5: both pillars half-extent 0.25 -> 0.50 -> room-qa aisle probe red ("recorded pillar->slot min 4.55 >= 5.0", approach <0.70); sightline pin stayed green (rays still cross the centres).
+  - AC6: paintFlyer gained an invented `fillText("PLAY NOW!", ...)` line -> room-qa sentinel pin AND scene-qa build-time one-surface pin red.
+  - AC7: ceilingMat colour ROOM_BLACK -> WALL_WARM -> scene-qa ceiling-token pin red.
+  - AC7 (wainscot/door-gap): front-band `away` sign flipped -> scene-qa wainscot pin red (band reached x=-0.49 into the opening).
+- Post-QA: `npm test` 155/155 green (141 + 14 QA); QA files green in both run orders (hermeticity); `npm run typecheck` / `node ci/depcheck.mjs` / `node ci/lint-bans.mjs` / registry-drift all exit 0. mutations_demonstrated=9 — 1-2 per AC, each a class the lead's gate list did not cover.
+
+**Review pass 2 pin strengthening + demonstrated mutations (2026-11-22 `bmad-code-review`; each applied -> observed red in the named pin -> reverted byte-identical by sha256 -> file re-green):**
+- wainscot placement pin (scene.test.ts per-wall inset toward the room face): `WAINSCOT_INSET` 0.01 -> -0.01 -> "wall-back band inset toward the room face" red; reverted.
+- door-glow plan pin (scene.test.ts): `DOOR_GLOW_Z` 6.15 -> 6.4 -> "door glow hangs on the room side of the front wall face" red; reverted.
+- Three-adapter forwarding pins (main-glue.test.ts): `pointLight` mapping arg order swapped to `(color, distance, intensity)` -> "Three seam maps through: new THREE.PointLight(color, intensity, distance)" red; reverted (executed adapter coverage stays DW-15, Epic-3 harness tier).
+- need2d non-surface pin (surfaces.test.ts): guard reverted to null-only check -> the `{}`-factory case died with a raw TypeError -> /no 2d context/ red; reverted.
+- Post-review: `npm test` 155/155 green, `npm run typecheck` exit 0 (full suite re-run after all review patches; new pins extend existing tests — test count unchanged).
 
 **Shared surfaces:** `core/room/collision-volumes.ts` id set (1.2 pins that address `wall-front`, `cabinet-1..3` and the default-spawn line move with this rewrite — list in the Code Map; the exact-ids pin is rewritten to the authored set), `INTERIOR` export (pins keep), player default-spawn test fixture (untouched), `core/no-ui-dom.test.ts` dev-serve module list (extended), `generated/game-registry.ts` entry count (0, unchanged), root `package.json` scripts (unchanged — no new scripts). Standing criterion: every test added or changed passes on a fresh environment, in either order.
 

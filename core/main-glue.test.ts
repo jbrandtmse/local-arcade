@@ -79,7 +79,20 @@ test("device glue is thin and forwards to the input service; the lock check comp
 test("the authored room reaches the page once: buildRoomScene through the real Three adapter + injected OffscreenCanvas factory, spawn on the authored volumes at ENTRY_SPAWN, clear colour from the token (1.3 AC1/AC2/AC7 wiring)", () => {
   assert.equal((MAIN.match(/buildRoomScene\(/g) ?? []).length, 1, "the room is built exactly once into the page scene");
   assert.ok(MAIN.includes("buildRoomScene(three, scene, makeCanvas);"), "built through the injected seam, not a second inline copy");
-  assert.ok(MAIN.includes("new THREE.BoxGeometry("), "the Three adapter maps the seam to real three primitives");
+  // Every seam method the room consumes must be mapped through to its real
+  // THREE constructor with the seam's own parameter order — the source-pin
+  // tier's coverage of the adapter legs the scene suite cannot see (the
+  // executed tier lands with the Epic-3 browser harness, DW-15).
+  for (const fwd of [
+    "new THREE.BoxGeometry(w, h, d)",
+    "new THREE.MeshStandardMaterial(params",
+    "new THREE.Mesh(geometry",
+    "new THREE.PointLight(color, intensity, distance)",
+    "new THREE.AmbientLight(color, intensity)",
+    "new THREE.CanvasTexture(source",
+  ]) {
+    assert.ok(MAIN.includes(fwd), `Three seam maps through: ${fwd}`);
+  }
   assert.ok(MAIN.includes("new OffscreenCanvas(width, height)"), "painters get OffscreenCanvas factories (the page still grows one DOM node)");
   assert.ok(MAIN.includes("createPlayerController(collisionVolumes, ENTRY_SPAWN)"), "the visitor spawns at the authored door spawn on the authored volume list");
   assert.ok(MAIN.includes("renderer.setClearColor(ROOM_BLACK, 1)"), "clear colour comes from tokens.ts, never a retyped hex");

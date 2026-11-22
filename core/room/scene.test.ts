@@ -205,6 +205,29 @@ test("walls wainscot to Wall Panel 0..1.0m; ceiling Room Black over the full env
     assert.equal(b.mat.params["color"], WALL_PANEL);
     assert.equal(b.y, 0.5, "band spans 0..1.0m");
   }
+  // Placement law per wall: every band sits inset toward its OWN wall's room
+  // face (never coplanar, never buried — the z-fighting the inset exists to
+  // prevent), on that wall's footprint, widened at most the along-wall 0.01.
+  const halfX = INTERIOR.width / 2;
+  const halfZ = INTERIOR.depth / 2;
+  for (const v of collisionVolumes.filter((v) => v.kind === "wall")) {
+    const n =
+      v.max.x === -halfX ? { x: 1, z: 0 } :
+      v.min.x === halfX ? { x: -1, z: 0 } :
+      v.max.z === -halfZ ? { x: 0, z: 1 } : { x: 0, z: -1 };
+    const cx = (v.min.x + v.max.x) / 2;
+    const cz = (v.min.z + v.max.z) / 2;
+    const band = bands.find(
+      (b) => Math.abs(b.x - cx) <= (v.max.x - v.min.x) / 2 + 0.05 && Math.abs(b.z - cz) <= (v.max.z - v.min.z) / 2 + 0.05,
+    );
+    assert.ok(band, `wainscot band on ${v.id}`);
+    const inset = (band.x - cx) * n.x + (band.z - cz) * n.z;
+    assert.ok(inset > 0 && inset < 0.05, `${v.id} band inset toward the room face, not coplanar or buried`);
+    assert.ok(
+      band.geo.w <= v.max.x - v.min.x + 0.011 && band.geo.d <= v.max.z - v.min.z + 0.011,
+      `${v.id} band stays on its wall's footprint`,
+    );
+  }
   const ceiling = built.meshes.find((m) => m.geo.h === 0.1);
   assert.ok(ceiling, "ceiling slab");
   assert.deepEqual([ceiling.geo.w, ceiling.geo.d], [INTERIOR.width + 2 * WALL_T, INTERIOR.depth + 2 * WALL_T]);
@@ -266,6 +289,8 @@ test("point lights = 4 zone identity + 2 roadmap amber + 1 door glow (7 total); 
   const door = built.lights.find((l) => l.color === GLOW_RED);
   assert.ok(door, "door glow light");
   assert.ok(door.y > DOOR_TOP, "door glow sits above the door head");
+  assert.equal(door.x, 0, "door glow centred on the door gap");
+  assert.ok(door.z < INTERIOR.depth / 2, "door glow hangs on the room side of the front wall face, not in the street");
   assert.equal(built.ambients.length, 1);
   assert.equal(built.ambients[0]!.color, ROOM_BLACK);
   assert.ok(built.ambients[0]!.intensity <= 0.2, "ambient is very low (the dark the glow sits against)");

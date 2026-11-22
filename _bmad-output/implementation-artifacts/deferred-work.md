@@ -80,3 +80,13 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: story 1.3 implement deferred: | severity: low | fix-risk: med | footprint: cross-cutting
 - evidence: spec-1-3 frontmatter deferred: + core/main-glue.test.ts source-pin tier added in review pass 1
 - 2026-11-22T11:32:43Z status=routed owner=burndown by=harvest note=DW-12 tier; Epic 3 browser harness (3.2/3.15) closes it
+
+### DW-16: Front wall open above the door head: no lintel volume over the door gap (visible see-through band y 2.1-3.0 when looking up at the door; 13cm recess behind the panel)
+- source: spec-1-3-the-arcade-room-slots-pillars-zones-and-the-roadmap-wall.md | severity: med | fix-risk: med | footprint: in-story
+- evidence: wall-front segments exclude the gap x entirely; door-front covers only y 0..2.1 z 6.25..6.37 - the spec's I/O matrix row authors exactly this volume set; all AC1 pins are 2D XZ so Y gaps cannot go red
+- 2026-11-22T13:41:43Z status=by-design owner=1-3-the-arcade-room-slots-pillars-zones-and-the-roadmap-wall by=cr note=spec-bound: matrix row + Design Notes 6 name the shape; reopen if the lead's door-front smoke sees the band -> spec amendment (lintel volume or taller door)
+
+### DW-17: AmbientLight coloured with the Room Black SURFACE token is a near-no-op fill (0x15110E x 0.15 ~ 4% luminance low-intensity): the pin cements an inert light
+- source: spec-1-3-the-arcade-room-slots-pillars-zones-and-the-roadmap-wall.md | severity: low | fix-risk: low | footprint: in-story
+- evidence: DESIGN.md treats Room Black as ceiling/clear-colour surface token; scene.test + scene-qa pin colour ROOM_BLACK and intensity <= 0.2; the fill the light nominally provides is ~0.6% luminance
+- 2026-11-22T13:41:54Z status=by-design owner=1-3-the-arcade-room-slots-pillars-zones-and-the-roadmap-wall by=cr note=spec-bound: Design Notes item 7 authors this exact value, 'tuned by eye at the smoke'; reopen at the lead's 6m smoke if unlit faces read too dark

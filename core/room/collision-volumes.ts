@@ -54,11 +54,15 @@ export const WALL_T = 0.25;
 /** Wall height, metres — (inference, spec Design Notes item 6); scene.ts
  * rests the ceiling on it, never retypes it. */
 export const WALL_TOP = 3.0;
-const DOOR_T = 0.12; // door panel thickness (inference, Design Notes item 6)
+/** Door panel thickness, metres — (inference, Design Notes item 6); pins
+ * derive from it, never retype it. */
+export const DOOR_T = 0.12;
 /** Door head height (inference, Design Notes item 6); the door glow sits
  * above it, never retyped. */
 export const DOOR_TOP = 2.1;
-const DOOR_HALF_W = 0.5; // 1.0m bottom-center gap (inference, Design Notes item 6)
+/** Half-width of the 1.0m bottom-center door gap — (inference, Design Notes
+ * item 6); pins derive from it, never retype it. */
+export const DOOR_HALF_W = 0.5;
 
 export const collisionVolumes: readonly CollisionVolume[] = [
   // Wall boxes closing the 19m x 12.5m interior envelope. wall-front is
