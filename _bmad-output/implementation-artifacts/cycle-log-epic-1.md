@@ -41,3 +41,4 @@
 2026-11-22T03:28:29Z	Story 1.2	dev_complete	spawn_at=2026-11-22T00:21:09Z	build_sha=a358fce	baseline_revision=56765fab8405a9e7fe0be8bc7031ca9a82a6cbc9	story_base=56765fa	review_loop_iteration=1	followup_review_recommended=true	deferred=1	files=10	loc_added=1251	loc_removed=11
 2026-11-22T03:30:30Z	Story 1.2	ledger_routed_planned	story=1-2-first-person-walk-look-and-move-no-prompts	entries=1	DW=DW-11	owner=burndown	by=harvest
 2026-11-22T03:40:37Z	Story 1.2	adr_verifications_complete	tool=node_cli	acs=ac1,ac2,ac3,ac4,ac6,ac7	result=pass	mutations=ac1:html-body-hud-div,ac2:diag-normalization-removed,ac3:drag-fallback-off,ac4:targetable-skip-always,ac6:z-axis-blocking-removed,ac6b:system-call-unwrapped,ac7:bob-phase-random	note=ac1_browser_half_deferred_to_smoke;in-view_half=DW-11	reverts=byte-identical	suite=106/106
+2026-11-22T03:41:30Z	Story 1.2	stage_spawned	stage=qa	spawn_at=2026-11-22T03:41:30Z	agent_name=1-2-walk-qa-1	cycle_iteration=1
