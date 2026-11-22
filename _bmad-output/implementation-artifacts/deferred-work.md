@@ -75,3 +75,8 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: _bmad-output/implementation-artifacts/spec-1-2-first-person-walk-look-and-move-no-prompts.md | severity: low | fix-risk: med | footprint: in-story
 - evidence: two strictPort dev-serve tests; external port use fails them independent of code
 - 2026-11-22T06:53:55Z status=wontfix-accepted owner=1-2-first-person-walk-look-and-move-no-prompts by=cr note=reopen_if=EADDRINUSE/port-collision red observed in a suite run; Epic 3 CI needs ephemeral port or lock
+
+### DW-15: main.ts real-THREE adapter executed coverage (browser harness tier)
+- source: story 1.3 implement deferred: | severity: low | fix-risk: med | footprint: cross-cutting
+- evidence: spec-1-3 frontmatter deferred: + core/main-glue.test.ts source-pin tier added in review pass 1
+- 2026-11-22T11:32:43Z status=routed owner=burndown by=harvest note=DW-12 tier; Epic 3 browser harness (3.2/3.15) closes it
