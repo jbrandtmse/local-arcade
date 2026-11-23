@@ -125,3 +125,8 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: spec-1-4-the-standard-stand-up-cabinet-shell-marquee-live-screen.md | severity: low | fix-risk: low | footprint: in-story
 - evidence: grep: main.ts builds the WebGLRenderer with no toneMapping anywhere; the 2/0.5 bounds encode inverse-square+linear semantics (three decay=2); a tone-map change re-derives them with the suite green — spec residual risks already label this
 - 2026-11-23T14:03:41Z status=wontfix-theoretical owner=1-4-the-standard-stand-up-cabinet-shell-marquee-live-screen by=cr note=reopen_if: tone mapping lands in main.ts or the exposure constants move under a non-linear tone curve
+
+### DW-24: mouse-look: mousing far left/right makes the view become the floor (camera flips/slams to floor at extreme yaw after big horizontal drags)
+- source: owner report 2026-11-23 (mid-run, story 1.5 in plan) | severity: minor | fix-risk: small | footprint: core/player.ts look math / camera basis (yaw wrap, pitch clamp)
+- evidence: Owner-observed while using the game: after dragging the mouse far left or right the view becomes the floor. Repro not yet confirmed by the lead; smoke drags never exceeded ~2.5 rad so the path is untested.
+- 2026-11-23T14:51:13Z status=routed owner=burndown by=owner note=owner said: do not fix now; address in the next pass over the backlog
