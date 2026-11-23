@@ -98,3 +98,5 @@
 2026-11-23T04:54:40Z	Story 1.4	stage_spawned	stage=plan	spawn_at=2026-11-23T04:54:40Z	agent_name=1-4-cabinet-plan-1	cycle_iteration=1
 2026-11-23T05:39:15Z	Story 1.4	story_created	spec=_bmad-output/implementation-artifacts/spec-1-4-the-standard-stand-up-cabinet-shell-marquee-live-screen.md	warnings=oversized	plan_agent=1-4-cabinet-plan-1
 2026-11-23T05:39:49Z	Story 1.4	spec_validated	service_introducing=true	integration_ac=present	adr_constrained_acs=AD-1,AD-3,AD-7,AD-10,AD-13,AD-14,AD-15,AD-17,AD-18,AD-24	decision_dependency=none	mutates_shared_runtime=false	sections_created=none	owned_ledger=none	addressed=0	declined=0	note=DW-21_born_routed_to_3-5(AD-24_screen_text_family);oversized_per_1-3_precedent
+2026-11-23T05:40:40Z	Story 1.4	stage_spawned	stage=implement	spawn_at=2026-11-23T05:40:40Z	agent_name=1-4-cabinet-implement-1	cycle_iteration=1	story_base=e45590e
+2026-11-23T05:41:34Z	Story 1.4	report_error	fault=lead	field=story_base	reported=4b62609	actual=e45590e	impact=corrected_before_dispatch;reported_sha_left_dangling_by_amend;convention_is_HEAD-at-write-per-1-2_1-3_precedent
