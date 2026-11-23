@@ -2,7 +2,7 @@
 title: 'Story 1.4: The standard stand-up cabinet shell — marquee, live screen'
 type: 'feature'
 created: '2026-11-22'
-status: 'done'
+status: 'in-progress'
 review_loop_iteration: 0
 baseline_revision: 'de093fcfaad1572b48ac8d86fd9738c7b60cec45'
 followup_review_recommended: true
@@ -100,7 +100,12 @@ cr pass 2026-11-23 (external review; layers blind-hunter 10, edge-case-hunter 1,
 - CR-A2 (low, patched): inline `* 0.3` light standoff with only an `lp > 0` pin → `CABINET_LIGHT_STANDOFF_M` exported, equality pin at the build, constant-IS-value drift pin; demonstrated red on 0.3→0.45 (M9).
 - Rejected (6 rows): B1/B5/B9 (duplicate `## Design Notes` heading, stale Code Map handle line, lead-adjudication line misquotes AC3's wording) — the fix is an edit to the spec under review, which step-03 rejects for the reviewer; handed to the lead's bookkeeping (see the cr-pass closing summary). B2 false — Auto Run Result blocks are per-run append-only history (Rule 14), not a contradiction. B3 false — the two "registries" are different lists (game registry vs volume list). V8 dismiss — cosmetic redundant assertion, no named harm.
 
+**Rework iteration 1 (failed smoke, 2026-11-23):**
+- [ ] [Smoke] Marquee exposure blown out: at the 2m front vantage and the 11m door vantage the marquee face renders white-hot — "MOON PATROL" is NOT legible amber-on-black (AC2 fails visually; the fit law itself held — the title painted on two lines). Retune the cabinet spill/halo light constants (`CABINET_LIGHT_INTENSITY = 15` / `CABINET_LIGHT_REACH = 8` / `CABINET_LIGHT_STANDOFF_M = 0.3` — all labelled inference, by-eye family per the 1.3/DW-17 precedent; the light sits only 0.3m off a 0.6m-wide face, candela-scale intensity washes it). The 0.18m cap is NOT a lever; hues stay the tokens. Evidence: evidence/story-1-4-smoke-front-2m-door-open.png, story-1-4-smoke-from-door-11m.png, story-1-4-smoke-corner-16m.png
+- [ ] [Smoke] Screen face blown out: at the front vantage the screen reads as a white rectangle, not a glowing cyan CRT — attract title lost, scan-band drift invisible, only NEXT survives (AC3 fails visually). Same light/paint exposure family; at the front the screen must glow cyan with the title and a visibly drifting band, NEXT amber, without bloom swallowing either. Re-pin exported constants so scene/cabinets equality pins move with the retune, and demonstrate a mutation class for whatever pin guards the exposure ceiling
+
 ## Spec Change Log
+- 2026-11-23 lead (rework iter 1): smoke FAIL — cabinet-light exposure blows the marquee and screen faces (AC2/AC3 visual legs). Two [Smoke] items scoped above; tracker downgraded done→in-progress with rework_opened logged; intent-contract and AC text untouched.
 - 2026-11-23 lead (post-cr maintenance): merged duplicate Design Notes heading (CR-B1); Code Map handles line corrected to {id, mesh, slot} + six parts (CR-B5); lead-adjudication AC3 quote corrected to the verbatim "glow-cyan family" wording with the Intent gloss noted (CR-B9). No intent-contract, AC or Verification-command text touched.
 
 ### 2026-11-23 — implement + review pass (unattended run)
