@@ -123,3 +123,4 @@
 2026-11-23T14:32:08Z	Story 1.4	fresh_check	env=clean-checkout	tests=87	result=pass	order=forward,reverse	clone=/tmp/fresh-13/clone@eda8512	node=26.13.1-portable	files=11	cycle_iteration=2
 2026-11-23T14:32:09Z	Story 1.4	committed	sha=fe81c5b	submodules=none	ci=none
 2026-11-23T14:32:09Z	Story 1.4	story_cycle	plan_to_commit_min=577	implement_passes=2	reviews=2	rework=1	first_ci=none
+2026-11-23T14:36:23Z	Story 1.5	stage_spawned	stage=plan	spawn_at=2026-11-23T14:36:23Z	agent_name=1-5-moon-patrol-plan-1	cycle_iteration=1
