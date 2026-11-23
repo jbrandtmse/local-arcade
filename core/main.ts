@@ -9,13 +9,20 @@
 
 import * as THREE from "three";
 import { createKernelLoop, type KernelLoop } from "./loop.ts";
-import { createGameInstance, math } from "./contract/index.ts";
+import {
+  createGameInstance,
+  math,
+  type GameInstance,
+  type PresentationHooks,
+  type TickInput,
+} from "./contract/index.ts";
 import { createInputService } from "./input/index.ts";
 import { createPlayerController, EYE_HEIGHT, type PlayerController } from "./player.ts";
+import { createSeatService, type SeatKeyMap, type SeatService } from "./seat.ts";
 import { ENTRY_SPAWN, collisionVolumes } from "./room/collision-volumes.ts";
 import { buildRoomScene, type Three } from "./room/scene.ts";
 import { ROOM_BLACK, toCss } from "./room/tokens.ts";
-import { repaintScreen, type CanvasFactory } from "./room/surfaces.ts";
+import { compositeScreen, repaintScreen, type CanvasFactory } from "./room/surfaces.ts";
 import {
   MARQUEE_CAP_M,
   SHELL,
@@ -38,7 +45,7 @@ declare global {
      * smoke (Design Notes item 6) — nothing is rendered or announced.
      * 1.4 adds the cabinet runtime (phase + coin doors) for the console
      * liveness/targeting smoke. */
-    arcadeDebug: { player: PlayerController; loop: KernelLoop; cabinets: CabinetRuntime };
+    arcadeDebug: { player: PlayerController; loop: KernelLoop; cabinets: CabinetRuntime; seat: SeatService };
   }
 }
 
@@ -78,8 +85,25 @@ const loop = createKernelLoop({
   onFault: (entry) => console.error(`[supervisor fault] tick=${entry.tick} id=${entry.errorId}: ${entry.message}`),
 });
 
+// Story 1.5: each entry gets its own kernel-owned TickInput object (the seat
+// service writes the per-tick mapped controls into it) and — when the entry
+// ships a presentation half — its own presentation canvas the kernel hands
+// out through the injected makeCanvas (the adapter never reaches for DOM).
+const instances = new Map<string, GameInstance>();
+const instanceInputs = new Map<string, TickInput>();
+const presentations = new Map<string, PresentationHooks>();
 for (const entry of gameRegistry) {
-  loop.addInstance(entry.id, createGameInstance(entry.createSim, entry.seed ?? 0));
+  const instance = createGameInstance(entry.createSim, entry.seed ?? 0);
+  const tickInput: TickInput = { controls: {} };
+  instances.set(entry.id, instance);
+  instanceInputs.set(entry.id, tickInput);
+  loop.addInstance(entry.id, instance, tickInput);
+  if (entry.createPresentation != null) {
+    presentations.set(
+      entry.id,
+      entry.createPresentation({ makeCanvas: (width, height) => new OffscreenCanvas(width, height) }),
+    );
+  }
 }
 
 // First-person shell: the authored Arcade Room AABB list (1.3) drives
@@ -93,18 +117,66 @@ const input = createInputService({
     void Promise.resolve(renderer.domElement.requestPointerLock()).catch(() => {});
   },
 });
+// Story 1.5 (AC4): the seat service owns the E-law for game-wired cabinets.
+// The raw-code legend mapping stays kernel-side (AD-7); the authored keys
+// mirror the vendored control legend ("ARROWS or A D ... FIRE Z/J ...
+// JUMP X/K ... PRESS ENTER").
+const SEAT_KEYS: Record<string, SeatKeyMap> = {
+  "moon-patrol": {
+    axes: { move: { minus: ["ArrowLeft", "KeyA"], plus: ["ArrowRight", "KeyD"] } },
+    buttons: { start: ["Enter"], jump: ["KeyX", "KeyK"], fire: ["KeyZ", "KeyJ"] },
+  },
+};
+const seat = createSeatService({ player, cabinets, loop });
+// One gate decides tracked-ness: a gameId-wired placement routes E through
+// the seat ONLY when it actually tracks (entry + declared controls + legend
+// keys present). An authoring gap (entry without controls, placement without
+// a legend map) keeps the plain 1.4 coin-door law for that cabinet instead
+// of throwing an untracked-seat fault on every E press.
+const seatTrackVolumeIds = new Set<string>();
+for (const p of cabinetPlacements) {
+  if (p.gameId == null) continue;
+  const entry = gameRegistry.find((e) => e.id === p.gameId);
+  const instance = instances.get(p.gameId);
+  const tickInput = instanceInputs.get(p.gameId);
+  const keys = SEAT_KEYS[p.gameId];
+  if (entry == null || entry.controls == null || instance == null || tickInput == null || keys == null) continue;
+  seat.track({
+    volumeId: p.volumeId,
+    gameId: p.gameId,
+    instance,
+    input: tickInput,
+    controls: entry.controls,
+    keys,
+  });
+  seatTrackVolumeIds.add(p.volumeId);
+}
+// The seat is the sole consumer of the loop's event queue; each drained
+// record rides to that game's presentation half (AD-6 -> AD-11 seam).
+seat.setEventSink((rec) => presentations.get(rec.gameId)?.onEvent?.(rec.event));
+
 loop.addSystem("player", () => {
-  player.step(1, input.takeView());
+  // Seated -> zeroed axes/aim, E kept (the seat's view IS the DeviceView
+  // contract; the player controller never learns why).
+  player.step(1, seat.playerView(input.takeView()));
 });
 
 // Story 1.4: the cabinet runtime mutates ONLY inside the tick — the phase
 // system advances it, and the coin door flips from the E handler the player
 // routes inside its own step (AD-15). Handlers register per placement
-// record, never per hand-typed id.
+// record, never per hand-typed id. 1.5: a gameId-wired placement routes
+// through the seat service; the rest keep the plain 1.4 toggle law.
 loop.addSystem("cabinets", () => stepCabinetPhase(cabinets, 1));
 for (const p of cabinetPlacements) {
-  player.registerInteractable(p.volumeId, (id) => toggleCoinDoor(cabinets, id));
+  if (seatTrackVolumeIds.has(p.volumeId)) {
+    player.registerInteractable(p.volumeId, (id) => seat.handleInteract(id));
+  } else {
+    player.registerInteractable(p.volumeId, (id) => toggleCoinDoor(cabinets, id));
+  }
 }
+// The seat system runs after the sim ticks and event dispatch (AD-23): it
+// drains this tick's events, then maps the raw codes for the NEXT tick.
+loop.addSystem("seat", () => seat.step(input.takeCodeView()));
 
 // Thin browser glue -> device service (AD-7: Core owns capture; the glue
 // only forwards events and (re)arms pointer lock). Silent by construction:
@@ -149,11 +221,14 @@ function frame(): void {
     d.slot.position.set(pose.slot.x, pose.slot.y, pose.slot.z);
     d.slot.rotation.set(0, pose.slot.yaw, 0);
   }
+  // 1.5 paint-step gate: the fallback painters cover only faces WITHOUT a
+  // presentation half (a game-driven face repaints every frame below).
   const paintStep = screenPaintStep(cabinets);
   if (paintStep !== lastScreenPaintStep) {
     lastScreenPaintStep = paintStep;
     for (const s of handles.screens) {
       const placement = placementByVolumeId(s.id);
+      if (placement.gameId != null && presentations.has(placement.gameId)) continue;
       repaintScreen(
         s.canvas,
         placement.screenZones,
@@ -168,6 +243,27 @@ function frame(): void {
       three.markTextureUpdated(s.texture);
     }
   }
+  // Story 1.5: the game half drives its own pixels per frame — drawFrame
+  // gets the instance snapshot, and the Core composites the canvas into the
+  // face under the still-Core-painted NEXT row (letterboxed, centered).
+  for (const s of handles.screens) {
+    const placement = placementByVolumeId(s.id);
+    if (placement.gameId == null) continue;
+    const pres = presentations.get(placement.gameId);
+    const instance = instances.get(placement.gameId);
+    if (pres == null || instance == null) continue;
+    pres.drawFrame(instance.snapshot());
+    compositeScreen(
+      s.canvas,
+      placement.screenZones,
+      pres.canvas,
+      toCss(ROOM_BLACK),
+      toCss(placement.marqueeHue),
+      MARQUEE_CAP_M,
+      SHELL.screen.height,
+    );
+    three.markTextureUpdated(s.texture);
+  }
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }
@@ -180,4 +276,5 @@ window.addEventListener("resize", () => {
 });
 
 // Non-visual debug handle for QA/browser smoke — state only, zero UI.
-window.arcadeDebug = { player, loop, cabinets };
+// 1.5 adds the seat service (E-law cycle + the drained-event record).
+window.arcadeDebug = { player, loop, cabinets, seat };

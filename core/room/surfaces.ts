@@ -22,6 +22,10 @@ export interface PaintContext {
   fillRect(x: number, y: number, w: number, h: number): void;
   fillText(text: string, x: number, y: number): void;
   measureText(text: string): { width: number };
+  /** Story 1.5 compositeScreen only: blit the game's presentation canvas
+   * into the screen face. Optional so the cheap recorder fakes stay valid
+   * for the fallback painters; compositeScreen throws loudly when missing. */
+  drawImage?(source: unknown, dx: number, dy: number, dw: number, dh: number): void;
 }
 
 export interface PaintSurface {
@@ -421,4 +425,69 @@ export function repaintScreen(
   faceHeightM: number,
 ): void {
   drawScreen(surface, zones, step, backgroundCss, attractCss, nextCss, attractCapM, nextCapM, faceHeightM);
+}
+
+/**
+ * Story 1.5: composite the live game frame onto an EXISTING screen face —
+ * the game's own presentation canvas (drawn each frame by the game's
+ * presentation half) is letterboxed into the area between the top margin
+ * and the NEXT row: uniform fit scale = min(areaW/gameW, areaH/gameH),
+ * centered, background showing through the bars. The NEXT row paints here
+ * exactly as drawScreen paints it (same edge inset, cap, fit law) — the
+ * Core keeps lettering that zone while the game drives its own pixels. The
+ * score zone renders nothing (honest until Story 1.8 fills it; CAP-8).
+ * paintScreen stays the fallback path for cabinets with no presentation
+ * half; the paint-step gate in main.ts picks one path per placement.
+ */
+export function compositeScreen(
+  surface: PaintSurface,
+  zones: ScreenZones,
+  gameCanvas: { width: number; height: number },
+  backgroundCss: string,
+  nextCss: string,
+  nextCapM: number,
+  faceHeightM: number,
+): void {
+  const ctx = need2d(surface);
+  if (typeof ctx.drawImage !== "function") {
+    throw new Error("compositeScreen: paint context has no drawImage (the composite path needs it)");
+  }
+  const w = surface.width;
+  const h = surface.height;
+  const pxPerM = h / faceHeightM; // whole px at the authored face sizes
+  ctx.fillStyle = backgroundCss;
+  ctx.fillRect(0, 0, w, h);
+  const edge = Math.round(h * SCREEN_EDGE_RATIO);
+  const nextBaseline = h - edge;
+  const nextTop = nextBaseline - Math.round(nextCapM * pxPerM);
+  if (nextTop < 0) {
+    throw new Error(`compositeScreen: NEXT cap ${nextCapM}m does not fit the ${faceHeightM}m face`);
+  }
+  const areaW = w - 2 * edge;
+  const areaH = nextTop - edge;
+  const gw = gameCanvas.width;
+  const gh = gameCanvas.height;
+  if (gw <= 0 || gh <= 0 || areaW <= 0 || areaH <= 0) {
+    throw new Error(`compositeScreen: game frame ${gw}x${gh} or screen area ${areaW}x${areaH} is empty`);
+  }
+  const scale = Math.min(areaW / gw, areaH / gh);
+  const dw = Math.round(gw * scale);
+  const dh = Math.round(gh * scale);
+  if (dw === 0 || dh === 0) {
+    throw new Error(`compositeScreen: game frame ${gw}x${gh} scales to nothing inside ${areaW}x${areaH}`);
+  }
+  ctx.drawImage(
+    gameCanvas,
+    edge + Math.round((areaW - dw) / 2),
+    edge + Math.round((areaH - dh) / 2),
+    dw,
+    dh,
+  );
+  ctx.textAlign = "center";
+  const maxLineWidth = w - 2 * MARQUEE_MARGIN_PX;
+  const nextCap = Math.round(nextCapM * pxPerM);
+  ctx.fillStyle = nextCss;
+  ctx.font = `600 ${nextCap}px ${MARQUEE_FONT_STACK}`;
+  fitLine(ctx, zones.next.toUpperCase(), nextCap, maxLineWidth);
+  ctx.fillText(zones.next.toUpperCase(), w / 2, nextBaseline);
 }

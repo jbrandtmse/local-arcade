@@ -10,7 +10,7 @@
     "dev": "vite",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
-    "test": "node --test \"core/**/*.test.ts\" \"ci/**/*.test.ts\" \"tools/**/*.test.ts\"",
+    "test": "node --test \"core/**/*.test.ts\" \"ci/**/*.test.ts\" \"tools/**/*.test.ts\" \"games/**/*.test.js\"",
     "registry": "node tools/gen-registry.mjs",
     "depcheck": "node ci/depcheck.mjs",
     "lint": "node ci/lint-bans.mjs"

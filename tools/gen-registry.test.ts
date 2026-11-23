@@ -18,6 +18,10 @@ function fixtureRoot(): string {
       path.join(dir, "sims", id, "sim.js"),
       "export function createSim() { return { tick() {}, events() { return []; }, snapshot() { return {}; } }; }\n",
     );
+    writeFileSync(
+      path.join(dir, "sims", id, "pres.js"),
+      "export function createPresentation() { return { canvas: { width: 0, height: 0, getContext: () => null }, drawFrame() {} }; }\n",
+    );
   }
   return dir;
 }
@@ -56,11 +60,46 @@ test("two fixture entries: sorted deterministic registry re-exporting sim halves
   assert.ok(first.indexOf("gAlpha") < first.indexOf("gBetaGame"), "entries sorted by id");
   assert.ok(first.includes('{ id: "alpha", createSim: gAlpha },'));
   assert.ok(first.includes('{ id: "beta-game", seed: 7, createSim: gBetaGame },'));
-  assert.ok(!first.includes("presentation"), "registry must reference sim halves only");
+  assert.ok(!first.includes("createPresentation"), "an entry without presPath emits the sim half only (no presentation binding)");
+  assert.ok(!first.includes("controls:"), "an entry without controls emits no vocab");
 
   runGenerator(dir);
   const second = readFileSync(path.join(dir, "out", "game-registry.ts"), "utf8");
   assert.equal(second, first); // byte-identical across runs
+});
+
+// Story 1.5: the presentation half and the declared control vocab travel the
+// same deterministic path as the sim half.
+test("presPath + controls emit; the vocab keys are fixed-order regardless of list order; bad legs die loudly", () => {
+  const dir = fixtureRoot();
+  writeFileSync(
+    path.join(dir, "list.json"),
+    JSON.stringify([
+      { id: "alpha", simPath: "sims/alpha/sim.js", presPath: "sims/alpha/pres.js", controls: { aim: [], buttons: ["fire"], axes: ["move"], vocab: 1 } },
+    ]),
+  );
+  runGenerator(dir);
+  const text = readFileSync(path.join(dir, "out", "game-registry.ts"), "utf8");
+  assert.ok(text.includes('import { createPresentation as pAlpha } from "../sims/alpha/pres.js";'), "presentation half imported beside the sim half");
+  assert.ok(
+    text.includes('{ id: "alpha", createSim: gAlpha, createPresentation: pAlpha, controls: {"vocab":1,"axes":["move"],"buttons":["fire"],"aim":[]} },'),
+    "entry carries both halves plus the declared vocab in fixed key order (byte-identical re-emits)",
+  );
+
+  writeFileSync(path.join(dir, "list.json"), JSON.stringify([{ id: "alpha", simPath: "sims/alpha/sim.js", presPath: "sims/alpha/gone.js" }]));
+  expectFailure(dir, "presentation source not found");
+
+  writeFileSync(
+    path.join(dir, "list.json"),
+    JSON.stringify([{ id: "alpha", simPath: "sims/alpha/sim.js", controls: { vocab: 1, axes: "move", buttons: [], aim: [] } }]),
+  );
+  expectFailure(dir, "controls.axes must be an array of strings");
+
+  writeFileSync(
+    path.join(dir, "list.json"),
+    JSON.stringify([{ id: "alpha", simPath: "sims/alpha/sim.js", controls: { vocab: true, axes: [], buttons: [], aim: [] } }]),
+  );
+  expectFailure(dir, "controls.vocab must be a finite number");
 });
 
 test("empty provisional list emits an empty registry", () => {

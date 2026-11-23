@@ -69,6 +69,61 @@ test("core/room modules are DOM-free: room data, scene builder, and painters nev
   }
 });
 
+// Story 1.5: the game's presentation half is DOM-free like the room painters
+// — the kernel hands it a canvas (injected makeCanvas), it never grows one,
+// and it never reaches for any other browser surface (AD-2/AD-11).
+test("the game presentation half is DOM-free: it paints on the kernel's injected canvas only", () => {
+  const src = readFileSync(path.join(REPO, "games", "moon-patrol", "presentation", "adapter.js"), "utf8");
+  for (const banned of ["document.", "window.", "localStorage", "navigator.", "createElement", "style."]) {
+    assert.ok(!src.includes(banned), `games/moon-patrol/presentation/adapter.js must not touch ${banned}`);
+  }
+});
+
+// Story 1.5 honesty scans (AC1/AC5 Verification pins): every file under the
+// games tree that came from the vendored source carries the provenance sha
+// in its header; the authored seams carry the PROVISIONAL marker so the
+// provisional wrap (AD-14) is visible at every entry point, not only in the
+// spec. sim/index.js is the authored sim adapter (not vendored), so the sha
+// leg exempts it and counts the rest exactly.
+test("vendored files carry the provenance sha; the provisional seams carry PROVISIONAL (AC1/AC5 scans)", () => {
+  const VENDORED_SHA = "49c351910af742a86cf97987bc474bb4d7d8da40";
+  const gamesDir = path.join(REPO, "games");
+  const walk = (dir: string): string[] => {
+    const files: string[] = [];
+    for (const ent of readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, ent.name);
+      if (ent.isDirectory()) files.push(...walk(full));
+      else if (ent.name.endsWith(".js")) files.push(full);
+    }
+    return files;
+  };
+  const all = walk(gamesDir);
+  assert.equal(all.length, 13, "the games tree is exactly the 10 vendored files + the 3 authored files");
+  // The authored files (no vendored code inside) are exempt from the sha leg;
+  // everything else in the tree is vendored and MUST carry provenance.
+  const authored = new Set([
+    path.join("moon-patrol", "sim", "index.js"), // authored sim adapter, cites provenance via the wrapped files
+    path.join("moon-patrol", "sim", "index.test.js"), // authored test of that adapter
+    path.join("moon-patrol", "presentation", "adapter.test.js"), // authored test of the presentation half
+  ]);
+  let provenanced = 0;
+  for (const file of all) {
+    const rel = path.relative(gamesDir, file);
+    if (authored.has(rel)) continue;
+    const src = readFileSync(file, "utf8");
+    assert.ok(src.includes(VENDORED_SHA), `${path.relative(REPO, file)} must carry the vendoring provenance sha (AC1)`);
+    provenanced += 1;
+  }
+  assert.equal(provenanced, 10, "exactly the ten vendored files carry the sha — a new games file without provenance is loud");
+  for (const seam of [
+    path.join("games", "moon-patrol", "sim", "index.js"),
+    path.join("games", "moon-patrol", "presentation", "adapter.js"),
+    path.join("core", "contract", "wrapper.ts"),
+  ]) {
+    assert.ok(readFileSync(path.join(REPO, seam), "utf8").includes("PROVISIONAL"), `${seam} carries the PROVISIONAL marker (AD-14 provisional wrap is visible at the code, not just the spec)`);
+  }
+});
+
 test("dev serve (real HTTP): the served body is unchanged, the 1.2 shell modules resolve", async () => {
   const server = await createServer({
     configFile: CONFIG,
@@ -96,6 +151,9 @@ test("dev serve (real HTTP): the served body is unchanged, the 1.2 shell modules
       "/core/room/tokens.ts",
       "/core/room/scene.ts",
       "/core/room/surfaces.ts",
+      "/core/seat.ts",
+      "/generated/game-registry.ts",
+      "/games/moon-patrol/presentation/adapter.js",
     ]) {
       const res = await fetch(`http://127.0.0.1:${DEV_PORT}${moduleUrl}`);
       assert.equal(res.status, 200, `${moduleUrl} resolves in the dev graph`);

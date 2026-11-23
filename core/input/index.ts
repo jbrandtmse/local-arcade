@@ -65,7 +65,19 @@ export interface InputService {
   visibilityChanged(): void;
   /** Pull this tick's device view; aim deltas land once, then reset. */
   takeView(): DeviceView;
+  /** Story 1.5 (seat service): per-code raw levels + press edges for ALL
+   * codes — the seat system maps these onto the game's declared slots each
+   * tick. Consumed exactly once per tick, same replay law as takeView. */
+  takeCodeView(): CodeView;
   readonly pointerLocked: boolean;
+}
+
+/** Raw-key view for the seat's per-tick slot mapping (AD-7: device capture
+ * stays Core-side; the game never sees codes). levels lists held codes only;
+ * edges mark fresh keydowns since the last take. */
+export interface CodeView {
+  levels: Record<string, boolean>;
+  edges: Record<string, boolean>;
 }
 
 const FORWARD_PLUS = "KeyW";
@@ -85,6 +97,9 @@ export function createInputService(host: PointerLockHost): InputService {
   // Press edge latches on keydown so a press that starts and ends between
   // two takeView() calls still edges exactly once (replay-safe).
   let interactEdge = false;
+  // Raw-code press edges for the seat's per-tick slot mapping — same latch
+  // law as interactEdge: a fresh keydown edges once even between takes.
+  const codeEdges = new Map<string, boolean>();
 
   return {
     key(code, down) {
@@ -94,6 +109,7 @@ export function createInputService(host: PointerLockHost): InputService {
         // only (AC4 once-per-press).
         if (keys.has(code)) return;
         keys.add(code);
+        codeEdges.set(code, true);
       } else keys.delete(code);
       if (code === INTERACT_KEY) {
         interactDown = down;
@@ -132,6 +148,7 @@ export function createInputService(host: PointerLockHost): InputService {
       aimDy = 0;
       interactDown = false;
       interactEdge = false;
+      codeEdges.clear();
     },
     takeView() {
       const view: DeviceView = {
@@ -146,6 +163,16 @@ export function createInputService(host: PointerLockHost): InputService {
       aimDy = 0;
       interactEdge = false;
       return view;
+    },
+    takeCodeView() {
+      const levels: Record<string, boolean> = {};
+      for (const code of keys) levels[code] = true;
+      const edges: Record<string, boolean> = {};
+      for (const code of codeEdges.keys()) {
+        edges[code] = true;
+        codeEdges.delete(code);
+      }
+      return { levels, edges };
     },
     get pointerLocked() {
       return locked;

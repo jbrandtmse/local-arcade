@@ -7,9 +7,13 @@ export { createGate, gateDeep, toPlain, type TickGate } from "./freeze.ts";
 export { canonicalSerialize, fnv1a64, stateHashOf } from "./hash.ts";
 export {
   createGameInstance,
+  type GameCanvasLike,
+  type GameControls,
   type GameInstance,
   type GameRegistryEntry,
   type InstanceMode,
+  type PresentationFactory,
+  type PresentationHooks,
   type SimContext,
   type SimEvent,
   type SimFactory,

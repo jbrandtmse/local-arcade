@@ -68,6 +68,12 @@ export interface PlayerController {
   /** Kernel-internal interact registry (Design Notes item 7). Empty this
    * story: an E press with a target and no handler is a silent no-op. */
   registerInteractable(volumeId: string, handler: InteractableHandler): void;
+  /** Set the four pose fields exactly (seat service, Story 1.5 — sit and
+   * stand move the visitor between the standing pose and the cabinet play
+   * pose). Bob state and target are left to step(): the seat holds a zeroed
+   * view while the visitor sits, so bobPhase is frozen and bobAmp has
+   * settled long before the restore (Design Notes: settle wait). */
+  teleport(pose: { x: number; z: number; yaw: number; pitch: number }): void;
 }
 
 export function createPlayerController(
@@ -227,6 +233,12 @@ export function createPlayerController(
     },
     registerInteractable(volumeId, handler) {
       interactables.set(volumeId, handler);
+    },
+    teleport(pose) {
+      state.x = pose.x;
+      state.z = pose.z;
+      state.yaw = pose.yaw;
+      state.pitch = pose.pitch;
     },
   };
 }

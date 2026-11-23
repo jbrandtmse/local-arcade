@@ -29,26 +29,73 @@ export interface SimContext {
   gated<T extends object>(state: T): T;
 }
 
-/** The verbatim sim-half hooks (AD-8; attract/autoplay may be absent). */
+/** The verbatim sim-half hooks (AD-8; attract/autoplay/play may be absent). */
 export interface SimHooks {
   tick(dt: number, input: TickInput): void;
   events(): SimEvent[];
   snapshot(): unknown;
   attract?(): void;
   autoplay?(seed: number): void;
+  /** PROVISIONAL (Story 1.5): visitor-seated start (AD-23). The kernel seats
+   * the visitor and hands over the seed; the sim (re)builds its play world
+   * from it. The 1.6 scheduler will own WHO may sit down — the hook shape
+   * itself is stable. */
+  play?(seed: number): void;
 }
 
 export type SimFactory = (ctx: SimContext) => SimHooks;
+
+/** A canvas the presentation may paint on — the narrow shape a browser
+ * HTMLCanvasElement already satisfies; the kernel never inspects it beyond
+ * width/height (the composite reads its size, Story 1.5). */
+export interface GameCanvasLike {
+  width: number;
+  height: number;
+  // The presentation may pass 2D-context options (the adapter asks for
+  // alpha:false); a kernel canvas that ignores them is still conforming.
+  getContext(kind: "2d", options?: unknown): unknown;
+}
+
+/** The presentation-half hooks (AD-2/AD-11): the kernel feeds drawFrame the
+ * instance snapshot and forwards each emitted event; the presentation owns
+ * its canvas and never touches loop/tick state. */
+export interface PresentationHooks {
+  canvas: GameCanvasLike;
+  drawFrame(snapshotView: unknown): void;
+  onEvent?(event: SimEvent): void;
+}
+
+/** Presentation factory: the kernel provides canvas creation (the entry's
+ * sim-view size comes from the presentation itself); the presentation never
+ * reaches for document.createElement. */
+export type PresentationFactory = (opts: {
+  makeCanvas: (width: number, height: number) => GameCanvasLike;
+}) => PresentationHooks;
+
+/** The declared control vocabulary of one game (AD-7/AD-16): the kernel maps
+ * raw device input onto exactly these slots — nothing else reaches the sim. */
+export interface GameControls {
+  vocab: number;
+  axes: string[];
+  buttons: string[];
+  aim: string[];
+}
 
 /** One entry of the build-generated game registry (AD-11, provisional list). */
 export interface GameRegistryEntry {
   id: string;
   seed?: number;
   createSim: SimFactory;
+  /** Presentation half, when the entry ships one (Story 1.5): the kernel
+   * composites its canvas into the cabinet screen. */
+  createPresentation?: PresentationFactory;
+  /** Control vocabulary this game accepts; presence is what makes the seat
+   * service route raw keys to this instance (Story 1.5). */
+  controls?: GameControls;
 }
 
-/** Kernel-owned instance modes; "play" (visitor-seated, AD-23) is reserved for
- * the 1.6 scheduler — no wrapper surface sets it this story. */
+/** Kernel-owned instance modes; "play" (visitor-seated, AD-23) is set by the
+ * seat service through instance.play(seed) — Story 1.5 opened that seam. */
 export type InstanceMode = "attract" | "autoplay" | "play";
 
 export interface GameInstance {
@@ -59,6 +106,7 @@ export interface GameInstance {
   stateHash(): string;
   attract(): void;
   autoplay(seed: number): void;
+  play(seed: number): void;
   mode(): InstanceMode;
 }
 
@@ -150,6 +198,13 @@ export function createGameInstance(createSim: SimFactory, seed: number): GameIns
       rng.reseed(seed);
       sim.autoplay?.(seed);
       mode = "autoplay";
+    },
+    play(seed: number) {
+      // Same seed law as autoplay (Story 1.5, AD-23): the kernel seats the
+      // visitor and hands the seed over; gate-closed like every non-tick call.
+      rng.reseed(seed);
+      sim.play?.(seed);
+      mode = "play";
     },
     mode() {
       return mode;

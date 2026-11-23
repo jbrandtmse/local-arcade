@@ -82,6 +82,10 @@ export interface CabinetPlacement {
   /** Marquee lettering/spill hue — DESIGN's token name IS the fiction:
    * marquees are amber. */
   marqueeHue: number;
+  /** Story 1.5: the registry gameId this shell is wired to (a room-data
+   * link, authored — no manifest, no ledger). Absent means a plain 1.4
+   * cabinet: E toggles the coin door and nothing is seated. */
+  gameId?: string;
 }
 
 export const cabinetPlacements: readonly CabinetPlacement[] = [
@@ -92,6 +96,7 @@ export const cabinetPlacements: readonly CabinetPlacement[] = [
     screenZones: { attract: "MOON PATROL", next: "NEXT", score: [] },
     hue: GLOW_CYAN,
     marqueeHue: GLOW_MARQUEE,
+    gameId: "moon-patrol",
   },
 ];
 

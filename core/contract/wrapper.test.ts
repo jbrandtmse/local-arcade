@@ -209,6 +209,32 @@ test("mode switches: attract() and autoplay(seed) are kernel-driven one-shots", 
   assert.equal(lastDraw, createRng(4242).uniform()); // autoplay re-seeded the instance rng
 });
 
+test("play(seed) re-arms the instance rng exactly like autoplay (Story 1.5 provisional seam, AC4)", () => {
+  // The seat hands a visitor start over through play(seed); if the wrapper
+  // skipped rng.reseed here, the sim would keep the OLD rng stream and the
+  // "same seed, same run" law would silently differ between autoplay and play.
+  let lastDraw = Number.NaN;
+  let receivedSeed = Number.NaN;
+  const a = createGameInstance((ctx) => ({
+    tick: () => {
+      lastDraw = ctx.rng.uniform();
+    },
+    events: () => [],
+    snapshot: () => ({}),
+    play: (seed: number) => {
+      receivedSeed = seed;
+    },
+  }), 1);
+  a.tick(1 / 60, { controls: {} });
+  const stale = lastDraw;
+  a.play(31337);
+  assert.equal(receivedSeed, 31337);
+  assert.equal(a.mode(), "play");
+  a.tick(1 / 60, { controls: {} });
+  assert.notEqual(lastDraw, stale, "the play seed re-arms the instance rng");
+  assert.equal(lastDraw, createRng(31337).uniform(), "the draw stream restarts at the handed-over seed");
+});
+
 test("ctx.math seam: the wrapper injects the Core math module at instantiation (AD-4)", () => {
   // The sim never imports core/contract (spine diagram: no SIM→CONTRACT edge);
   // ctx.math is the sanctioned channel for the deterministic transcendentals.

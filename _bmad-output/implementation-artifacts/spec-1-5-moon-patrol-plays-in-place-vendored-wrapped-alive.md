@@ -2,7 +2,8 @@
 title: 'Story 1.5: Moon Patrol plays in place — vendored, wrapped, alive'
 type: 'feature'
 created: '2026-11-23'
-status: 'ready-for-dev'
+status: 'done'
+baseline_revision: '584110e96d1272555d4e30604a5619616d357d45'
 review_loop_iteration: 0
 followup_review_recommended: true
 context:
@@ -13,6 +14,21 @@ context:
   - _bmad-output/planning-artifacts/ux-designs/ux-local-arcade-2026-11-20/EXPERIENCE.md
   - _bmad-output/planning-artifacts/ux-designs/ux-local-arcade-2026-11-20/mockups/cabinet-close-up.html
 warnings: ['oversized']
+deferred:
+  - finding: 'Vendored respawn pad-clear filter never removes minefields (NaN comparison)'
+    location: 'games/moon-patrol/sim/world.js:106 (respawn), data shape from games/moon-patrol/sim/course.js:100'
+    severity: 'medium'
+    evidence: >-
+      respawn() filters ground obstacles with the predicate
+      (o.x + o.w > padL && o.x < padR), but minefield records carry x1/x2 (no x/w),
+      so both comparisons yield NaN and the filter never drops a minefield standing
+      on the respawn pad — the buggy can respawn directly onto one and lose a life
+      it never had a chance to dodge. Present in the vendored source at
+      C:/git/moonpatrol@49c351910af742a86cf97987bc474bb4d7d8da40; the port kept
+      world.js unmodified below its seam edits (AC1 vendor law), so this was NOT
+      fixed here. What would settle it: fix the predicate to read x1/x2 for
+      minefield kinds (upstream first, then re-vendor), plus a sim test that
+      respawns onto a pad containing a minefield and pins the pad is clear.
 ---
 
 <intent-contract>
@@ -51,7 +67,7 @@ warnings: ['oversized']
 ## Code Map
 
 **New — the game plugin (plain JS, AD-13/AD-14):**
-- `games/moon-patrol/sim/index.js` — `createSim()` → the contract hooks: `tick(dt,input)` (dt halves, 2 × 1/120 substeps into vendored `step`), `attract()`, `events()`, `snapshot()` (world + attract clock + both rng cursors, plain), plus provisional `play?(seed)`; canonical-event mapping from vendored fx names. PROVISIONAL header + provenance sha.
+- `games/moon-patrol/sim/index.js` — `createSim()` → the contract hooks: `tick(dt,input)` (dt halves, 2 × 1/120 substeps into vendored `step`; on `world.done` the champion-continuation law re-homed from the discarded main.js glue — rebuild at `courseIndex: 1` carrying score/lives/extraLifeIdx, same run seed), `attract()`, `events()`, `snapshot()` (world + attract clock + both rng cursors, plain), plus provisional `play?(seed)`; canonical-event mapping from vendored fx names. PROVISIONAL header + provenance sha.
 - `games/moon-patrol/sim/config.js`, `course.js` — vendored as-is (config carries the score TABLE as presentation-read data — never in snapshot; `course.js` keeps its own derived game-local rng — legal per game-authoring §2).
 - `games/moon-patrol/sim/rng.js` — vendored mulberry32 + added `getState`/`setState` (plain uint32 state) so snapshots carry the cursor.
 - `games/moon-patrol/sim/world.js` — vendored with seam edits only: particles out (emit game-local `burst` fx; `burst()` consumers presentation-side), `Math.sin` → `ctx.math.sin`, `Math.hypot` → `Math.sqrt`, `up.hits` Set-of-refs → numeric `oid` array, world rng state exposed for snapshot, `structuredClone` kept (plain data). dt-agnostic `step` unchanged.
@@ -75,16 +91,16 @@ warnings: ['oversized']
 
 ## Tasks & Acceptance
 
-- [ ] `games/moon-patrol/sim/*.js` -- create (vendor + seam edits) -- the game, deterministic, lint-clean
-- [ ] `games/moon-patrol/sim/*.test.js` -- create (port) -- vendored behaviour locked after the seam edits
-- [ ] `games/moon-patrol/presentation/*.js` -- create (vendor + edit) -- frames from sim state only
-- [ ] `core/contract/wrapper.ts` -- modify (play seam) -- enter the reserved play mode contractually
-- [ ] `tools/registry-list.json` + `tools/gen-registry.mjs` + its test -- modify -- the one registration carrier
-- [ ] `core/input/index.ts`, `core/player.ts`, `core/room/cabinets.ts`, `core/room/surfaces.ts` -- modify (extend) -- raw-key views, teleport, gameId, compositeScreen
-- [ ] `core/seat.ts` + `core/seat.test.ts` -- create -- the seat-transition service (FR-6)
-- [ ] `core/main.ts` -- modify (wiring) -- seat system + adapter draw + seat-aware E handlers
-- [ ] `package.json`, `tsconfig.json` -- modify -- test glob, allowJs
-- [ ] moved pins in `cabinets.test.ts`, `main-glue.test.ts`, `no-ui-dom.test.ts` -- modify -- the enumerated shared surfaces move honestly
+- [x] `games/moon-patrol/sim/*.js` -- create (vendor + seam edits) -- the game, deterministic, lint-clean
+- [x] `games/moon-patrol/sim/*.test.js` -- create (port) -- vendored behaviour locked after the seam edits
+- [x] `games/moon-patrol/presentation/*.js` -- create (vendor + edit) -- frames from sim state only
+- [x] `core/contract/wrapper.ts` -- modify (play seam) -- enter the reserved play mode contractually
+- [x] `tools/registry-list.json` + `tools/gen-registry.mjs` + its test -- modify -- the one registration carrier
+- [x] `core/input/index.ts`, `core/player.ts`, `core/room/cabinets.ts`, `core/room/surfaces.ts` -- modify (extend) -- raw-key views, teleport, gameId, compositeScreen
+- [x] `core/seat.ts` + `core/seat.test.ts` -- create -- the seat-transition service (FR-6)
+- [x] `core/main.ts` -- modify (wiring) -- seat system + adapter draw + seat-aware E handlers
+- [x] `package.json`, `tsconfig.json` -- modify -- test glob, allowJs
+- [x] moved pins in `cabinets.test.ts`, `main-glue.test.ts`, `no-ui-dom.test.ts` -- modify -- the enumerated shared surfaces move honestly
 
 **AC 1 — Vendored in, L0-clean at the seam.** Given the owner's original game at `C:/git/moonpatrol@49c3519…`, when the vendored files land in `games/moon-patrol/`, then the sim half imports nothing but itself, the input.js/audio.js/main.js layers are not vendored, `node ci/lint-bans.mjs` and `node ci/depcheck.mjs` pass with zero exemptions, the ported vendored tests pass, and every vendored file carries its provenance header.
 
@@ -101,10 +117,45 @@ warnings: ['oversized']
 ## Spec Change Log
 
 - 2026-11-23: initial plan (plan stage, unattended; no prior spec for this key).
+- 2026-11-23: review pass at implement stage — 29 findings triaged (17 patched, 2 deferred to the frontmatter list, 3 rejected, 7 false); no intent-contract change; status done.
 
 ## Review Triage Log
 
-(empty — plan stage)
+### 2026-11-23 — Review pass (four layers: blind-hunter, edge-case, verification, intent-alignment)
+
+Verdicts: 29 findings — high 0, medium 10, low 12, false 7. One row per finding, layer-report order (B = blind, E = edge, V = verification, IA = intent). Grouped patches name the shared fix.
+
+- **B1** [medium] PATCHED — the compositeScreen letterbox/fit law has no executed test (main-glue pins only). Fix: two new tests in `core/room/cabinets.test.ts` (min-fit scale, centered blit, equal bars, aspect intact, NEXT row at the cap over the injected background; plus the no-drawImage loud-throw pin). Probe M2: `Math.min` -> `Math.max` at surfaces.ts:473 -> exactly the letterbox test red; reverted, md5 3c1387b676605006627ecebf073b97c9.
+- **B2** [low] PATCHED (group "seat gate": B2+E1+E2) — main.ts routes E by `p.gameId != null` while `seat.track` additionally requires entry/controls/keys: an authoring gap (entry without controls, placement without legend keys) would throw an untracked-seat fault instead of keeping the 1.4 law. Fix: single `seatTrackVolumeIds` gate decides both tracking and E-routing; main-glue gains the gate-identity pin. Probe M8: widen the E-gate back to `p.gameId != null` -> exactly the new pin red; reverted, md5 7cee7c538cc98258f57b70a91129be64.
+- **B3** [medium] DEFERRED — minefield respawn-pad NaN bug (vendored). See frontmatter `deferred:`; world.js stays unmodified below its seam edits per AC1.
+- **B4** [low] REJECTED — the adapter's game-over panel branch is unreachable under the seat wiring. Rejection reason: the seat's flip-to-attract-on-gameEnded IS the intent's liveness law ("the instance returns to attract the moment gameEnded lands (liveness law — no frozen screen)"); deleting the vendored branch would trade vendored structure for an unreachable-code preference. Reading recorded in Design Notes 34.
+- **B5** [medium] PATCHED (group "legend": B5+E5) — the adapter attract screen advertised `P PAUSE   M MUTE`, controls that exist in no declared vocab and cannot work (pause/mute live in the discarded vendored main.js glue). Fix: legend line replaced with `ENTER ......... START` (same 4-line dotted block); Design Notes 35.
+- **B6** [low] PATCHED — the presentation event-sink path (main.ts `setEventSink`) is only source-pinned, never executed. Fix: the seat death test installs a sink recorder before the run and pins the sunk pair order + per-record gameId. Probe M6: `sink(rec)` -> `void rec` in seat.ts:184 -> exactly the sink-leg assertion red (drained-pair pins stay green); reverted, md5 d2fbb782d7328fab8278697e3947f4c2.
+- **B7** [low] REJECTED — per-tick `structuredClone` cost in the wrapper gate path. Rejection reason: not this story's everyday path (one small plain object per tick at 60Hz), and the direct fix would weaken the AD-15/AD-16 clone-at-the-seam discipline without a story mandate; profile evidence would be the honest opener, not a drive-by.
+- **B8** [low] PATCHED — the visitSession comment claims "the exact shape main.ts wires (loop systems + ...)" while the test steps player + phase directly. Fix: honest reword (same call order, registry registration identical; loop-system registry itself is pinned by main-glue source pins).
+- **B9** [low] PATCHED — `GameCanvasLike.getContext(kind)` rejects the adapter's `getContext('2d', {alpha:false})` call shape at the type level. Fix: signature widened to `getContext(kind: "2d", options?: unknown)`; typecheck green.
+- **E1** [low] PATCHED — (group "seat gate", see B2) a gameId placement whose entry lacks `controls` routes E to `seat.handleInteract`, which throws "not tracked".
+- **E2** [low] PATCHED — (group "seat gate") same shape for a placement with no `SEAT_KEYS` entry.
+- **E3** [false] — claims the first play tick crashes on `controls: {}`. Not reachable: the seat's attract branch returns before reading controls, and the seat writes the `{axes, buttons}` mapping before the first play-mode tick (Design Notes 24); the seed-role twin test replays that exact one-zero-plus-N pattern green.
+- **E4** [medium] DEFERRED — same minefield respawn-pad bug as B3 (shared root cause; one deferred entry covers both).
+- **E5** [medium] PATCHED — (group "legend", see B5) same advertised-P/M defect seen from the controls-vocab edge.
+- **V1** [medium] PATCHED — `play(seed)`'s reseed law is untested at the wrapper (only autoplay's is pinned). Fix: new `wrapper.test.ts` test asserting the draw stream restarts at the handed-over seed. Probe M1: drop `rng.reseed(seed)` from `play()` -> exactly the new test red ("the draw stream restarts at the handed-over seed"); reverted, md5 4b4fa50963e150c15a8f17aad8da407c.
+- **V2** [medium] PATCHED — same missing-executed-test defect as B1 (compositeScreen law).
+- **V3** [medium] PATCHED (group "sim purity": V3+IA9) — AD-2's "sim imports nothing but itself" has no gate: depcheck scanned only core->games. Fix: `ci/depcheck.mjs` gains the sim-source leg (files under a `sim` component, test files exempt because the matrix demands sim tests wire the REAL wrapper; bare/absolute/escaping specifiers are violations) plus `depcheck.test.ts` fixtures; both scan legs now guard missing dirs with existsSync. Probe M3: planted `import { math as probe } from '../../../core/contract/index.ts'` in sim/index.js -> depcheck exit 1 citing `games\moon-patrol\sim\index.js:10:31`; reverted, md5 08e25b8d35f1c6b7a3c4ed17f1aedd00.
+- **V4** [medium] PATCHED — Verification's AC1/AC5 pins cite a provenance-header scan and a PROVISIONAL scan that did not exist. Fix: `core/no-ui-dom.test.ts` now walks the games tree: every JS file except the three authored ones (sim/index.js, sim/index.test.js, presentation/adapter.test.js) must carry the vendored sha `49c351910af742a86cf97987bc474bb4d7d8da40`, count pinned to exactly 10; the three provisional seams (sim/index.js, adapter.js, wrapper.ts) must contain `PROVISIONAL`. Probe M4: sha last digit 0->1 in world.js header -> exactly the scan test red; reverted, md5 58cf39401ecdfdf1e6d22cf97b429e78.
+- **V-obs** [false] — zero-tick-step drift concern on the fake-clock rigs. Observed otherwise: every rig step asserts exactly one tick, and the blind-hunter's numeric probe measured `tickCount` exactly 2160 for the 3x720 run (Design Notes 25's 0.1% margin swamps FP drift at these lengths).
+- **IA1** [false] — "legend must mirror the vendored legend exactly" vs the P/M advertised-never-wired tension. The intent's own enumeration (`A/D + Arrows = speed, Z/J = fire, X/K = jump, Enter = start/restart`) is the binding law; the screen now matches it (B5/E5 patch). No intent change needed.
+- **IA2** [false] — gated-state honesty: Design Notes 26 already records the by-construction AD-15 reading (world never `ctx.gated`, `tick` its only mutator, gate window still wraps `sim.tick`). Nothing hidden.
+- **IA3** [false] — champion continuation: the implement-stage Matrix Test Audit caught and fixed exactly this (Design Notes 33, pinned continuation tick 15572); no remaining gap.
+- **IA4** [false] — blink wave-shape concern: Design Notes 29 pins the vendored `floor(attractT * 2) % 2` law honestly rather than an idealized square wave.
+- **IA5** [low] PATCHED — the attract seed's provenance is unpinned (generated value could drift from the authored list). Fix: seat.test.ts pins `entry.seed`/`entry.controls` equal to the `tools/registry-list.json` block. Probe M5: hand-move the generated seed 1982 -> 1983 -> exactly that pin red ("the attract seed IS the authored list's number"); reverted by regeneration, sha1 71f45be3372eff5d6c4bb3647112bc1964bfed20 byte-identical.
+- **IA6** [low] PATCHED — the matrix's "three pairwise-distinct hashes" half-row was unpinned (adjacent pairs only). Fix: `assert.notEqual(hashes[0], hashes[2])` in the attract-liveness test. Probe M7b: reset `attractT` to 0 at >= 24 (two-state attract) -> exactly the pairwise pin red (adjacent pins stay green); reverted, md5 08e25b8d35f1c6b7a3c4ed17f1aedd00.
+- **IA7** [false] — glue wiring pinned by source-text instead of executed browser test: established repo tier (DW-15 — the executed tier lands with the Epic-3 browser harness); main-glue pins are that tier, not a gap.
+- **IA8** [low] REJECTED — asks that the adapter's attract HI-SCORE draw be reconciled with "no scores on screen". Rejection reason: the fix the finding wants IS a spec reading, and readings go in Design Notes, not code — recorded in Design Notes 34 (in-run HUD + vendored attract HI-SCORE are game screen content per the intent's own parenthetical; the Never-boundary binds the Core cabinet score zone until 1.8). Code kept.
+- **IA9** [medium] PATCHED — (group "sim purity", see V3) intent's "imports nothing but itself" unenforced by any gate.
+- **IA10** [low] PATCHED — post-flip attract liveness (matrix "its hash keeps advancing" half-row) unpinned at the seat level. Fix: two ticks + hash notEqual after the in-place flip in the seat death test. Probe M7: freeze the attract clock (`attractT += dt` removed) -> exactly "attract keeps ticking after the in-place flip" red in the death test; reverted, md5 08e25b8d35f1c6b7a3c4ed17f1aedd00.
+
+Post-patch suite: 238/238; typecheck/depcheck/lint-bans silent; regen idempotent; probes M1-M8 (M7b included) all named-pin-red then reverted byte-identical; Design Notes 34-36.
 
 ## Design Notes
 
@@ -140,6 +191,24 @@ warnings: ['oversized']
 19. `autoplay(seed)` NOT implemented in this story (1.6's); the wrapper tolerates the missing optional hook (1.1 design).
 20. Fault behaviour while seated is 1.7's story; the supervisor already wraps the call sites — no seat-side containment invented here.
 
+**Decided at implement stage (choices the plan did not cover; recorded per dispatch):**
+21. Vendored buggy NEVER reverses: spawn speed is the slow floor (100) and `speed` is clamped >= 100, so KeyA from spawn is a no-op. "KeyA moves the buggy left" is therefore pinned honestly as deceleration: KeyD reaches 190, release + KeyA returns to 100, and x stays behind the free-run twin's x over the same window (asserted < twin x at switch + 72.5px). The attract legend's "CONTROL SPEED (NEVER STOPS)" is true as vendored.
+22. `play(seed)` also resets `attractT = 0` (mode switch restarts the attract clock): a stale attract phase is state debt, not history. Needed for the post-stand attract twin-identity pins (inference).
+23. Sit settle-wait law: scripted sits idle 30 ticks (bob amp eases to 0) before the sit press, so the post-stand player-snapshot deepEqual against the pre-sit snapshot is exact on the four teleported pose fields with bob/target left to `step`.
+24. First-play-tick mapping: sit fires inside `player.step` (system phase, after that tick's instance tick), and the seat system writes the mapped controls for the NEXT tick in the same tick — the first play tick carries `move: 0`, all buttons false. The seed-role twin replay replicates exactly this one-zero-plus-N pattern (Design-Notes law for any future replay pin).
+25. Test fake clock: seat/loop tests advance the clock by `MS_PER_TICK * 1.0001` so `loop.step()` yields exactly one tick per step despite float-accumulator drift (residual grows ~0.0017ms/step, stays under a tick for 2160-step runs); bare `MS_PER_TICK` intermittently yields 0 ticks.
+26. Gated-state honesty: the vendored world can never be `ctx.gated` (it holds function-valued `rng`/`math`); mutation-in-tick (AD-15) holds BY CONSTRUCTION — `tick` is the world's only mutator and the wrapper's gate window still wraps `sim.tick`; `snapshot()` returns a structuredClone of the plain fields plus both cursors. Recorded, not hidden.
+27. Refines inference 18: the authored attract seed is the constant 1982 in `tools/registry-list.json`.
+28. The roundBreak clear pin is a hand-authored scripted landing-safety planner (the vendored smoke AI never guarantees a clear): SEED 5, clear pinned at tick 15302, score pinned 48100 as the determinism witness. Seat-side death path pins stub seeds 8 (gameover at observed tick ~943) and 5150 (Enter restart). Formation fixtures stamp `oid = 11 + i` for the numeric `up.hits` arrays (consequence of the plainness edit 7).
+29. PRESS ENTER blink honesty: the vendored blink is `floor(attractT * 2) % 2`, and float accumulation of `attractT` flips OFF exactly on a half-second tick boundary; the pin is honest to that law (checked at ticks 40/70; the matrix rows 0/600) rather than pinning an idealized square wave.
+30. Registry drift at this story's base: `git diff --exit-code -- generated/` against HEAD shows the DECLARED shared-surface move 0->1 (HEAD carries the empty registry; the regenerated one-entry file is committed by the lead). Idempotency proven: two consecutive `node tools/gen-registry.mjs` runs are byte-identical.
+31. Rule 19 probes ran at implement stage; all six recorded mutation lines held (each named pin went red, reverted, tree byte-identical, suite green after reverts — final sweep: 232/232, depcheck/lint-bans/typecheck silent, build once). One observation nuance, recorded rather than re-worded: for AC2's cursor-drop, the named test goes red on the cursor assert; the same-seed determinism assert inside that same test would itself still pass (both twins lose the cursor symmetrically). Probe targets are untracked files, so `git checkout --` does not apply — reverts were byte-exact reverse-edits verified by md5 (world.js 58cf39401ecdfdf1e6d22cf97b429e78, index.js ddd9e58ab5b4ff0103ede65a7fe7423c, seat.ts d2fbb782d7328fab8278697e3947f4c2).
+32. No new files fall outside the Code Map: `core/seat.test.ts` is on the map; `games/moon-patrol/sim/index.test.js` and `presentation/adapter.test.js` are matched by the map's `*.test.js` / `*.js` globs; package.json/tsconfig/gen-registry moves are map lines.
+33. Matrix Test Audit (implement stage) caught the "Course clear" row half-unimplemented: the row expects "vendored champion behaviour (continue at courseIndex 1) keeps running unmodified", but that law lives only in the DISCARDED glue layer (vendored `src/main.js:67-76` — AC1 forbids vendoring main.js), so the ported sim left the world frozen in `cleared` after the panel ttl. Fixed the code per the audit rule: the law re-homed verbatim in `sim/index.js` `tick` — on `world.done`, rebuild `createWorld` with `courseIndex: 1` carrying `score`/`lives`/`extraLifeIdx` on the same run seed; the world.js clear/done mechanic stays untouched. Row reading recorded: "keeps running" is cabinet-observable behavior (the run continues), not merely a statement that the vendored file is unmodified. The clear test extended to pin continuation at tick 15572 (clear + 270 ttl ticks), carried score 48100, lives/extraLifeIdx carried, fresh spawn x=40. Probe: dropping the done→rebuild block turned the continuation pin red (-1 !== 15572); reverted byte-identical (md5 08e25b8d35f1c6b7a3c4ed17f1aedd00), green again.
+34. HI-SCORE reading (review pass, IA8/B4): the adapter draws the vendored attract HI-SCORE line and raises `hi` from each drained `gameEnded` (`hi = Math.max(hi, score)`) — kernel-fed, session-scoped, no localStorage (1.8 owns the persistent table). The intent's Never-boundary "no scores on screen" binds the CORE cabinet surfaces (the NEXT/score zone stays honest-empty until CAP-8/1.8); the game's own screen content — the in-run HUD and the vendored attract HI-SCORE — stays per the intent's own parenthetical. The adapter's game-over panel branch stays as vendored structure though the seat's liveness law makes it unreachable in-place (B4 rejection).
+35. Attract legend honesty (review pass, B5/E5): the vendored legend line `P PAUSE   M MUTE   ENTER START` advertised pause/mute — features of the discarded vendored main.js glue, absent from the declared vocab `{move, start, jump, fire}` and from any kernel seat mapping, so the keys could never work. The screen now reads `ENTER ......... START` in the same 4-line dotted block; Design Notes 10's "the screen that teaches the game teaches the keys" holds exactly against the working set. No adapter test pinned the removed text, so no test moved.
+36. Review-pass patches and probes (2026-11-23): main.ts E-routing gate aligned to the track gate (`seatTrackVolumeIds`, with a new main-glue pin); new executed pins — compositeScreen letterbox + throw (cabinets.test.ts), `play(seed)` reseed (wrapper.test.ts), depcheck AD-2 sim-source leg + fixtures (both scan legs gained existsSync guards), provenance-sha + PROVISIONAL scans (no-ui-dom.test.ts), sink recorder + pairwise attract hash + seed-source pin + post-flip hash advance (seat.test.ts), GameCanvasLike context-options widening (wrapper.ts). Rule 19 probes M1-M8 + M7b each went red on exactly their named pin (assertion messages in the Review Triage Log rows) and were reverted byte-identical (md5/sha1 per row); post-patch: npm test 238/238, typecheck/depcheck/lint-bans silent, regen idempotent (sha1 71f45be3372eff5d6c4bb3647112bc1964bfed20), build already run once this story per the once-per-story rule.
+
 ## Verification
 
 **Commands (all at absolute workdir `C:/git/local-arcade`; every command finishes in one foreground call):**
@@ -164,5 +233,17 @@ warnings: ['oversized']
 
 ## Auto Run Result
 
-Status: ready-for-dev
+Status: done
 Blocking condition: none
+
+Summary: Story 1.5 landed in full — the vendored Moon Patrol plugin (`games/moon-patrol/sim/` + `presentation/`, provenance-sha headers, lint-bans clean with zero exemptions), the provisional `play(seed)` seam on the wrapper and sim (PROVISIONAL-marked at all three entry points per AD-14), the kernel seat service (`core/seat.ts`: E open/sit/stand law, play pose from placement geometry, raw-code slot mapping in-tick, gameEnded -> attract liveness while the visitor stays seated, sole event-drain consumer), `CabinetPlacement.gameId`, `compositeScreen` (letterboxed game frame + Core-painted NEXT row), the one registry entry, and the wiring in `core/main.ts`. Implement-stage audit re-homed the champion-continuation law from the discarded main.js glue into `sim/index.js` (DN 33). Review pass triaged 29 findings; the patched set closed every real gap (gate alignment, six new executed pins, depcheck AD-2 leg, provenance/PROVISIONAL scans, legend honesty).
+
+Files (this story, diff vs `584110e`): new `games/moon-patrol/**` (10 vendored + 3 authored), `core/seat.ts`, `core/seat.test.ts`; modified `core/contract/wrapper.ts`, `core/input/index.ts`, `core/player.ts`, `core/room/cabinets.ts`, `core/room/surfaces.ts`, `core/main.ts`, `core/room/cabinets.test.ts`, `core/contract/wrapper.test.ts`, `core/main-glue.test.ts`, `core/no-ui-dom.test.ts`, `ci/depcheck.mjs`, `ci/depcheck.test.ts`, `tools/registry-list.json`, `tools/gen-registry.mjs`, `tools/gen-registry.test.ts`, `package.json`, `tsconfig.json`, `generated/game-registry.ts` (regenerated, 0 -> 1 entry, sha1-verified idempotent).
+
+Findings: 29 total — high 0, medium 10, low 12, false 7. Patched 17 (8 medium: B1, B5, E5, V1, V2, V3, V4, IA9; 9 low: B2, B6, B8, B9, E1, E2, IA5, IA6, IA10). Deferred 2 (B3, E4 — one root cause: the vendored minefield respawn-pad NaN bug, world.js:106; in the frontmatter `deferred:` list with settle steps). Rejected 3 (B4 — game-over panel branch: the seat's flip-to-attract law is the intent's own liveness law; B7 — wrapper clone cost: no story mandate, discipline would weaken; IA8 — asks for a spec reading, recorded in DN 34 instead). False 7 (E3 — attract branch returns before controls read, DN 24; V-obs — tickCount measured exactly 2160; IA1 — intent's enumeration is the binding legend law; IA2 — DN 26 honesty record; IA3 — DN 33 already fixed; IA4 — DN 29 honest blink pin; IA7 — source-pin tier is the established precedent until the Epic-3 browser harness).
+
+Follow-up review recommended: true — 8 patched mediums exceed the 2-medium first-pass threshold.
+
+Verification: `npm test` 238/238; `npm run typecheck`, `node ci/depcheck.mjs`, `node ci/lint-bans.mjs` silent; `node tools/gen-registry.mjs` byte-identical (sha1 71f45be3372eff5d6c4bb3647112bc1964bfed20); `npm run build` once (dist entry 590.59 kB / gzip 154.01 kB, chunk-size warning informational — precedent tier). Rule 19: implement-stage probes (six pins, DN 31) plus this pass's probes M1-M8 + M7b — each named mutation went red on its pin, reverted byte-identical (md5/sha1 per triage row), tree verified clean after each.
+
+Residual risks: in-browser behaviour (both title-screen legibility and the letterbox-as-CRT reading) is unverified until the lead's Chrome+Edge smoke (DW-12 tier, Manual checks section); the deferred minefield respawn bug ships as-vendored; the provisional `play` seam's final contract shape is Epic 3's call.

@@ -34,9 +34,12 @@ import {
 import { ENTRY_SPAWN, collisionVolumes } from "./collision-volumes.ts";
 import { wallSlots } from "./slot-config.ts";
 import { GLOW_CYAN, GLOW_MARQUEE } from "./tokens.ts";
-import { math } from "../contract/index.ts";
+import { createGameInstance, math, type TickInput } from "../contract/index.ts";
+import { createKernelLoop } from "../loop.ts";
+import { createSeatService, type SeatKeyMap } from "../seat.ts";
 import { MOUSE_SENSITIVITY, createPlayerController } from "../player.ts";
 import type { DeviceView } from "../input/index.ts";
+import { gameRegistry } from "../../generated/game-registry.ts";
 import {
   MARQUEE_MARGIN_PX,
   SCREEN_BAND_WIDTH_RATIO,
@@ -45,6 +48,7 @@ import {
   SCREEN_SCAN_PITCH_PX,
   SCREEN_SCAN_ROWS,
   SURFACE_PX_PER_M,
+  compositeScreen,
   paintMarquee,
   paintScreen,
   repaintScreen,
@@ -204,10 +208,19 @@ function fontPxOf(font: string): number {
   return Number(m[1]);
 }
 
+interface DrawRec {
+  src: unknown;
+  dx: number;
+  dy: number;
+  dw: number;
+  dh: number;
+}
+
 function fakePainter() {
   const sizes: [number, number][] = [];
   const rects: RectRec[] = [];
   const texts: TextRec[] = [];
+  const draws: DrawRec[] = [];
   const factory = (width: number, height: number): PaintSurface => {
     sizes.push([width, height]);
     const ctx: PaintContext = {
@@ -217,6 +230,9 @@ function fakePainter() {
       letterSpacing: "",
       fillRect(x, y, w, h) {
         rects.push({ style: String(ctx.fillStyle), x, y, w, h });
+      },
+      drawImage(source, dx, dy, dw, dh) {
+        draws.push({ src: source, dx, dy, dw, dh });
       },
       fillText(text, x, y) {
         texts.push({
@@ -239,7 +255,7 @@ function fakePainter() {
     };
     return { width, height, getContext: (kind) => (kind === "2d" ? ctx : null) };
   };
-  return { factory, sizes, rects, texts, reset: () => { rects.length = 0; texts.length = 0; } };
+  return { factory, sizes, rects, texts, draws, reset: () => { rects.length = 0; texts.length = 0; draws.length = 0; } };
 }
 
 const CAP_PX = Math.round(MARQUEE_CAP_M * SURFACE_PX_PER_M);
@@ -346,6 +362,66 @@ test("repaint rewrites the SAME canvas — a live screen never grows a second ca
   assert.ok(f.rects.length >= 1 + SCREEN_SCAN_ROWS * 2, "the canvas was repainted at the new steps");
 });
 
+// Story 1.5 composite law (AC5): the game frame letterboxes into the area
+// between the edge inset and the NEXT row — uniform min-fit scale, centered,
+// equal bars — and the Core still letters the NEXT zone. Every expected
+// number derives from the SAME constants compositeScreen reads (no retyped
+// pixels the law could drift under).
+test("compositeScreen: game frame letterboxed (min-fit, centered, equal bars, aspect intact), NEXT still painted at the cap over the injected background (AC5)", () => {
+  const p = cabinetPlacements[0]!;
+  const f = fakePainter();
+  const game = { width: 640, height: 360 }; // the moon-patrol sim-view size: wide, width-bound fit
+  const surface = f.factory(
+    Math.round(SHELL.screen.width * SURFACE_PX_PER_M),
+    Math.round(SHELL.screen.height * SURFACE_PX_PER_M),
+  );
+  compositeScreen(surface, p.screenZones, game, "#15110e", "#ffc46b", MARQUEE_CAP_M, SHELL.screen.height);
+  const w = surface.width;
+  const h = surface.height;
+  const pxPerM = h / SHELL.screen.height;
+  const edge = Math.round(h * SCREEN_EDGE_RATIO);
+  const nextCap = Math.round(MARQUEE_CAP_M * pxPerM);
+  const nextBaseline = h - edge;
+  const areaW = w - 2 * edge;
+  const areaH = nextBaseline - nextCap - edge;
+  const scale = Math.min(areaW / game.width, areaH / game.height);
+  const dw = Math.round(game.width * scale);
+  const dh = Math.round(game.height * scale);
+  assert.equal(f.draws.length, 1, "exactly one blit per composite");
+  const d = f.draws[0]!;
+  assert.equal(d.src, game, "the blit source IS the game's own presentation canvas");
+  assert.equal(d.dw, dw, "blit width from the min-fit law (Math.min flip is red here)");
+  assert.equal(d.dh, dh, "blit height from the SAME uniform scale");
+  assert.equal(d.dx, edge + Math.round((areaW - dw) / 2), "centered horizontally in the letterbox area");
+  assert.equal(d.dy, edge + Math.round((areaH - dh) / 2), "centered vertically in the letterbox area");
+  assert.equal(dw, areaW, "a wide frame is width-bound: it fills the area exactly side-to-side");
+  assert.ok(dh < areaH, "letterbox bars remain above and below the frame");
+  assert.equal(d.dy - edge, nextBaseline - nextCap - (d.dy + dh), "top and bottom bars are equal (the centering law)");
+  assert.ok(Math.abs(d.dw * game.height - d.dh * game.width) <= game.width, "uniform scale keeps the frame's aspect intact within rounding");
+  assert.ok(f.rects[0] && f.rects[0].style === "#15110e" && f.rects[0].w === w && f.rects[0].h === h, "the injected background fills the whole face before the blit (the bars show through)");
+  const next = f.texts.filter((t) => t.text === p.screenZones.next.toUpperCase());
+  assert.equal(next.length, 1, "composite letters exactly the NEXT zone (the score zone stays honest-empty until 1.8)");
+  assert.equal(next[0]!.y, nextBaseline, "NEXT sits on the same bottom-band baseline drawScreen uses");
+  assert.equal(next[0]!.fontPx, nextCap, "NEXT paints at the 0.18m cap on the composite path too");
+  assert.ok(next[0]!.style === "#ffc46b", "NEXT carries the injected marquee hue");
+});
+
+test("compositeScreen dies loudly when the injected context has no drawImage (the cheap recorder fakes stay valid for the fallback painters only)", () => {
+  const p = cabinetPlacements[0]!;
+  const bare: PaintSurface = {
+    width: 440,
+    height: 520,
+    getContext: (kind) =>
+      kind === "2d"
+        ? { fillStyle: "", font: "", textAlign: "", fillRect() {}, fillText() {}, measureText: () => ({ width: 0 }) }
+        : null,
+  };
+  assert.throws(
+    () => compositeScreen(bare, p.screenZones, { width: 640, height: 360 }, "#15110e", "#ffc46b", MARQUEE_CAP_M, SHELL.screen.height),
+    /no drawImage/,
+  );
+});
+
 // --- Rule 1: the real consumer, end to end ------------------------------------
 
 function view(axes: [number, number] = [0, 0], aim: [number, number] = [0, 0], btn: [boolean, boolean] = [false, false]): DeviceView {
@@ -356,21 +432,45 @@ function view(axes: [number, number] = [0, 0], aim: [number, number] = [0, 0], b
   };
 }
 
-// The whole visit: spawn at ENTRY_SPAWN, aim at B0 through the mouse channel,
-// walk until the shell is centred (bounded at 6000 ticks), E open, E close,
-// turn off-center and E (no target -> no-op), while the cabinets system steps
-// the phase alongside — the exact shape main.ts wires (loop systems + the
-// player-routed interact registry).
+// The whole visit (Story 1.5 law): spawn at ENTRY_SPAWN, aim at B0 through
+// the mouse channel, walk until the shell is centred (bounded at 6000 ticks),
+// settle (bob eases out — the sit/stand pose law needs a settled pose), then
+// the E cycle on the GAME cabinet through the REAL seat service + the REAL
+// registry instance: E opens the coin door, E sits (wrapper flips to play on
+// the stub seed, visitor teleported to the play pose, targeting still resolves
+// B0 from the chair), E stands (pose fields back exactly, door closed, the
+// machine back in attract). Off-centre E stays a no-op. The cabinets phase
+// steps alongside each player step — the same call order main.ts wires as
+// loop systems (player, cabinets), with the seat-routed interact registry
+// registered exactly as main.ts does; the loop's own system registry is
+// pinned in main-glue.test.ts's source pins, not re-run here.
+const MOON_KEYS: SeatKeyMap = {
+  axes: { move: { minus: ["ArrowLeft", "KeyA"], plus: ["ArrowRight", "KeyD"] } },
+  buttons: { start: ["Enter"], jump: ["KeyX", "KeyK"], fire: ["KeyZ", "KeyJ"] },
+};
+
 function visitSession(): {
   transcriptEnd: ReturnType<ReturnType<typeof createPlayerController>["snapshot"]>;
   doors: Record<string, boolean>;
   phase: number;
   walkTicks: number;
   ticksAtOpen: number;
+  modeAfterSit: string;
+  playPoseAfterSit: { x: number; z: number; yaw: number; pitch: number };
 } {
   const rt: CabinetRuntime = createCabinetRuntime();
   const player = createPlayerController(collisionVolumes, ENTRY_SPAWN);
-  for (const p of cabinetPlacements) player.registerInteractable(p.volumeId, (id) => toggleCoinDoor(rt, id));
+  // the REAL registry entry + wrapper instance, wired exactly as main.ts:
+  // kernel-owned TickInput, seat service over (player, runtime, loop).
+  const entry = gameRegistry.find((e) => e.id === "moon-patrol")!;
+  assert.ok(entry.controls, "the registry entry declares its control vocab (the seat mapping needs it)");
+  const instance = createGameInstance(entry.createSim, entry.seed ?? 0);
+  const tickInput: TickInput = { controls: {} };
+  const loop = createKernelLoop({ now: () => 0 });
+  loop.addInstance(entry.id, instance, tickInput);
+  const seat = createSeatService({ player, cabinets: rt, loop, seedFn: () => 4242 });
+  seat.track({ volumeId: "cabinet-B0", gameId: entry.id, instance, input: tickInput, controls: entry.controls, keys: MOON_KEYS });
+  player.registerInteractable("cabinet-B0", (id) => seat.handleInteract(id));
   // aim at the shell's body centre through the MOUSE channel (no state pokes):
   // the controller's facing is (-sin yaw, -cos yaw), so yaw = atan2(-dx, -dz)
   // for the spawn->centre direction, all read off the authored records.
@@ -386,28 +486,55 @@ function visitSession(): {
   }
   assert.ok(player.state.targetId === "cabinet-B0", `the shell entered center-of-view (target=${player.state.targetId}) after ${walkTicks} ticks`);
   assert.ok(walkTicks < 6000, "the bounded walk reaches the shell well inside the cap");
+  // settle wait (Design Notes: the sit/stand pose-identity law binds on a
+  // settled pose): bob amplitude eases out while standing still.
+  for (let i = 0; i < 30; i++) {
+    player.step(1, view());
+    stepCabinetPhase(rt, 1);
+  }
+  const preSit = { x: player.state.x, z: player.state.z, yaw: player.state.yaw, pitch: player.state.pitch };
   // E opens the coin door THE SAME tick the press lands (handler runs inside
-  // player.step, itself a kernel system — AD-15).
+  // player.step, itself a kernel system — AD-15; 1.4 law intact for first press).
   player.step(1, view([0, 0], [0, 0], [true, true]));
   stepCabinetPhase(rt, 1);
   const ticksAtOpen = rt.phase;
   assert.equal(coinDoorOpen(rt, "cabinet-B0"), true, "one E press opens, inside the tick");
+  // second E sits: play mode on the stub seed, visitor on the authored play pose.
   player.step(1, view([0, 0], [0, 0], [true, true]));
-  assert.equal(coinDoorOpen(rt, "cabinet-B0"), false, "the next press closes it");
+  const modeAfterSit = instance.mode();
+  assert.equal(modeAfterSit, "play", "the second E sits: the wrapper holds play mode with the kernel's stub seed");
+  const playPoseAfterSit = { x: player.state.x, z: player.state.z, yaw: player.state.yaw, pitch: player.state.pitch };
+  assert.ok(near(playPoseAfterSit.x, -4.2) && near(playPoseAfterSit.z, -4.75), `play pose stands 0.80m in front of the B0 front plane (${JSON.stringify(playPoseAfterSit)})`);
+  assert.equal(player.state.targetId, "cabinet-B0", "targeting still resolves the cabinet from the play pose (E routes from the chair)");
+  // third E stands: pose restored exactly, door closed, attract in place.
+  player.step(1, view([0, 0], [0, 0], [true, true]));
+  assert.deepEqual({ x: player.state.x, z: player.state.z, yaw: player.state.yaw, pitch: player.state.pitch }, preSit, "standing restores the pre-sit pose fields exactly");
+  assert.equal(coinDoorOpen(rt, "cabinet-B0"), false, "standing closes the coin door");
+  assert.equal(instance.mode(), "attract", "the machine returns to attract in place");
   // turn away: no target, E is a silent no-op (the door stays closed).
   player.step(1, view([0, 0], [(2 * Math.PI) / MOUSE_SENSITIVITY / 4, 0]));
   assert.equal(player.state.targetId, null, "a quarter turn drops the target");
   player.step(1, view([0, 0], [0, 0], [true, true]));
   assert.equal(coinDoorOpen(rt, "cabinet-B0"), false, "E with no target changes nothing");
-  return { transcriptEnd: player.snapshot(), doors: { ...rt.coinDoors }, phase: rt.phase, walkTicks, ticksAtOpen };
+  return {
+    transcriptEnd: player.snapshot(),
+    doors: { ...rt.coinDoors },
+    phase: rt.phase,
+    walkTicks,
+    ticksAtOpen,
+    modeAfterSit,
+    playPoseAfterSit,
+  };
 }
 
-test("Rule 1 integration: scripted visit on the REAL volumes + REAL controller — walk to cabinet-B0, E flips the coin door same-tick, E closes it, off-centre E is a no-op, and two runs are bit-identical (AC4)", () => {
+test("Rule 1 integration: scripted visit on the REAL volumes + REAL controller + REAL registry entry — walk to cabinet-B0, E opens the door, E sits (play mode, play pose, targeting held), E stands (pose restored exactly, door closed, attract), off-centre E is a no-op, and two runs are bit-identical (AC4, 1.5 law)", () => {
   const a = visitSession();
   const b = visitSession();
   assert.deepEqual(a.transcriptEnd, b.transcriptEnd, "identical scripted devices -> identical player transcripts");
   assert.deepEqual(a.doors, b.doors, "identical door state");
-  assert.equal(a.phase, b.phase, "identical cabinet phase (walkTicks + 2 presses of the system)");
+  assert.equal(a.phase, b.phase, "identical cabinet phase (walk + settle + presses of the system)");
   assert.equal(a.walkTicks, b.walkTicks);
   assert.equal(a.ticksAtOpen, b.ticksAtOpen);
+  assert.equal(a.modeAfterSit, "play");
+  assert.deepEqual(a.playPoseAfterSit, b.playPoseAfterSit, "the authored play pose is exact and deterministic");
 });

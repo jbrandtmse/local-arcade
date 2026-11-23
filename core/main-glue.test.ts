@@ -120,8 +120,23 @@ test("1.4 cabinet wiring: the phase advances as a kernel system, coin doors togg
   assert.ok(body.includes("placement.screenZones,"), "the repaint re-reads the placement's authored zone records");
   assert.ok(body.includes("paintStep,"), "the repaint receives the tick-derived paint step (liveness source)");
   assert.ok(body.includes("three.markTextureUpdated(s.texture)"), "a repaint marks the SAME texture dirty (no second canvas)");
-  assert.ok(MAIN.includes("window.arcadeDebug = { player, loop, cabinets };"), "the console smoke can read the cabinet runtime");
+  assert.ok(MAIN.includes("window.arcadeDebug = { player, loop, cabinets, seat };"), "the console smoke can read the cabinet runtime and the seat cycle (1.5)");
   for (const banned of ["performance.now", "Date.now", "Math.random", "tickCount"]) {
     assert.ok(!body.includes(banned), `the 1.4 frame legs must not read ${banned} either (liveness derives from tick state)`);
   }
+});
+
+test("1.5 seat wiring: the seat service owns the game-cabinet E-law, the seated view law, the raw-code slot mapping in-tick, and the event sink to the presentation half (AC4/AC5 wiring)", () => {
+  assert.ok(MAIN.includes("const seat = createSeatService({ player, cabinets, loop });"), "the seat is created over the kernel's own player/cabinets/loop");
+  assert.ok(MAIN.includes("seat.track({"), "game-wired placements track with instance, kernel input object, controls, and the authored legend keys");
+  assert.ok(MAIN.includes("seatTrackVolumeIds.has(p.volumeId)"), "the seat E-routing gate IS the track gate (an entry without controls or legend keys keeps the plain 1.4 law, never an untracked-seat fault)");
+  assert.ok(MAIN.includes("player.registerInteractable(p.volumeId, (id) => seat.handleInteract(id));"), "a tracked game cabinet routes E through the seat (the plain 1.4 toggle stays for the rest)");
+  assert.ok(MAIN.includes("player.step(1, seat.playerView(input.takeView()));"), "the player system consumes the seat's view (seated -> zeroed axes/aim, E kept)");
+  assert.ok(MAIN.includes('loop.addSystem("seat", () => seat.step(input.takeCodeView()));'), "the seat maps raw codes onto declared slots inside the tick, after sim ticks + event dispatch (AD-23)");
+  assert.ok(MAIN.includes("seat.setEventSink((rec) => presentations.get(rec.gameId)?.onEvent?.(rec.event));"), "the seat's drained records ride to the presentation half (sole M0 consumer)");
+  assert.ok(MAIN.includes("entry.createPresentation({ makeCanvas:"), "the kernel hands the presentation its canvas through the injected factory (the adapter never touches DOM)");
+  const body = frameBody(MAIN);
+  assert.ok(body.includes("pres.drawFrame(instance.snapshot());"), "the game half paints from the instance snapshot every frame");
+  assert.ok(body.includes("compositeScreen("), "the Core composites the game canvas under the Core-painted NEXT row");
+  assert.ok(body.includes("presentations.has(placement.gameId)) continue;"), "a game-driven face skips the paint-step fallback (the gate governs the fallback path only)");
 });

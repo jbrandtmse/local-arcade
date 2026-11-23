@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "id": "moon-patrol",
+    "simPath": "games/moon-patrol/sim/index.js",
+    "seed": 1982,
+    "presPath": "games/moon-patrol/presentation/adapter.js",
+    "controls": {
+      "vocab": 1,
+      "axes": ["move"],
+      "buttons": ["start", "jump", "fire"],
+      "aim": []
+    }
+  }
+]
