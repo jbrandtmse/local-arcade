@@ -45,10 +45,23 @@ export interface Zone {
 
 /** Ceiling hang height for zone lighting (inference, Design Notes item 7). */
 export const ZONE_LIGHT_Y = 2.8;
-/** PointLight reach / intensity for zone identity lights (inference, tuned
- * by eye at the lead's smoke — "readable at 6m" is the smoke check). */
-export const ZONE_LIGHT_DISTANCE = 8;
-export const ZONE_LIGHT_INTENSITY = 3.0;
+// Identity-fill law: the zone/roadmap lights ARE the room's fill — wall
+// faces, the cabinet row and the roadmap baseplates must READ at the 6m
+// vantages, and hues stay zone tokens + roadmap amber (no new colours).
+// three renders point lights in physical units (candela, inverse-square
+// decay, windowed to zero at `distance`) since r155: intensity is
+// candela-scaled, and reach lets neighbouring pools' bleed carry the faces
+// between them (DESIGN.md: light bleeds around occluder edges and sheens
+// along the floor). The pair below is (inference), "tuned by eye at the
+// smoke — readable at 6m is the smoke check" (Design Notes item 7).
+
+/** PointLight reach for zone/roadmap identity lights: wide enough that
+ * neighbouring pools' spill carries the faces between them (inference,
+ * Design Notes item 7). */
+export const ZONE_LIGHT_DISTANCE = 16;
+/** PointLight intensity in three's physical candela units — candela-scale
+ * by the r155 unit law above (inference, Design Notes item 7). */
+export const ZONE_LIGHT_INTENSITY = 150;
 
 /** Pinball Corner — back-left, violet. */
 export const PINBALL_CORNER: Zone = {

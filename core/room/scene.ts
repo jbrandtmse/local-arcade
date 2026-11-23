@@ -71,11 +71,23 @@ const WAINSCOT_INSET = 0.01; // keep the band off the wall face (z-fighting)
 const FLOOR_T = 0.04; // carpet slab thickness
 const BASEPLATE_T = EMPTY_BASEPLATE.thickness;
 const FLYER_T = 0.005; // the paper sheet, thin as paper
-const AMBIENT_INTENSITY = 0.15; // very low Room-Black ambient (Design Notes 7)
+// Room-Black ambient fill (Design Notes item 7 — "tuned by eye at the
+// smoke"): a floor-lift above the near-no-op 0.15 floor, not the room's
+// fill — Room Black is a dark token by design; the zone/amber pools carry
+// the light. Colour stays the Room Black token (the identity guard) and
+// the fill stays a lift, never a flood, so the dark the glow sits against
+// stays dark. Exported so the scene pins derive from the authored value,
+// never retype it.
+export const AMBIENT_INTENSITY = 0.6;
 const DOOR_GLOW_Y = DOOR_TOP + 0.25; // glow-red just above the door head
 const DOOR_GLOW_Z = 6.15; // on the room side of the front wall face
-const DOOR_GLOW_INTENSITY = 1.5; // door glow reach/intensity (inference,
-const DOOR_GLOW_REACH = 4; // Design Notes 7 — tuned by eye at the smoke)
+// Door glow reach/intensity (inference, Design Notes item 7 — the same
+// by-eye-tuned lighting family): scaled with the room's candela-scale light
+// law so the glow-red identity anchor reads at 6m; it is an accent above
+// the door head, not one of the fill pools. Exported so the scene pins
+// derive from the authored values, never retype them.
+export const DOOR_GLOW_INTENSITY = 15;
+export const DOOR_GLOW_REACH = 8;
 
 function volumeCenter(v: CollisionVolume): { x: number; y: number; z: number } {
   return {

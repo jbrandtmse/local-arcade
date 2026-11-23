@@ -13,7 +13,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { buildRoomScene, type Placed, type RoomScene, type Three } from "./scene.ts";
+import { AMBIENT_INTENSITY, buildRoomScene, DOOR_GLOW_INTENSITY, DOOR_GLOW_REACH, type Placed, type RoomScene, type Three } from "./scene.ts";
 import { DOOR_TOP, INTERIOR, WALL_T, WALL_TOP, collisionVolumes } from "./collision-volumes.ts";
 import { EMPTY_BASEPLATE, wallSlots } from "./slot-config.ts";
 import { CASUAL_ALLEY, PINBALL_CORNER, SNACK_BAR, WORKSHOP, ZONE_LIGHT_DISTANCE, ZONE_LIGHT_INTENSITY, roadmap, zones } from "./zones.ts";
@@ -294,7 +294,7 @@ test("empty Wall Slots get baseplate meshes (20, Wall Panel, raised), and the on
 
 // --- lighting: hues arrive from lights, never from emissive -------------------
 
-test("point lights = 4 zone identity + 2 roadmap amber + 1 door glow (7 total); hues are glow-anchor tokens only; one low Room Black ambient (AC4)", () => {
+test("point lights = 4 zone identity + 2 roadmap amber + 1 door glow (7 total); hues are glow-anchor tokens only; one token-coloured Room Black fill ambient (AC4)", () => {
   assert.equal(built.lights.length, 7);
   const zoneLights = [PINBALL_CORNER, WORKSHOP, SNACK_BAR, CASUAL_ALLEY].flatMap((z) => [z.light]);
   for (const zl of zoneLights) {
@@ -304,19 +304,37 @@ test("point lights = 4 zone identity + 2 roadmap amber + 1 door glow (7 total); 
     assert.equal(l.intensity, ZONE_LIGHT_INTENSITY);
     assert.equal(l.distance, ZONE_LIGHT_DISTANCE);
   }
+  // Fill law: the authored intensity/reach sit above the 3.0 / 8m
+  // placeholder floor that reads near-black at the 6m vantages — reverting
+  // the authored pair reddens here without touching the hue/id/position
+  // guards above.
+  assert.ok(ZONE_LIGHT_INTENSITY > 3, "zone/amber intensity is above the 3.0 placeholder floor");
+  assert.ok(ZONE_LIGHT_DISTANCE > 8, "zone/amber reach is above the 8m placeholder floor");
   for (const rl of roadmap.lights) {
     const l = built.lights.find((x) => x.x === rl.x && x.y === rl.y && x.z === rl.z);
     assert.ok(l, `roadmap light at (${rl.x},${rl.z})`);
     assert.equal(l.color, GLOW_MARQUEE);
+    assert.equal(l.intensity, ZONE_LIGHT_INTENSITY, "roadmap amber carries the authored fill intensity");
+    assert.equal(l.distance, ZONE_LIGHT_DISTANCE, "roadmap amber carries the authored fill reach");
   }
   const door = built.lights.find((l) => l.color === GLOW_RED);
   assert.ok(door, "door glow light");
   assert.ok(door.y > DOOR_TOP, "door glow sits above the door head");
   assert.equal(door.x, 0, "door glow centred on the door gap");
   assert.ok(door.z < INTERIOR.depth / 2, "door glow hangs on the room side of the front wall face, not in the street");
+  assert.equal(door.intensity, DOOR_GLOW_INTENSITY, "door glow carries the authored intensity");
+  assert.equal(door.distance, DOOR_GLOW_REACH, "door glow carries the authored reach");
+  assert.ok(DOOR_GLOW_INTENSITY > 1.5, "door glow intensity is above the 1.5 placeholder floor");
+  assert.ok(DOOR_GLOW_REACH > 4, "door glow reach is above the 4m placeholder floor");
   assert.equal(built.ambients.length, 1);
   assert.equal(built.ambients[0]!.color, ROOM_BLACK);
-  assert.ok(built.ambients[0]!.intensity <= 0.2, "ambient is very low (the dark the glow sits against)");
+  // The builder hangs exactly the authored fill (this pin derives from the
+  // exported constant — it moves with a re-tune and never weakens): the
+  // fill sits above the 0.15 near-no-op floor and stays a lift, not a
+  // flood, so the dark the glow sits against stays dark.
+  assert.equal(built.ambients[0]!.intensity, AMBIENT_INTENSITY, "ambient carries the authored fill value");
+  assert.ok(built.ambients[0]!.intensity > 0.15, "ambient is above the 0.15 near-no-op floor");
+  assert.ok(built.ambients[0]!.intensity <= 1, "ambient is a fill, not a flood (the dark identity stays)");
   const glowAnchors = [GLOW_MARQUEE, GLOW_PINK, GLOW_CYAN, GLOW_GREEN, GLOW_VIOLET, GLOW_ORANGE, GLOW_RED, GLOW_STEEL];
   for (const l of built.lights) assert.ok(glowAnchors.includes(l.color), `light hue ${l.color.toString(16)} is a DESIGN glow anchor`);
 });
