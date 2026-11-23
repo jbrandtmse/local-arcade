@@ -5,6 +5,7 @@ created: '2026-11-22'
 status: 'done'
 review_loop_iteration: 0
 baseline_revision: 'fb3dda92f41821d11479576af8c7052293789bc1'
+baseline_commit: 'fb3dda92f41821d11479576af8c7052293789bc1'
 followup_review_recommended: false
 context:
   - _bmad-output/planning-artifacts/architecture/architecture-local-arcade-2026-11-19/ARCHITECTURE-SPINE.md
