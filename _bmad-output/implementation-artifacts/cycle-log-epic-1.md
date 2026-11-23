@@ -93,3 +93,5 @@
 2026-11-23T04:28:12Z	Story 1.3	ledger_adjudicated	owned=1 resolved=1 reowned=0 terminal=0 cycle_iteration=3
 2026-11-23T04:46:34Z	Story 1.3	smoke_complete	method=browser	result=pass	iterations=3	defects_caught=0	evidence=_bmad-output/implementation-artifacts/evidence/story-1-3-smoke-*.png+story-1-3-smoke3-edge.txt	note=owner_confirmed_darkness_iter2_fixed_candela_retune;six_vantages_legible_hues_intact;flyer_verbatim_legible;chrome_edge_parity_0faults_0console
 2026-11-23T04:51:01Z	Story 1.3	fresh_check	env=clean-checkout	tests=10	result=pass	order=forward,reverse	note=/tmp/fresh-13_clone_at_dcaee67;portable_node_26.13.1;68/68_both_orders
+2026-11-23T04:51:55Z	Story 1.3	committed	sha=42f4faf	submodules=	ci=none
+2026-11-23T04:51:55Z	Story 1.3	story_cycle	plan_to_commit_min=1281 implement_passes=3 reviews=3 rework=2 first_ci=none
