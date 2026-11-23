@@ -124,3 +124,5 @@
 2026-11-23T14:32:09Z	Story 1.4	committed	sha=fe81c5b	submodules=none	ci=none
 2026-11-23T14:32:09Z	Story 1.4	story_cycle	plan_to_commit_min=577	implement_passes=2	reviews=2	rework=1	first_ci=none
 2026-11-23T14:36:23Z	Story 1.5	stage_spawned	stage=plan	spawn_at=2026-11-23T14:36:23Z	agent_name=1-5-moon-patrol-plan-1	cycle_iteration=1
+2026-11-23T15:28:13Z	Story 1.5	story_created	spawn_at=2026-11-23T14:36:23Z	path=_bmad-output/implementation-artifacts/spec-1-5-moon-patrol-plays-in-place-vendored-wrapped-alive.md	build_status=ready-for-dev	spec_tokens=8180	epic_context=compiled
+2026-11-23T15:28:13Z	Story 1.5	spec_validated	service_introducing=true	integration_ac=present	adr_constrained_acs=AD-1,2,3,4,5,6,7,8,11,12,13,14,15,16,18,23,24	decision_dependency=none	mutates_shared_runtime=false	owned_ledger=none	addressed=0	declined=0	sections_created=none	note=provisional_play_seam_accept_decide_AD14_wrapping_AD8_hooks_untouched_spine_untouched_review_to_adjudicate;vendored_source_sha_verified_at_C_git_moonpatrol
