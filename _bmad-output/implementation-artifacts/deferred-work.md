@@ -91,6 +91,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - evidence: DESIGN.md treats Room Black as ceiling/clear-colour surface token; scene.test + scene-qa pin colour ROOM_BLACK and intensity <= 0.2; the fill the light nominally provides is ~0.6% luminance
 - 2026-11-22T13:41:54Z status=by-design owner=1-3-the-arcade-room-slots-pillars-zones-and-the-roadmap-wall by=cr note=spec-bound: Design Notes item 7 authors this exact value, 'tuned by eye at the smoke'; reopen at the lead's 6m smoke if unlit faces read too dark
 - 2026-11-23T01:55:41Z status=routed owner=1-3-the-arcade-room-slots-pillars-zones-and-the-roadmap-wall by=smoke note=reopened at lead 6m smoke iter2: unlit faces read near-black at all six vantages; owner present 'it's very dark in there, probably going to need a little more light'
+- 2026-11-23T04:28:12Z status=resolved-by:1-3-the-arcade-room-slots-pillars-zones-and-the-roadmap-wall by=lead note=rework pass 2 candela-scale retune (zone/amber 150/reach16, ambient 0.6 token, glow 15/8) + strengthened pins; cr-3 four layers re-verified green at HEAD; lead mutations red->byte-identical (floor-breach, built-desync, emissive); 6m visual proof=story's own re-smoke iter 3 before commit; red re-smoke re-opens DW-17 in-story
 
 ### DW-18: tests/test-summary.md flyer-probe descriptions stale after story 1.3 rework pass 1 (paintFlyer wrap+measureText fit law, sheet widened 0.40x0.60)
 - source: spec-1-3-the-arcade-room-slots-pillars-zones-and-the-roadmap-wall.md | severity: low | fix-risk: low | footprint: in-story
@@ -103,3 +104,8 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: spec-1-3-the-arcade-room-slots-pillars-zones-and-the-roadmap-wall.md | severity: low | fix-risk: low | footprint: in-story
 - evidence: 4 test fakes carry the identical metric body; review pass 3 had to edit all four at once - drift risk on the next metric change
 - 2026-11-22T18:45:08Z status=wontfix-accepted owner=1-3-the-arcade-room-slots-pillars-zones-and-the-roadmap-wall by=cr note=reopen_if=next pass that must change the fake metric meets the 4 copies first; extract a shared test-support helper then
+
+### DW-20: stray untracked _bmad-output/planning-artifacts/sprint-status.yaml is a stale duplicate of the tracked canonical implementation-artifacts copy
+- source: spec-1-3-the-arcade-room-slots-pillars-zones-and-the-roadmap-wall.md | severity: low | fix-risk: low | footprint: out-of-footprint
+- evidence: the stray copy (generated 11-22 20:30) lists epic-1/1-1/1-2 backlog + 1-3 review while the tracked canonical impl copy holds in-progress/done/done + 1-3; nothing in the test path reads the planning copy; it entered the cr-3 diff only via the untracked-files rule
+- 2026-11-23T04:22:41Z status=wontfix-accepted owner=1-3-the-arcade-room-slots-pillars-zones-and-the-roadmap-wall by=cr note=reopen_if=the file gets committed, or an argument-less /bmad-code-review Tier-3 scan or sprint view reads the planning-artifacts copy; the fix then is the sprint-planning skill regenerating it (AGENTS.md bars hand-editing _bmad-output artifacts) - the canonical impl-side file is synced by the epic-cycle stage tool (cr-3 set 1-3=done there)

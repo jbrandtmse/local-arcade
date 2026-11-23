@@ -48,9 +48,10 @@ export const ZONE_LIGHT_Y = 2.8;
 // Identity-fill law: the zone/roadmap lights ARE the room's fill — wall
 // faces, the cabinet row and the roadmap baseplates must READ at the 6m
 // vantages, and hues stay zone tokens + roadmap amber (no new colours).
-// three renders point lights in physical units (candela, inverse-square
-// decay, windowed to zero at `distance`) since r155: intensity is
-// candela-scaled, and reach lets neighbouring pools' bleed carry the faces
+// three renders point lights in physical candela units since r155 (its
+// inverse-square decay, windowed to zero at `distance`, long predates
+// that): intensity is candela-scaled, and reach lets neighbouring pools'
+// bleed carry the faces
 // between them (DESIGN.md: light bleeds around occluder edges and sheens
 // along the floor). The pair below is (inference), "tuned by eye at the
 // smoke — readable at 6m is the smoke check" (Design Notes item 7).
