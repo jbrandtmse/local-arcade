@@ -130,3 +130,8 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: owner report 2026-11-23 (mid-run, story 1.5 in plan) | severity: minor | fix-risk: small | footprint: core/player.ts look math / camera basis (yaw wrap, pitch clamp)
 - evidence: Owner-observed while using the game: after dragging the mouse far left or right the view becomes the floor. Repro not yet confirmed by the lead; smoke drags never exceeded ~2.5 rad so the path is untested.
 - 2026-11-23T14:51:13Z status=routed owner=burndown by=owner note=owner said: do not fix now; address in the next pass over the backlog
+
+### DW-25: Moon Patrol respawn pad-clear filter never removes minefields (x/w vs x1/x2 NaN predicate) — buggy can respawn onto a mine
+- source: story 1.5 implement review B3+E4 (shared root cause); spec-1-5 frontmatter deferred | severity: medium | fix-risk: small | footprint: games/moon-patrol/sim/world.js:106 respawn predicate; data shape sim/course.js:100; vendored law kept world.js unmodified below seam edits (AC1)
+- evidence: Spec 1.5 Review Triage Log B3/E4: respawn() filters with (o.x + o.w > padL && o.x < padR); minefields carry x1/x2 -> NaN -> never filtered. Present in vendored source C:/git/moonpatrol@49c3519... Settle: fix predicate for x1/x2 kinds (upstream first, then re-vendor) + sim test that respawns a run with a minefield on the pad.
+- 2026-11-23T20:25:26Z status=routed owner=1-6-one-busy-machine-a-patron-actually-plays by=dev note=1.6 drives the sim to a real end state via autoplay (AD-8 L1) — the respawn unfairness lands squarely in that path; fix upstream at C:/git/moonpatrol then re-vendor
