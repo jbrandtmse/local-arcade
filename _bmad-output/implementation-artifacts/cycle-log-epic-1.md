@@ -80,3 +80,4 @@
 2026-11-23T01:43:41Z	Epic 1	permission_mode_attested	mode=bypassPermissions via=owner_answer_interactive_resume
 2026-11-23T01:43:41Z	Epic 1	notify_unavailable	reason=no_push_notification_tool_in_session
 2026-11-23T01:43:41Z	Epic 1	unattended_resumed	run=20261121T0537Z-1-7 policy=cc3dfe318c687a5f4549d7b653ec4a5278cbb9f7 doctrine=1ac9e3987fa47aeddd6db0265385923232cbe42e lock_token=1795398206-1675 via=interactive_hold_clear
+2026-11-23T01:44:21Z	Story 1.3	hold_restored	story=1-3-the-arcade-room-slots-pillars-zones-and-the-roadmap-wall stage=code-review tree=clean applied=forward
