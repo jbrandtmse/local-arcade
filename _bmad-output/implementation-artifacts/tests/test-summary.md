@@ -1,6 +1,6 @@
-# Test Automation Summary — Story 1.3 (QA stage, 2026-11-22)
+# Test Automation Summary — Story 1.3 (QA stage, 2026-11-22; lead refresh for rework pass 1 + cr-2 — DW-18)
 
-Target: the implemented deliverable of Story 1.3 (`git diff --name-only cbc66b65..HEAD` —
+Target: the implemented deliverable of Story 1.3 (`git diff --name-only 438b840..HEAD` — story_base to head, covering rework pass 1 `a85fa07` and cr-2's test patches; the QA stage itself ran from the pre-rework baseline `cbc66b65` —
 the rewritten `core/room/collision-volumes.ts`, new authored modules
 `slot-config/zones/signage/tokens/surfaces/scene`, `core/main.ts` wiring, and the story's
 own test files). Framework: the project's existing convention — `node --test` with native
@@ -20,11 +20,11 @@ no browser harness this epic).
   blocking volume); aisle probes (main aisle >=1.20, pillar->cabinet-box >=5.0 recorded
   5.05, per-slot approach clears every blocker >=0.70); sampled sightlines + the
   ear-blocks-eye occluder-subset pin (test-local slab clip, AD-7 keeps the production
-  raycast in Epic 2); paintFlyer sentinel + containment probes (the painter prints only
-  the injected string — word-wrapped at spaces inside the sheet — in only the injected
-  colours, on one injected canvas; every painted line must MEASURE within the sheet
-  minus 2x the margin, and the fit law throws on a word or leading that no longer fits —
-  rework pass 1).
+  raycast in Epic 2); paintFlyer sentinel probes (the painter prints only the injected
+  string — in only the injected colours, on one injected canvas). The wrap + fit-law
+  containment law (every painted line MEASURES within the sheet minus 2x the margin;
+  throws on a word or leading that no longer fits) is pinned at the implementation tier
+  in `surfaces.test.ts` (rework pass 1), not in the QA file — cr-2 re-attribution.
 
 ### Scene-builder QA probes through the injected Three seam
 - [x] `core/room/scene-qa.test.ts` (QA) — the envelope-spanning ceiling slab carries the
@@ -54,7 +54,11 @@ no browser harness this epic).
   Chrome-vs-Edge stays the lead's smoke.
 
 ## Verification run (post-QA)
-- `npm test`: 155/155 pass (141 pre-QA + 14 QA).
+- `npm test`: 157/157 pass (141 pre-QA + 14 QA + 2 rework pass 1 fit-law/containment probes).
+- cr-2 (rework re-review, 2026-11-22): 4 test files patched — comment parity
+  ("rework pass 1"/"review pass 3" labels) plus a new scene.test.ts assertion that the
+  flyer canvas measures the record's sheet metres (texture aspect == mesh aspect); no new
+  tests. Re-verified 157/157 green at lead resume 2026-11-22.
 - `npm run typecheck`: 0. `node ci/depcheck.mjs`: 0. `node ci/lint-bans.mjs`: 0.
 - `node tools/gen-registry.mjs && git diff --exit-code -- generated/`: byte-identical.
 - QA files green in one run forward and reverse order (hermeticity spot-check).

@@ -96,6 +96,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - evidence: spec frontmatter deferred bullet 2; stale lines 23/31 describe pre-rework paintFlyer pins
 - 2026-11-22T16:30:58Z status=routed owner=1-3-the-arcade-room-slots-pillars-zones-and-the-roadmap-wall by=harvest note=QA regenerates the artifact on its next pass; implement stage never hand-edits it
 - 2026-11-22T18:45:03Z status=routed owner=1-3-the-arcade-room-slots-pillars-zones-and-the-roadmap-wall by=cr note=23/31 already refreshed by rework commit; residual: header baseline, stale 155 count, room-qa containment misattribution
+- 2026-11-23T01:47:21Z status=resolved-by:1-3-the-arcade-room-slots-pillars-zones-and-the-roadmap-wall by=lead note=test-summary.md refreshed at adjudication: header baseline 438b840..HEAD, 157/157 counts, cr-2 patch note, containment pin re-attributed to surfaces.test.ts; spec deferred bullet 2 reconciled
 
 ### DW-19: fake 0.92em measureText metric duplicated across room-qa/scene/scene-qa fakes; surfaces.test.ts holds the helper
 - source: spec-1-3-the-arcade-room-slots-pillars-zones-and-the-roadmap-wall.md | severity: low | fix-risk: low | footprint: in-story

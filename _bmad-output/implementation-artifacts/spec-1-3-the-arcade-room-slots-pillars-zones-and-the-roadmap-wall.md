@@ -15,7 +15,7 @@ context:
 warnings: ['oversized']
 deferred:
   - 'main.ts real-THREE adapter executed coverage — lands with the Epic 3 browser harness (DW-12 tier); the source-pin tier (main-glue.test.ts 1.3 wiring test) was added in story 1.3 review pass 1'
-  - 'tests/test-summary.md flyer-probe descriptions (lines 23/31) still describe the pre-rework paintFlyer pins after rework pass 1 (wrap + measureText + sheet widening); the QA skill regenerates that artifact on its next pass — the implement stage never hand-edits it; severity low'
+  - 'tests/test-summary.md flyer-probe descriptions — refreshed by lead at adjudication 2026-11-22 (DW-18 resolved): header baseline 438b840, 157/157 counts, wrap/fit-law containment pin re-attributed to surfaces.test.ts'
 ---
 
 <intent-contract>
