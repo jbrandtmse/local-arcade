@@ -97,3 +97,27 @@ test("the authored room reaches the page once: buildRoomScene through the real T
   assert.ok(MAIN.includes("createPlayerController(collisionVolumes, ENTRY_SPAWN)"), "the visitor spawns at the authored door spawn on the authored volume list");
   assert.ok(MAIN.includes("renderer.setClearColor(ROOM_BLACK, 1)"), "clear colour comes from tokens.ts, never a retyped hex");
 });
+
+test("1.4 cabinet wiring: the phase advances as a kernel system, coin doors toggle ONLY through the player-routed E handler, the frame poses doors and repaints screens from state (never wall-clock), the texture-update leg maps through, and arcadeDebug carries the runtime (1.4 AC3/AC4/AC5)", () => {
+  assert.ok(MAIN.includes('loop.addSystem("cabinets", () => stepCabinetPhase(cabinets, 1));'), "attract phase mutates inside the tick only (AD-15)");
+  assert.ok(MAIN.includes("for (const p of cabinetPlacements)"), "interactables register per placement record, never hand-typed ids");
+  assert.ok(
+    MAIN.includes("player.registerInteractable(p.volumeId, (id) => toggleCoinDoor(cabinets, id));"),
+    "the E handler flips coin-door state, routed inside player.step (inside the tick)",
+  );
+  assert.ok(MAIN.includes("(texture as THREE.Texture).needsUpdate = true"), "the Three seam's markTextureUpdated maps to the real needsUpdate flag");
+  const body = frameBody(MAIN);
+  assert.ok(body.includes("coinDoorPose(d.id, coinDoorOpen(cabinets, d.id))"), "door pose each frame comes from the pose law reading state — the frame never decides open/closed");
+  assert.ok(body.includes("d.mesh.position.set(pose.panel.x, pose.panel.y, pose.panel.z)"), "the frame APPLIES the pose to the door mesh (the law alone would leave the door frozen)");
+  assert.ok(body.includes("d.mesh.rotation.set(0, pose.panel.yaw, 0)"), "and the door's swing");
+  assert.ok(body.includes("d.slot.position.set(pose.slot.x, pose.slot.y, pose.slot.z)"), "the coin slot rides the same pose");
+  assert.ok(body.includes("d.slot.rotation.set(0, pose.slot.yaw, 0)"), "and its rotation");
+  assert.ok(body.includes("screenPaintStep(cabinets)"), "the repaint cadence is tick-derived state, not wall-clock");
+  assert.ok(body.includes("paintStep !== lastScreenPaintStep"), "screens repaint only when the paint step changed");
+  assert.ok(body.includes("lastScreenPaintStep = paintStep;"), "the gate records the step it just painted (else every frame would repaint)");
+  assert.ok(body.includes("three.markTextureUpdated(s.texture)"), "a repaint marks the SAME texture dirty (no second canvas)");
+  assert.ok(MAIN.includes("window.arcadeDebug = { player, loop, cabinets };"), "the console smoke can read the cabinet runtime");
+  for (const banned of ["performance.now", "Date.now", "Math.random", "tickCount"]) {
+    assert.ok(!body.includes(banned), `the 1.4 frame legs must not read ${banned} either (liveness derives from tick state)`);
+  }
+});

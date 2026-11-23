@@ -4,17 +4,19 @@
 // token specifically (AC7: "ceiling Room Black"), not just be a slab; (2) the
 // front-wall wainscot bands must never reach into the door opening (1.9's
 // door-open beat swings through that gap at low height — the review pass
-// tightened this and no probe held it); (3) the only text the built scene
-// ever paints onto any canvas is exactly the Welcome Flyer record's verbatim
-// string (AD-24 one-surface law at build time). Fake seam + fake canvases are
+// tightened this and no probe held it); (3) every string the built scene
+// paints onto any canvas is an authored record's string — the Welcome Flyer
+// verbatim line plus each cabinet placement's title/zone words, nothing
+// invented (AD-24 text law at build time, 1.4 wording). Fake seam + fake canvases are
 // test-local (the scene's contract is the seam, not three itself).
 import test from "node:test";
 import assert from "node:assert/strict";
 import { buildRoomScene, type Placed, type RoomScene, type Three } from "./scene.ts";
 import { DOOR_HALF_W, INTERIOR, WALL_T, WALL_TOP } from "./collision-volumes.ts";
 import { signSurfaces, WELCOME_FLYER } from "./signage.ts";
+import { cabinetPlacements } from "./cabinets.ts";
 import { zones } from "./zones.ts";
-import { GLOW_MARQUEE, GLOW_RED, ROOM_BLACK } from "./tokens.ts";
+import { GLOW_CYAN, GLOW_MARQUEE, GLOW_RED, ROOM_BLACK } from "./tokens.ts";
 import type { PaintContext, PaintSurface } from "./surfaces.ts";
 
 interface GeoRec {
@@ -64,6 +66,8 @@ function fakeThree() {
             rec.z = z;
           },
         },
+        // 1.4 seam extension: the coin-door parts carry a rotation.
+        rotation: { set() {} },
       };
       return placed;
     },
@@ -78,6 +82,7 @@ function fakeThree() {
             rec.z = z;
           },
         },
+        rotation: { set() {} },
       };
     },
     ambientLight() {
@@ -87,6 +92,7 @@ function fakeThree() {
     canvasTexture(source) {
       return { source };
     },
+    markTextureUpdated() {},
   };
   return { three, meshes, lights, ambientCount: () => ambients };
 }
@@ -147,22 +153,32 @@ test("front-wall wainscot bands stop at the door faces: nothing intrudes into th
   }
 });
 
-// --- AC6/AD-24 at build time: the only painted text is the flyer record -----
+// --- AC6/AD-24 at build time: all painted text comes from authored records --
 
-test("build-time one-surface law: across every injected canvas the only painted text is the Welcome Flyer's verbatim string", () => {
+test("build-time text law: every painted string is an authored record's string — the flyer's verbatim line, each placement's title words, and its zone strings; nothing invented (AD-24 whitelist + 1.4)", () => {
   const DOT = String.fromCharCode(0xb7);
   const withText = built.canvasTexts.filter((t) => t.length > 0);
-  assert.equal(withText.length, 1, "exactly one canvas carries text (the carpet canvas carries none)");
+  assert.equal(withText.length, 1 + 2 * cabinetPlacements.length, "flyer + one marquee + one screen canvas per placement (carpet carries none)");
+  const flyerCanvas = withText.find((t) => t.some((s) => WELCOME_FLYER.text.includes(s)));
+  assert.ok(flyerCanvas, "the flyer canvas carries the verbatim line");
   // Verbatim in the metric-robust form (rework pass 1 word-wrap moved the
   // split points): substring membership + character order, nothing invented.
-  const painted = withText[0]!;
-  for (const t of painted) assert.ok(WELCOME_FLYER.text.includes(t), `painted line "${t}" is a substring of the verbatim string`);
+  for (const t of flyerCanvas) assert.ok(WELCOME_FLYER.text.includes(t), `painted line "${t}" is a substring of the verbatim string`);
   assert.equal(
-    painted.join("").replace(/\s+/g, ""),
+    flyerCanvas.join("").replace(/\s+/g, ""),
     WELCOME_FLYER.text.split(` ${DOT} `).join("").replace(/\s+/g, ""),
     "painted characters rebuild the verbatim string in order",
   );
-  assert.equal(signSurfaces.length, 1, "the signage whitelist still holds exactly one surface");
+  for (const p of cabinetPlacements) {
+    const titleWords = p.title.toUpperCase().split(/\s+/);
+    const marquee = withText.find((t) => t.length === titleWords.length && t.every((s) => titleWords.includes(s)));
+    assert.ok(marquee, `marquee canvas lettered with exactly the title record's words "${p.title}"`);
+    const screen = withText.find((t) => t.includes(p.screenZones.next.toUpperCase()));
+    assert.ok(screen, "the screen canvas carries the NEXT zone string");
+    const allowed = new Set([...titleWords, p.screenZones.next.toUpperCase(), ...p.screenZones.score]);
+    for (const s of screen) assert.ok(allowed.has(s), `screen painted "${s}", which is no zone string of the record`);
+  }
+  assert.equal(signSurfaces.length, 1, "the paper signage whitelist still holds exactly one surface");
 });
 
 // --- AC4 consumption: the builder lights zones + roadmap from authored data --
@@ -176,10 +192,14 @@ test("the scene consumes the authored lighting: one point light per zone + roadm
   }
   for (const l of built.lights) {
     assert.ok(
-      zoneHues.has(l.color) || l.color === GLOW_MARQUEE || l.color === GLOW_RED,
-      `light hue ${l.color.toString(16)} is a zone token, roadmap amber, or door glow`,
+      zoneHues.has(l.color) || l.color === GLOW_MARQUEE || l.color === GLOW_RED || l.color === GLOW_CYAN,
+      `light hue ${l.color.toString(16)} is a zone token, roadmap amber, door glow, or a cabinet placement hue`,
     );
   }
-  assert.equal(built.lights.length, zones.length + 2 + 1, "4 zone + 2 amber + 1 door glow point lights");
+  assert.equal(
+    built.lights.length,
+    zones.length + 2 + 1 + 2 * cabinetPlacements.length,
+    "4 zone + 2 amber + 1 door glow + 2 cabinet (spill + halo) point lights",
+  );
   assert.equal(built.ambientCount(), 1);
 });

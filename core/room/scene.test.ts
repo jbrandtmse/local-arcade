@@ -5,10 +5,12 @@
 // (the single-geometry-source law in render form), Wall Panel wainscot band
 // 0..1.0m on every wall, Room Black ceiling over the full envelope, carpet
 // floor carrying the painted texture, 20 baseplates under the empty slots,
-// the painted Welcome Flyer as the only text mesh, zone/roadmap/door glow as
-// LIGHTS only, and zero emissive on any material ("paint glow on walls" is a
-// DESIGN don't — hues arrive from lights). BoxGeometry is the only geometry
-// kind the seam can even ask for.
+// the painted Welcome Flyer as the only paper text surface, 1.4's cabinet
+// shells (part meshes from the shell spec, closed-pose doors, returned
+// handles), zone/roadmap/door glow as LIGHTS only, and zero emissive on any
+// material ("paint glow on walls" is a DESIGN don't — hues arrive from
+// lights; the live screens stay painted maps too). BoxGeometry is the only
+// geometry kind the seam can even ask for.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -17,11 +19,21 @@ import { AMBIENT_INTENSITY, buildRoomScene, DOOR_GLOW_INTENSITY, DOOR_GLOW_REACH
 import { DOOR_TOP, INTERIOR, WALL_T, WALL_TOP, collisionVolumes } from "./collision-volumes.ts";
 import { EMPTY_BASEPLATE, wallSlots } from "./slot-config.ts";
 import { CASUAL_ALLEY, PINBALL_CORNER, SNACK_BAR, WORKSHOP, ZONE_LIGHT_DISTANCE, ZONE_LIGHT_INTENSITY, roadmap, zones } from "./zones.ts";
-import { WELCOME_FLYER } from "./signage.ts";
+import { WELCOME_FLYER, signSurfaces } from "./signage.ts";
+import {
+  CABINET_LIGHT_INTENSITY,
+  CABINET_LIGHT_REACH,
+  SHELL,
+  SHELL_PART_MESHES,
+  cabinetPlacements,
+  coinDoorPose,
+  placementGeometry,
+} from "./cabinets.ts";
 import {
   CARD_INK,
   CARPET_BASE,
   CARPET_PATTERN,
+  FACE_TINT,
   GLOW_CYAN,
   GLOW_GREEN,
   GLOW_MARQUEE,
@@ -32,6 +44,7 @@ import {
   GLOW_VIOLET,
   PAPER_CARD,
   ROOM_BLACK,
+  SIGN_CHALK,
   STREET_GRAY,
   WALL_PANEL,
   WALL_WARM,
@@ -58,6 +71,7 @@ interface MeshRec {
   x: number;
   y: number;
   z: number;
+  yaw: number; // 1.4: the coin-door panels carry a rotation; all else stays 0
 }
 
 interface LightRec {
@@ -76,6 +90,7 @@ function fakeThree() {
   const lights: LightRec[] = [];
   const ambients: { color: number; intensity: number }[] = [];
   const textures: { source: PaintSurface }[] = [];
+  let textureUpdates = 0;
   const three: Three = {
     boxGeometry(w, h, d) {
       const g: GeoRec = { w, h, d };
@@ -88,7 +103,7 @@ function fakeThree() {
       return m;
     },
     mesh(geometry, material) {
-      const rec: MeshRec = { geo: geometry as GeoRec, mat: material as MatRec, x: NaN, y: NaN, z: NaN };
+      const rec: MeshRec = { geo: geometry as GeoRec, mat: material as MatRec, x: NaN, y: NaN, z: NaN, yaw: NaN };
       meshes.push(rec);
       const placed: Placed = {
         position: {
@@ -96,6 +111,11 @@ function fakeThree() {
             rec.x = x;
             rec.y = y;
             rec.z = z;
+          },
+        },
+        rotation: {
+          set(x, y, z) {
+            rec.yaw = y;
           },
         },
       };
@@ -112,6 +132,7 @@ function fakeThree() {
             rec.z = z;
           },
         },
+        rotation: { set() {} },
       };
     },
     ambientLight(color, intensity) {
@@ -123,8 +144,11 @@ function fakeThree() {
       textures.push(t);
       return t;
     },
+    markTextureUpdated() {
+      textureUpdates += 1;
+    },
   };
-  return { three, geos, mats, meshes, lights, ambients, textures };
+  return { three, geos, mats, meshes, lights, ambients, textures, textureUpdateCount: () => textureUpdates };
 }
 
 function fakeWorld(): {
@@ -168,8 +192,8 @@ function fakeWorld(): {
 const built = (() => {
   const f = fakeThree();
   const w = fakeWorld();
-  buildRoomScene(f.three, w.scene, w.factory);
-  return { ...f, ...w };
+  const handles = buildRoomScene(f.three, w.scene, w.factory);
+  return { ...f, ...w, handles };
 })();
 
 const DOT = String.fromCharCode(0xb7);
@@ -289,13 +313,17 @@ test("empty Wall Slots get baseplate meshes (20, Wall Panel, raised), and the on
     flyer.text.split(` ${DOT} `).join("").replace(/\s+/g, ""),
     "painted characters are the verbatim control line in order",
   );
-  assert.equal(built.canvasTexts.length, 2, "exactly two painted canvases: carpet + flyer");
+  assert.equal(
+    built.canvasTexts.length,
+    2 + 2 * cabinetPlacements.length,
+    "painted canvases: carpet + flyer + one marquee + one screen per placement",
+  );
 });
 
 // --- lighting: hues arrive from lights, never from emissive -------------------
 
-test("point lights = 4 zone identity + 2 roadmap amber + 1 door glow (7 total); hues are glow-anchor tokens only; one token-coloured Room Black fill ambient (AC4)", () => {
-  assert.equal(built.lights.length, 7);
+test("point lights = 4 zone identity + 2 roadmap amber + 1 door glow + 2 per cabinet shell (marquee spill + screen halo); hues are glow-anchor tokens only; one token-coloured Room Black fill ambient (1.3 AC4, 1.4)", () => {
+  assert.equal(built.lights.length, 7 + 2 * cabinetPlacements.length);
   const zoneLights = [PINBALL_CORNER, WORKSHOP, SNACK_BAR, CASUAL_ALLEY].flatMap((z) => [z.light]);
   for (const zl of zoneLights) {
     const l = built.lights.find((x) => x.x === zl.x && x.y === zl.y && x.z === zl.z);
@@ -357,12 +385,90 @@ test("BoxGeometry only: the seam offers no other geometry kind, and the scene so
   assert.ok(built.geos.length >= collisionVolumes.length);
 });
 
-test("static authored scene: the build emits exactly 38 meshes (10 volumes + 5 wainscot bands + ceiling + floor + 20 baseplates + flyer) and touches no clock (AD-3/AD-15)", () => {
-  assert.equal(built.meshes.length, 38);
-  assert.equal(built.objects.length, 38 + built.lights.length + built.ambients.length);
+test("static authored scene: the build emits exactly one mesh per volume + wainscot + ceiling + floor + baseplates + flyer + SHELL_PART_MESHES per placement (formula, never a magic count), and touches no clock (AD-3/AD-15)", () => {
+  const expectedMeshes =
+    collisionVolumes.length +
+    collisionVolumes.filter((v) => v.kind === "wall").length +
+    2 + // ceiling + floor
+    wallSlots.length +
+    signSurfaces.length +
+    SHELL_PART_MESHES * cabinetPlacements.length;
+  assert.equal(built.meshes.length, expectedMeshes, "mesh count derives from the authored data");
+  assert.equal(
+    built.objects.length,
+    expectedMeshes + built.lights.length + built.ambients.length,
+    "the scene graph holds meshes + lights + ambient only — no hidden nodes",
+  );
   const src = readFileSync(SCENE_SRC, "utf8");
   for (const banned of ["Date.now", "performance.now", "Math.random", "requestAnimationFrame"]) {
     assert.ok(!src.includes(banned), `scene.ts must not use ${banned}`);
+  }
+});
+
+// --- Story 1.4: the stand-up shells' extrusion + returned handles -----------
+
+function meshByDims(w: number, h: number, d: number): MeshRec {
+  const found = built.meshes.filter((m) => m.geo.w === w && m.geo.h === h && m.geo.d === d);
+  assert.equal(found.length, 1, `exactly one mesh with dims ${w}x${h}x${d}`);
+  return found[0]!;
+}
+
+test("1.4 shell build: marquee bar + painted face, bezel + live screen face, coin-door panel + coin-slot detail posed CLOSED by the pose law, two glow lights per shell in the placement hues, and door/screen handles handed back (1.4 AC1/AC3/AC7)", () => {
+  for (const p of cabinetPlacements) {
+    const g = placementGeometry(p.slotId);
+    // Materials follow the close-up mockup: marquee bg Room Black, screen
+    // bezel Card Ink, coin door Wall Warm, coin slot Sign Chalk.
+    const bar = meshByDims(SHELL.marquee.width, SHELL.marquee.height, SHELL.marquee.depth);
+    assert.equal(bar.mat.params["color"], ROOM_BLACK, "marquee bar is Room Black (mockup .marquee bg)");
+    assert.equal(bar.y, SHELL.marquee.centerY);
+    const faces = built.meshes.filter((m) => m.geo.w === SHELL.marquee.width && m.geo.h === SHELL.marquee.height && m.geo.d <= 0.006);
+    assert.equal(faces.length, 1, "exactly one thin painted face on the marquee bar");
+    const face = faces[0]!;
+    assert.equal(face.mat.params["color"], FACE_TINT, "painted face carries the neutral tint (hues come from the map)");
+    assert.ok(typeof face.mat.params["map"] === "object", "marquee face is texture-mapped");
+    const proud = (face.x - g.front.x) * g.facing.x + (face.z - g.front.z) * g.facing.z;
+    assert.ok(proud > 0 && proud < 0.1, "marquee face sits proud of the body front along the facing");
+    const marqueeTexts = built.canvasTexts.find((t) => t.length === p.title.toUpperCase().split(/\s+/).length && t.every((s) => p.title.toUpperCase().includes(s)));
+    assert.ok(marqueeTexts, "a canvas carries the marquee title lines");
+    assert.deepEqual(marqueeTexts, p.title.toUpperCase().split(/\s+/), "marquee lettering is exactly the title record's words, uppercased");
+    const bezel = meshByDims(SHELL.bezel.width, SHELL.bezel.height, SHELL.bezel.depth);
+    assert.equal(bezel.mat.params["color"], CARD_INK, "screen bezel is Card Ink (mockup .screen border)");
+    const screenFaces = built.meshes.filter((m) => m.geo.w === SHELL.screen.width && m.geo.h === SHELL.screen.height && m.geo.d <= 0.006);
+    assert.equal(screenFaces.length, 1, "exactly one thin live face inside the bezel");
+    const screenFace = screenFaces[0]!;
+    assert.ok(typeof screenFace.mat.params["map"] === "object", "the screen face is texture-mapped (painted, not emissive)");
+    assert.ok(!("emissive" in screenFace.mat.params), "the live screen carries NO emissive — hues come from its lights");
+
+    // Coin door + slot: built at the CLOSED pose, numbers from the pose law.
+    const pose = coinDoorPose(p.volumeId, false);
+    const panel = meshByDims(SHELL.coinDoor.width, SHELL.coinDoor.height, SHELL.coinDoor.thickness);
+    assert.equal(panel.mat.params["color"], WALL_WARM, "coin door is Wall Warm (mockup .coindoor bg)");
+    assert.ok(Math.abs(panel.x - pose.panel.x) < 1e-12 && Math.abs(panel.y - pose.panel.y) < 1e-12 && Math.abs(panel.z - pose.panel.z) < 1e-12, "door panel at the closed-pose centre");
+    assert.equal(panel.yaw, pose.panel.yaw, "door panel carries the closed yaw from the pose law");
+    const slotMesh = meshByDims(SHELL.coinSlot.width, SHELL.coinSlot.height, SHELL.coinSlot.thickness);
+    assert.equal(slotMesh.mat.params["color"], SIGN_CHALK, "coin slot is Sign Chalk (mockup .slot bg)");
+    assert.ok(Math.abs(slotMesh.x - pose.slot.x) < 1e-12 && Math.abs(slotMesh.z - pose.slot.z) < 1e-12, "coin slot at the closed-pose centre");
+
+    // Two glow lights: marquee spill + screen halo, placement hues,
+    // authored cabinet intensity/reach.
+    const spill = built.lights.find((l) => l.color === p.marqueeHue && l.y === SHELL.marquee.centerY);
+    assert.ok(spill, "marquee spill light in the marquee family");
+    const halo = built.lights.find((l) => l.color === p.hue && l.y === SHELL.screen.centerY);
+    assert.ok(halo, "screen halo in the machine's family");
+    for (const l of [spill, halo]) {
+      assert.equal(l.intensity, CABINET_LIGHT_INTENSITY);
+      assert.equal(l.distance, CABINET_LIGHT_REACH);
+      const lp = (l.x - g.front.x) * g.facing.x + (l.z - g.front.z) * g.facing.z;
+      assert.ok(lp > 0, "cabinet lights hang in front of the face, inside the room");
+    }
+
+    // Handles the entry animates every frame.
+    const door = built.handles.doors.find((d) => d.id === p.volumeId);
+    const screen = built.handles.screens.find((s) => s.id === p.volumeId);
+    assert.ok(door && screen, "door + screen handles returned for the placement");
+    assert.equal(screen.canvas.width, Math.round(SHELL.screen.width * 1000), "screen canvas aspect == face metres (1000 px/m)");
+    assert.ok(built.canvasTexts.some((t) => t.includes(p.screenZones.next.toUpperCase())), "the screen canvas is lettered with the NEXT zone at build (step 0)");
+    assert.ok(built.textureUpdateCount() === 0, "the BUILD itself never marks textures updated (repaint is frame-side)");
   }
 });
 
@@ -371,7 +477,10 @@ test("scene lighting hues match the authored zone hues (no drift between zones.t
   const hues = new Set(zones.map((z) => z.hue));
   for (const zl of built.lights) {
     if (hues.has(zl.color)) continue; // a zone identity light
-    assert.ok([GLOW_MARQUEE, GLOW_RED].includes(zl.color), "the rest are roadmap amber / door glow");
+    assert.ok(
+      [GLOW_MARQUEE, GLOW_RED, GLOW_CYAN].includes(zl.color),
+      "the rest are roadmap amber / door glow / cabinet spill + halo (placements' hues)",
+    );
   }
   assert.equal(CASUAL_ALLEY.hue, GLOW_GREEN);
   assert.equal(CARPET_PATTERN, 0x3e3046);

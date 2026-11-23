@@ -20,14 +20,18 @@
 // render/occluder reuse. Wall thickness 0.25 and wall height 3.0 are
 // (inference); the interior envelope is contract.
 
+import { cabinetAABB, cabinetPlacements } from "./cabinets.ts";
+
 export interface Vec3 {
   x: number;
   y: number;
   z: number;
 }
 
-// "cabinet" stays in the vocabulary: 1.4's stand-up shells enter this list
-// as targetable cabinet volumes; the authored room itself has none yet.
+// "cabinet" entries are 1.4's authored stand-up shells (core/room/cabinets.ts
+// placement records, derived below): blocking, targetable, and the body box
+// the scene extrudes all come from these list entries — the one-source law
+// in geometry form (blocking + Epic 2 occlusion + render never diverge).
 export type VolumeKind = "wall" | "pillar" | "door" | "street" | "cabinet";
 
 export interface CollisionVolume {
@@ -155,4 +159,19 @@ export const collisionVolumes: readonly CollisionVolume[] = [
     targetable: false,
     kind: "street",
   },
+  // Story 1.4: the authored stand-up shells — one entry per placement record
+  // (core/room/cabinets.ts), AABB derived from the record, never hand-copied.
+  // Standing on their Wall Slot baseplates; blocking + targetable per the
+  // volume-kind grammar (the E-openable coin door rides the targetable leg).
+  ...cabinetPlacements.map((p) => {
+    const box = cabinetAABB(p);
+    return {
+      id: p.volumeId,
+      min: box.min,
+      max: box.max,
+      blocksMovement: true,
+      targetable: true,
+      kind: "cabinet" as const,
+    };
+  }),
 ];

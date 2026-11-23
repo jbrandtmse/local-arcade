@@ -29,6 +29,7 @@ import {
 } from "./slot-config.ts";
 import { CASUAL_ALLEY, PINBALL_CORNER, SNACK_BAR, WORKSHOP, ZONE_LIGHT_Y, roadmap, zones, type Zone } from "./zones.ts";
 import { signSurfaces } from "./signage.ts";
+import { cabinetPlacements } from "./cabinets.ts";
 import {
   GLOW_GREEN,
   GLOW_MARQUEE,
@@ -60,6 +61,7 @@ test("authored id set, envelope faces, closed door in the bottom-center gap, str
   assert.deepEqual(
     [...ids].sort(),
     [
+      "cabinet-B0", // 1.4's authored shell (derived from its placement record)
       "door-front",
       "pillar-1",
       "pillar-2",
@@ -128,10 +130,11 @@ test("occluder pillars: authored ids, centers (+-3.5, 2.1), 0.5m squares, and th
   assert.deepEqual(occluders, ["pillar-1", "pillar-2"]);
 });
 
-test("authored grammar: min<max everywhere; all block except the street floor; nothing targetable until 1.4's shells; entry spawn just inside the door", () => {
+test("authored grammar: min<max everywhere; all block except the street floor; only 1.4's cabinet shells are targetable (the E-openable coin door rides that leg); entry spawn just inside the door", () => {
   for (const v of collisionVolumes) {
     assert.ok(v.min.x < v.max.x && v.min.y < v.max.y && v.min.z < v.max.z, `${v.id} min<max`);
-    assert.equal(v.targetable, false, `${v.id} targetable`);
+    // Volume-kind grammar (1.4): "cabinet" is the one targetable kind.
+    assert.equal(v.targetable, v.kind === "cabinet", `${v.id} targetable`);
     const expected = v.id === "street-floor" ? false : true;
     assert.equal(v.blocksMovement, expected, `${v.id} blocksMovement`);
   }
@@ -392,7 +395,13 @@ test("aisle probes (AC5): main aisle 17.60m and every corridor depth >= the cont
 
   // Per-slot approach: from the corridor line (x = +-4.5 at the slot's z for
   // the side runs; z = -1.25 ahead of each back-row face) to the slot face;
-  // every blocking volume clears the segment by >= 0.70m.
+  // every blocking volume clears the segment by >= 0.70m. 1.4 twist: on a
+  // filled slot the shell standing there IS that face, so the approach ends
+  // at the visitor's STANDING point an arm's reach in front of the shell
+  // face — the segment never ends inside a blocker, and the shell's own
+  // volume joins the probe like every other blocker (no skip). For B0 the
+  // binding clearance is its own shell at the recorded 0.80m.
+  const STAND_M = 0.8; // (inference) visitor stands arm's reach off the face
   for (const s of wallSlots) {
     let cx: number;
     let cz: number;
@@ -409,10 +418,20 @@ test("aisle probes (AC5): main aisle 17.60m and every corridor depth >= the cont
       fx = s.center.x + s.facing.x * (0.6 / 2);
       fz = s.center.z;
     }
+    const ownShell = cabinetPlacements.find((p) => p.slotId === s.id);
+    if (ownShell) {
+      if (s.wall === "back") fz += STAND_M;
+      else fx += s.facing.x * STAND_M;
+    }
+    let ownMin = Infinity;
     for (const v of collisionVolumes) {
       if (!v.blocksMovement) continue;
       const d = segRectDist(cx, cz, fx, fz, volRect(v));
       assert.ok(d >= 0.7 - EPS, `${s.id} approach vs ${v.id}: ${d}`);
+      ownMin = Math.min(ownMin, d);
+    }
+    if (ownShell) {
+      assert.ok(Math.abs(ownMin - 0.8) < 1e-9, `filled slot ${s.id}: recorded binding clearance ${ownMin} (own shell at the standing point)`);
     }
   }
   // And the slot approach point itself clears its own wall by >= 1.20m of

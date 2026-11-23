@@ -32,10 +32,22 @@ export const GLOW_STEEL = 0x7fb0c9; // Workshop
 export const PAPER_CARD = 0xf2e8d4;
 /** Card Ink: warm-black print (DESIGN.md `card-ink`). */
 export const CARD_INK = 0x2a241c;
+/** Sign Chalk: the light-on-dark legend family (DESIGN.md `sign-chalk`).
+ * 1.4 borrows it for the coin-slot detail (the mockup's bright slot mouth
+ * on the dark door) so every material hue stays inside this token set. */
+export const SIGN_CHALK = 0xe8e4dd;
 
 // Street side (beyond the front wall) — beyond-fiction-adjacent geometry;
 // muted concrete gray is (inference), outside the DESIGN.md token set.
 export const STREET_GRAY = 0x57534c;
+
+// 1.4 (inference, STREET_GRAY precedent): the neutral tint a self-lit game
+// face (CRT screen, marquee sheet) carries so its painted token hues show
+// undistorted — material color multiplies the map, so tinting the screen
+// with one glow hue would recolour the OTHER family's lettering (the
+// mockup paints attract cyan and NEXT amber on one face). The hue SET
+// guard still pins this hex here as its only home.
+export const FACE_TINT = 0xffffff;
 
 /** CSS paint form of a token (for canvas painters, Rule 14: derived). */
 export function toCss(hex: number): string {

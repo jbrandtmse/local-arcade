@@ -2,9 +2,10 @@
 title: 'Story 1.4: The standard stand-up cabinet shell — marquee, live screen'
 type: 'feature'
 created: '2026-11-22'
-status: 'ready-for-dev'
+status: 'done'
 review_loop_iteration: 0
-followup_review_recommended: false
+baseline_revision: 'de093fcfaad1572b48ac8d86fd9738c7b60cec45'
+followup_review_recommended: true
 context:
   - _bmad-output/planning-artifacts/architecture/architecture-local-arcade-2026-11-19/ARCHITECTURE-SPINE.md
   - _bmad-output/specs/spec-local-arcade/room-layout.md
@@ -80,7 +81,54 @@ warnings: ['oversized']
 
 ## Spec Change Log
 
+### 2026-11-23 — implement + review pass (unattended run)
+
+Pre-authorised levers pulled in-stage (the Design Notes residual-risk note named these; the 0.18m cap was NOT touched and keeps its equality pin): marquee face widened 0.56m -> 0.58m toward the 0.60m body width; `MARQUEE_LETTER_SPACING_EM_FLOOR` -0.25em -> -0.5em (labelled inference; at 1.3's ~0.92em fake advance "PATROL" needs ~-0.486em, so the first reading could not close the gap). Screen face re-stacked 0.46x0.46 -> 0.44x0.52 at y 1.05 so the 0.18m NEXT block, attract block, and scan area fit without overlap (inference; the intent fixed NEXT's floor, never the face size).
+
+Review-pass amendments (triage-patched, smallest fix): coin-slot `centerY` 0.8 -> 0.67 (the detail now sits on the door's upper face ~20% below its top edge per the mockup's `.coindoor .slot`; it had been buried inside the bezel box); scan constants AREA 60 -> 77 and DRIFT 3 -> 2 px so the band travel span (48) divides drift x steps-per-cycle (2 x 24) — the drift no longer snaps backward mid-cycle or at the wrap (inference values re-picked under the stated divisibility law); the B0 approach probe re-anchored to a standing point 0.80m in front of the shell face exactly as the intent's edge-table row states (recorded binding: the shell itself at 0.80m); `ScreenZones` de-duplicated (surfaces.ts imports the cabinets.ts record type — the story's one-source law applied to its own types); `citations fixed`.
+
+Ambiguity recorded, code kept: AC3's compressed phrase "NEXT ... in the cabinet's glow-cyan family" conflicts with the Intent's own parenthetical ("the mockup marks its attract title and halo as this game's family"), Design Notes item 3 ("glow-cyan for screen + halo; marquee stays GLOW_MARQUEE"), and the mockup (`.next{color:var(--glow-marquee)}` — amber). The glow-cyan family binds the screen's attract family and the halo, NEXT stays amber; `drawScreen` labels this reading. Flagged for the lead's smoke adjudication.
+
+Spec-text note (no code change): the Shared-surfaces paragraph's "room-DOM-free scan gains core/room/cabinets.ts" overstates — that scan is a directory glob (`no-ui-dom.test.ts:60-70`) and covered the new file automatically; the dev-serve module list DID gain it. Left as-is (historical record of intent, not a contract statement).
+
 ## Review Triage Log
+
+### 2026-11-23 — Review pass (single pass, no loop)
+
+Layers: edge-case-hunter 10 findings, blind-hunter 6 (3 claim + 3 latent), verification-gap 3 (arrived pre-verified; verdicts from filed evidence), intent-alignment 9 divergences (8 readings reviewed to ground them). Verdict totals: 28 rows — 11 patched, 2 false, 15 rejected/deferred (incl. 4 cross-layer duplicates grouped, one route; members keep rows). Patched groups re-verified: full loop suite green 171/171, typecheck, depcheck, lint-bans, registry no-drift, build green; each new pin carries a demonstrated mutation in Verification.
+
+| # | Finding (layer, location) | Verdict | Route | Disposition |
+|---|---|---|---|---|
+| E1 | coin-slot buried in bezel, not on the door (edge; cabinets.ts SHELL.coinSlot) | real, medium | patch | `centerY` 0.67 + mockup-ratio comment (Spec Change Log); mockup `.coindoor .slot` + geometry (bezel y 0.77..1.33 vs door 0.43..0.73) confirm |
+| E2 | "cap never shrunk" pin is a width proxy; fake never records font (edge; cabinets.test.ts) | real, medium | patch | grouped with V2 — fontPx recorded + pinned (see V2) |
+| E3 | scan band snaps backward twice per cycle; constants don't divide (edge; surfaces.ts) | real, medium | patch | AREA 77 / DRIFT 2 + full-cycle drift-law pin; demonstrated: DRIFT 3 goes red at step 16 |
+| E4 | ScreenZones defined in two modules (edge) | real, low | patch | surfaces.ts type-imports cabinets.ts (acyclic; no other consumers — grep-checked) |
+| E5 | SignKind "marquee" member is inert (edge) | real, low | defer | grouped with B5/V3/I7 — see B5 row |
+| E6 | attract cap retyped 0.08 at 5 call sites instead of importing the constant (edge; cabinets.test.ts) | real, low | patch | import `SCREEN_ATTRACT_CAP_M`; pins derive |
+| E7 | scene.test 1.4 pins are global-unique but loop over placements — break on a 2nd shell (edge) | real, low | defer | two-way-door but future-only and loud-at-authoring; `reopen_if:` a second placement record is authored (1.5+); meshByDims scoping noted in residual risks |
+| E8 | runtime-freshness pin is vacuous object identity (edge; cabinets.test.ts:115) | real, low | patch | mutate-one-observe-the-other; shared-record regression demonstrated red |
+| E9 | fit law counts len-1 gaps; real Canvas2D trailing spacing shifts centred text ~(half-gap) (edge; plausible) | maybe-false | reject | real-face advance unknown (ASSUMPTION face); artifact bounded (<=~1.5% of bar at the floor); settle at the lead's smoke (fit row); fake-metric surface cannot observe it |
+| E10 | nits: (a) `lastScreenPaintStep=-1` first-frame repaint; (b) mockup path citation unresolvable; (c) no-ui-dom spec wording overstated (edge) | mixed, low | patch(b) / reject(a,c) | (b) fixed to the real `_bmad-output/.../mockups/` path; (a) not a law violation — gate compares equal steps; first frame differs from build harmlessly (one extra repaint at t=0); (c) spec-text note recorded, no code change |
+| B1 | open coin-door panel swings ~0.27m into walkable room; volume stays the body box (blind; cabinets.ts pose) | real, low | reject | intent scopes the one-list entry to the body mesh ("body box the volume list registers"); open-door blocking is not in AC/matrix; patrons pathing is 1.6; reopen_if patrons collide at smoke |
+| B2 | empty `screenZones.next` paints a silent blank row; suggest throw guard (blind) | real, low | reject | authored data, pinned record; hardening theoretical zone-validation beyond the story's throw-loudly laws; the pin `deepEqual(p.screenZones,...)` already binds the authored record |
+| B3 | scene pins fail confusingly for x-facing placements (blind; scene.test.ts) | real, low | defer | grouped with E7 (same pins, same reopen_if) |
+| B4 | claim: AC3 wants a cyan NEXT; code ships amber (blind) | maybe-false | reject | Intent parenthetical + Design Notes item 3 + mockup `.next{glow-marquee}` bind amber; AC3 phrase is compression; labelled reading recorded in drawScreen + Spec Change Log; lead's smoke adjudicates |
+| B5 | claim: "declared kind marquee" enforced nowhere — vocabulary only (blind) | real, low | defer | the Code Map scoped signage.ts to the vocabulary move; the AD-24 build-time law runs through the scene-qa placement-record whitelist, which IS enforced; character-lint adoption is 3.5's (Design Notes AD-24 boundary note already flags it); reopen_at: 3.5 |
+| B6 | claim: font-size 0.18m != glyph cap height ~0.7em, so real caps measure < 0.18m (blind) | maybe-false | defer | adjudicating em-vs-cap needs a font ratio the ASSUMPTION face forbids inventing; fontPx pin now observes the size at the surface (V2); ~15m legibility is the lead's smoke row + Epic-3 legibility lint |
+| V1 | main.ts frame legs (repaint gate, pose apply, needsUpdate) string-pin-only (verification-gap; pre-verified, disposition patch) | real, medium | patch | extended main-glue pins per the layer's own disposition; demonstrated: deleting gate-assignment + rotation apply goes red; executed tier stays DW-15's Epic-3 harness |
+| V2 | painted font px never observed by any pin; 50% cap shrink ships green (verification-gap; pre-verified, disposition patch) | real, medium | patch | fontPx pins (marquee/NEXT/attract); demonstrated: halved nextCap goes red |
+| V3 | SignKind marquee member has no adopter (verification-gap other-finding) | real, low | defer | grouped with E5/B5/I7 |
+| I1 | intent letter-spacing floor -0.25 vs shipped -0.5 (intent-alignment) | not-a-defect | log | pre-authorised lever (residual-risk note names this exact lever; dispatch warned the cap floor + condensed advance; cap untouched); recorded in Spec Change Log |
+| I2 | hinge side contradicts its own comment; code hinges visitor-RIGHT at -4.33 (intent-alignment) | false | reject | re-verified: `g.right` is the VISITOR-right (placementGeometry pin comment: "facing +Z -> visitor right is +X"); visitor facing B0 (looking -Z) sees -X at their left, so the -4.33 hinge IS the visitor-left the comment claims and the mockup's `transform-origin:left` draws; reviewer's -4.07 reading inverts the convention |
+| I3 | frame-row behavior verified at replica/string surface only (intent-alignment) | real, medium | patch | grouped with V1 (same fix) |
+| I4 | transcript byte-identity row satisfied by slices, not full op-logs (intent-alignment) | maybe-false | reject | the only step-dependent ops ARE the band rects (texts/fills/baselines are step-invariant — verified against drawScreen); the pins compare those y-arrays + step transcripts; full-op byte-compare adds no law coverage |
+| I5 | approach probe re-anchored only in wording; endpoint stayed inside the shell with an id-skip (intent-alignment) | real, medium | patch | both twins now end at the 0.80m standing point, no skip; binding re-recorded 0.80m (own shell) |
+| I6 | "one source" holds only at the consumer-read surface; two authored artifacts (intent-alignment) | false | reject | the spine's law is about consumers reading one list; the derivation equality is pinned numerically in both test files; placement-record + derived-entry is the Code Map's own design |
+| I7 | marquee kind is vocabulary-only (intent-alignment) | real, low | defer | grouped with E5/B5/V3 |
+| I8 | cap-floor guard strength (call-site argument identity unpinned) (intent-alignment) | real, low | defer | grouped with V2/B6 — the fontPx patch closes the observed-surface half; call-site identity stays with the Epic-3 harness/legibility lint |
+| I9 | no dark recess behind the opened door — reveals the wall-panel face (intent-alignment) | real, low | reject | AC1 bounds the shell to the six-part box list; "recess stays dark" = no Card renders (satisfied); a dark recess box is an extra part 3.5 authors with the Instruction Card |
+
+## Design Notes
 
 ## Design Notes
 
@@ -101,7 +149,21 @@ Governing ADs (Rule 6): AD-1 (no core→games imports; new files are core/room T
 - `node tools/gen-registry.mjs && git diff --exit-code -- generated/` -- (loop) expected: no drift; registry stays 0 entries
 - `npm run build` -- (once per story) expected: Vite build succeeds
 
-Rule 19 — pinning tests + intended mutations per AC: AC1: room.test.ts exact-id pin gains "cabinet-B0"; the "nothing targetable until 1.4" pin (room.test.ts:131-134) becomes "only cabinet volumes are targetable"; mutation: delete the volume → id pin + walk-up integration + B0 approach red (player walks through the cabinet); flip targetable false → grammar pin + E integration red. AC2: marquee canvas op-log pin (exactly the record string, verbatim uppercase) + MARQUEE_CAP_M === 0.18 equality (contract value, derived not retyped); mutation: lowercase paint → verbatim red; cap constant → 0.12 → cap pin red; test-local too-long title → fit-law throw pin red. AC3: transcript equality at equal tick counts AND inequality at +30 (anti-vacuity liveness pin); repaint-count pin (same step → 0 repaints, texture marker only on change); main-glue frame() banned-strings pin stays green; mutation: no-op phase step → equal-transcripts-differ red; frame reading tickCount → main-glue red. AC4: cabinets.test.ts integration — real controller walks to B0 (real resolver), E → state flips inside the same tick count, E again → back; no-target E → no-op; mutation: unwire registerInteractable → main-glue wiring pin red and integration state unchanged. AC5: scene-fake hue-set pin (every cabinet material/light hex ∈ tokens), extended build-time painted-text-set law (flyer + "MOON PATROL" + "NEXT"), no-ui-dom dev-serve module list includes cabinets.ts + entry still appends exactly one canvas, registry/depcheck green; mutation: a raw hex literal in scene.ts → hue pin red; a `document.` in cabinets.ts → no-ui-dom red.
+Rule 19 — pinning tests + demonstrated mutations per AC (implement pass: each mutation applied, red observed, reverted, tree byte-identical; suite green again after reverts):
+
+- AC1 pin: room.test.ts exact-id set (gains "cabinet-B0") + cabinets.test.ts derived-volume pin (exact AABB, kind grammar, targetable). `mutation: derived entry targetable true→false → cabinets.test.ts volume-grammar pin AND Rule-1 integration walk red (never acquires the target); reverted.`
+- AC2 pin: cabinets.test.ts marquee op-log (exactly the record's words, uppercased) + `MARQUEE_CAP_M === 0.18` equality pin (added in-pass: the other cap pins derive from the constant and stay green under drift — the demonstrated mutation below went red ONLY on this pin, proving it is the discriminating one). `mutation: MARQUEE_CAP_M 0.18→0.12 → exactly the cap-equality pin red, all other pins green; reverted.`
+- AC3 pin: cabinets.test.ts phase/paint-step determinism (two fresh runtimes, equal ticks → equal step transcripts) + liveness (`+30 ticks` moves the step; painter band at equal steps identical, step 3 offset by 3 drift units) + repaint-same-canvas + scene.test build-marks-no-textures + main-glue frame() banned-strings pin. `mutation: stepCabinetPhase body no-op → phase/paint-step liveness pin red; reverted.`
+- AC4 pin: cabinets.test.ts Rule-1 integration — real controller walks to B0 (real resolver), E flips coin-door state inside the same tick, E again closes, off-centre E is a no-op, two runs bit-identical. `mutation: registerInteractable loop removed from the visit wiring → integration red (door never opens); reverted.`
+- AC5 pin: scene.test/scene-qa hue-set + painted-text-set law (flyer + title words + NEXT) + light/mesh formula pins, no-ui-dom dev-serve module list includes cabinets.ts, registry stays 0 (depcheck/gen-registry green). `mutation: raw hex 0x00ffff on the cabinet halo light in scene.ts → scene.test.ts light-hue pin + 1.4-shell-build pin + zone-hue-match pin red; reverted.`
+
+Review-pass pins (added by triage; each demonstrated, red observed, reverted, tree restored, suite green after reverts — 171/171):
+
+- AC2 strengthened (font-size observed at the painted surface): fakePainter records `fontPx` per fillText; every marquee line and the NEXT row pins `fontPx === round(0.18m x 1000)`, attract rows pin `round(SCREEN_ATTRACT_CAP_M x 1000)`. `mutation: drawScreen nextCap font size halved (nextCapM x pxPerM x 0.5) → cabinets.test.ts screen-painter test red on the NEXT fontPx pin (the old t.w width proxy stayed green); reverted.`
+- Scan drift law (AREA/DRIFT now divide the cycle): the screen-painter test walks every paint step 0..24 — the band's first row must never move backward, and step 24 must paint like step 0. `mutation: SCREEN_SCAN_DRIFT_PX 2→3 → screen-painter test red at "step 16: band row 232 must advance past 277 (no backward snap)"; reverted.`
+- AC3/AC4 frame legs (main-glue source-pin tier tightened): pins added for `lastScreenPaintStep = paintStep;` and all four pose-apply lines (`d.mesh.position/rotation`, `d.slot.position/rotation`). `mutation: delete main.ts's lastScreenPaintStep assignment + the door-mesh rotation apply line → main-glue 1.4 wiring test red on the new pins; reverted.`
+- AC3 runtime hermeticity (mutate-one-observe-the-other replaces the object-identity check). `mutation: createCabinetRuntime returns a shared coinDoors record → cabinets.test.ts runtime test red on "a fresh runtime's coin door is its own" (the identity pin stayed green, proving the old check vacuous); reverted.`
+- Shared surfaces: the B0 approach probe re-anchors to a standing point 0.80m in front of the shell face (intent edge-table as written); the recorded binding is the shell itself at 0.80m (re-recorded from this run; the old corridor->face probe with the own-shell skip is retired).
 
 Shared surfaces (Rule 19) — every list/count other tests assert on that this story moves: collision-volume id set (room.test.ts:58-61 exact-ids pin) and the targetable pin (room.test.ts:131-134) — both move; per-slot approach probes (room.test.ts:368-418) and their QA twin (room-qa.test.ts:252-274) — move for B0 only (corridor-line point → standing point in front of the shell face); scene.test.ts "extruded exactly once" per volume (stays, extended to the cabinet), painted-canvas count 2 → 4 (carpet, flyer, marquee, screen), mesh-count pin 38 → base + per-shell parts (make it a formula, not a new magic number); scene-qa.test.ts:152-165 build-time one-surface text law extends to the three strings, light-hue-set pin gains GLOW_MARQUEE/GLOW_CYAN cabinet lights; no-ui-dom.test.ts dev-serve module list + room-DOM-free scan gain core/room/cabinets.ts; main-glue.test.ts gains the cabinet wiring pins (banned strings unchanged); player-qa.test.ts:60-61 comment rewritten; window.arcadeDebug shape gains `cabinets`. NOT moved by this story (standing checks): slot config (20 slots, wallslots-r1-2026-11-21), INTERIOR, signSurfaces length 1 (marquee joins the kind vocabulary, not the SignSurface list), Casual Alley kept-clean (room-qa.test.ts:191 — it auto-scans blockers and stays green: B0 is back row), aisle minimums, generated registry 0 entries, package.json scripts. Standing criterion: every test added or changed passes on a fresh environment, in either order (1.3 fresh-check precedent).
 
@@ -111,6 +173,19 @@ Manual checks (lead's per-story browser smoke, Chrome AND Edge, evidence `eviden
 - The roadmap wall still reads (L4–L6 / R3–R5 amber over baseplates); aisles unchanged; DOM is canvas-only at every vantage; all colours are the room's tokens (no new hues anywhere) — mockup parity is composition + tokens, never pixel fidelity (UX-DR26).
 
 ## Auto Run Result
+
+Status: done
+Blocking condition: none
+
+Summary: Story 1.4 shipped in one pass: the ONE authored stand-up shell (Moon Patrol's, slot B0) as data in `core/room/cabinets.ts`, the derived `cabinet-B0` entry in the single collision-volume list (blocking + targetable, one geometry source), marquee + screen painters beside `paintFlyer` with the throw-loudly fit law at the pinned 0.18m cap, the coin-door state/toggle/exact axis-swap pose law, the kernel-phase attract cycle with paint-step-gated repaints, the Three-seam extension (rotation + texture-update marker, per-placement parts + two token-hued lights), and main.ts wiring (cabinets kernel system, per-placement E handlers inside `player.step`, frame reads state only). Single review pass: 28 findings, 11 patched (coin slot onto the door, scan-drift divisibility, font-size observation pins, frame-leg source pins, runtime-isolation pin, type de-dup, approach-probe re-anchor, citation), 15 rejected/deferred with reasons, 2 false (hinge side, one-source authoring) — all in the Review Triage Log. Pre-authorised levers (marquee width, letter-spacing floor) pulled and labelled; the 0.18m cap untouched.
+
+Files changed (18): `core/room/cabinets.ts` (new), `core/room/cabinets.test.ts` (new), `core/room/collision-volumes.ts`, `core/room/surfaces.ts`, `core/room/scene.ts`, `core/room/signage.ts`, `core/room/tokens.ts`, `core/main.ts`, `core/room/room.test.ts`, `core/room/room-qa.test.ts`, `core/room/scene.test.ts`, `core/room/scene-qa.test.ts`, `core/room/surfaces.test.ts`, `core/main-glue.test.ts`, `core/no-ui-dom.test.ts`, `core/player.test.ts`, `core/player-qa.test.ts` (comment), this spec.
+
+Verification performed (all at the absolute workdir, foreground, one suite per call): `npm run typecheck` zero errors; `npm test` 171/171 pass (baseline 157, +14 new/kept); `node ci/depcheck.mjs` clean (cabinets.ts imports nothing from games/**; list never imported by cabinets.ts); `node ci/lint-bans.mjs` green; `node tools/gen-registry.mjs && git diff --exit-code -- generated/` no drift, registry 0 entries; `npm run build` once after the last patch: green (557.66 kB entry chunk — the known three.js bundle-size warning, unchanged since 1.3). Rule 19: nine demonstrated mutations total (five stage-pass AC1-AC5 lines above, four review-pass lines) — each applied, red observed with attribution, reverted; no mutation residue in the tree (grep-checked). Matrix Test Audit: every headless row executed green; the Chrome+Edge browser rows are the lead's manual smoke (DW-12 tier), unchanged scope.
+
+Follow-up review recommended: yes — this is the first pass, and two patched mediums (V1/V2: the frame-leg and cap-observation gaps) changed pinning behavior after the reviewed diff. Unverified by CI, in priority order: the real-browser fit outcome (fake 0.92em metric passes ~0.014em above the throw floor; real condensed fallbacks run ~0.4-0.55em advance — fit will likely succeed with visible letter-spacing tightening, or throw loudly at first paint); ~15m marquee legibility including the em-vs-glyph-cap reading (B6); letter-spacing trailing-gap centring (E9); open-door swing vs patron pathing (B1, 1.6).
+
+Residual risks: scan constants and stand-point 0.80m are labelled inference values (smoke re-tune precedent); scene.test 1.4 pins stay globally-unique until a second shell is authored (E7 reopen_if); the marquee SignKind member stays vocabulary-only until 3.5's character lint (B5); the untracked `_bmad-output/planning-artifacts/sprint-status.yaml` in the workdir is the lead's bookkeeping artifact, intentionally not committed here.
 
 Status: ready-for-dev
 Blocking condition: none

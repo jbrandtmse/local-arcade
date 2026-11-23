@@ -8,8 +8,15 @@
 
 import { PAPER_CARD } from "./tokens.ts";
 
-/** AD-24 text-surface kinds (whitelist; later stories extend the members). */
-export type SignKind = "room-sign";
+/** AD-24 text-surface kinds (whitelist; later stories extend the members).
+ * 1.4 adds "marquee": the cabinet marquee's game-title lettering declares
+ * this kind — the kind vocabulary lives in this whitelist home, while the
+ * marquee's RECORD lives with its placement (core/room/cabinets.ts); its
+ * stock is not paper-card, so the signSurfaces list below stays unchanged.
+ * The cabinet SCREEN's zone strings are Core-owned game-surface text (a
+ * surface treatment outside the four paper stocks — DESIGN Components);
+ * the Epic-3 character lint adjudicates that family (3.5). */
+export type SignKind = "room-sign" | "marquee";
 
 /** In-world print stock (DESIGN.md token families). */
 export type SignStock = "paper-card";

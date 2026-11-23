@@ -69,6 +69,10 @@ function fakeCanvas(width: number, height: number, rec: Recording): PaintSurface
     fillStyle: "#000000",
     font: "",
     textAlign: "",
+    // 1.4 seam: the fake models the real letterSpacing property as a stored
+    // string; measureText below deliberately ignores it (widths are the
+    // zero-spacing natural widths the fit law solves against).
+    letterSpacing: "",
     fillRect(x, y, w, h) {
       rec.rects.push({ x, y, w, h, style: ctx.fillStyle as string });
     },

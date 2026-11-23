@@ -2,7 +2,11 @@
 // spine's Room-geometry row: meshes are assembled ONCE from the authored
 // data (the collision volume list, slot config, zones, signage, tokens);
 // render code never hardcodes room geometry (AD-3/AD-15: static authored
-// scene, no motion, no tick mutation here).
+// scene, no motion, no tick mutation here). Story 1.4 extends it: the
+// stand-up shells' parts + glow lights are built from the placement
+// records, and the builder RETURNS door/screen handles so the entry can
+// pose and repaint them from state every frame (the builder itself still
+// never reads state or ticks).
 //
 // Three.js is injected as a small factory seam (the injectable-source
 // pattern of core/input/index.ts again — Rule 2: extend, don't copy) so a
@@ -21,28 +25,44 @@ import {
   CARD_INK,
   CARPET_BASE,
   CARPET_PATTERN,
+  FACE_TINT,
   GLOW_RED,
   PAPER_CARD,
   ROOM_BLACK,
+  SIGN_CHALK,
   STREET_GRAY,
   WALL_PANEL,
   WALL_WARM,
   toCss,
 } from "./tokens.ts";
-import type { CanvasFactory } from "./surfaces.ts";
-import { paintCarpet, paintFlyer } from "./surfaces.ts";
+import type { CanvasFactory, PaintSurface } from "./surfaces.ts";
+import { paintCarpet, paintFlyer, paintMarquee, paintScreen } from "./surfaces.ts";
 import type { CollisionVolume } from "./collision-volumes.ts";
 import { DOOR_TOP, INTERIOR, WALL_T, WALL_TOP, collisionVolumes } from "./collision-volumes.ts";
 import type { ZoneLight } from "./zones.ts";
 import { ZONE_LIGHT_DISTANCE, ZONE_LIGHT_INTENSITY, roadmap, zones } from "./zones.ts";
 import { EMPTY_BASEPLATE, wallSlots } from "./slot-config.ts";
+import {
+  CABINET_LIGHT_INTENSITY,
+  CABINET_LIGHT_REACH,
+  MARQUEE_CAP_M,
+  SHELL,
+  SCREEN_ATTRACT_CAP_M,
+  cabinetPlacements,
+  coinDoorPose,
+  placementGeometry,
+} from "./cabinets.ts";
 
 // --- Three seam -------------------------------------------------------------
 // Method-style factories (not constructor types) so a `* as THREE` adapter
 // in the entry and a headless recorder fake both satisfy this structurally.
+// 1.4 extends (never replaces) the seam: Placed gains rotation (the coin
+// door swings), Three gains markTextureUpdated (the live screen repaints
+// into its existing canvas; the entry flips the texture's needsUpdate).
 
 export interface Placed {
   position: { set(x: number, y: number, z: number): void };
+  rotation: { set(x: number, y: number, z: number): void };
 }
 
 export interface Three {
@@ -57,6 +77,7 @@ export interface Three {
   pointLight(color: number, intensity: number, distance: number): Placed;
   ambientLight(color: number, intensity: number): object;
   canvasTexture(source: object): object;
+  markTextureUpdated(texture: object): void;
 }
 
 /** The scene the room is added to — the subset of three's Scene used here. */
@@ -132,14 +153,42 @@ function inwardNormal(v: CollisionVolume): { x: number; z: number } {
   throw new Error("inwardNormal: wall volume sits on no named interior face");
 }
 
+/** Handles buildRoomScene hands the entry so the frame side can pose the
+ * coin doors and repaint the live screens (1.4). Screens carry their canvas
+ * and texture so a repaint mutates the SAME texture the material samples. */
+export interface ScreenHandle {
+  id: string;
+  canvas: PaintSurface;
+  texture: object;
+}
+
+export interface DoorHandle {
+  id: string;
+  /** The swinging panel; the coin-slot detail rides it (same hinge law,
+   * so its pose is read from the same source — the Code Map's one `door`
+   * handle became this pair; see the story report). */
+  mesh: Placed;
+  slot: Placed;
+}
+
+export interface RoomHandles {
+  screens: ScreenHandle[];
+  doors: DoorHandle[];
+}
+
 /**
  * Build the room into `scene`: one box mesh per collision volume extruded
  * straight from its bounds, walls wainscotted, ceiling/floor/pillars/door/
  * street in token colours, empty-slot baseplates, the Welcome Flyer painted
- * onto an injected canvas, and the provisional zone/roadmap/door glow
- * lighting.
+ * onto an injected canvas, the authored stand-up shells' parts + glow
+ * lights, and the provisional zone/roadmap/door glow lighting. Returns the
+ * coin-door and screen handles the frame side animates.
  */
-export function buildRoomScene(THREE: Three, scene: RoomScene, makeCanvas: CanvasFactory): void {
+export function buildRoomScene(
+  THREE: Three,
+  scene: RoomScene,
+  makeCanvas: CanvasFactory,
+): RoomHandles {
   const wallMat = THREE.standardMaterial({ color: WALL_WARM, roughness: 0.92 });
   const panelMat = THREE.standardMaterial({ color: WALL_PANEL, roughness: 0.85 });
   const ceilingMat = THREE.standardMaterial({ color: ROOM_BLACK, roughness: 1 });
@@ -257,6 +306,134 @@ export function buildRoomScene(THREE: Three, scene: RoomScene, makeCanvas: Canva
     );
   }
 
+  // Story 1.4: the authored stand-up shells (cabinets.ts placements). The
+  // body box already stands from the volume-list extrusion above (kind
+  // "cabinet" takes the Wall Panel material — the mockup's cabinet body);
+  // this loop adds the six part meshes per shell (SHELL_PART_MESHES) and
+  // the two glow lights, every coord derived from the placement record —
+  // never retyped (one-geometry-source law). The coin door poses start
+  // CLOSED; the frame side re-poses from coinDoorPose every frame.
+  const screens: ScreenHandle[] = [];
+  const doors: DoorHandle[] = [];
+  const marqueeBarMat = THREE.standardMaterial({ color: ROOM_BLACK, roughness: 1 });
+  const bezelMat = THREE.standardMaterial({ color: CARD_INK, roughness: 0.9 });
+  const doorMat = THREE.standardMaterial({ color: WALL_WARM, roughness: 0.85 }); // mockup .coindoor bg
+  const slotMat = THREE.standardMaterial({ color: SIGN_CHALK, roughness: 0.6 }); // mockup .slot bg
+  const FACE_T = 0.005; // painted faces thin as paper (FLYER_T sibling)
+  for (const p of cabinetPlacements) {
+    const g = placementGeometry(p.slotId);
+    const facesX = g.facing.x !== 0;
+    // Width runs along visitor-right, depth along the facing — derived from
+    // the facing axis, no per-slot coord branches.
+    const dims = (width: number, depth: number): { x: number; z: number } =>
+      facesX ? { x: depth, z: width } : { x: width, z: depth };
+    const mount = (
+      width: number,
+      height: number,
+      depth: number,
+      centerY: number,
+      proudOffset: number,
+      material: object,
+    ): Placed => {
+      const d = dims(width, depth);
+      return addBox(
+        THREE,
+        scene,
+        material,
+        d.x,
+        height,
+        d.z,
+        g.front.x + g.facing.x * proudOffset,
+        centerY,
+        g.front.z + g.facing.z * proudOffset,
+      );
+    };
+
+    // Marquee: Room Black bar proud of the front face, its painted sheet
+    // (room-black ground, marquee-amber title at the MARQUEE_CAP_M floor)
+    // on the bar's outer face — the mockup's "marquee bg room-black,
+    // lettering glow-marquee".
+    const marquee = SHELL.marquee;
+    mount(marquee.width, marquee.height, marquee.depth, marquee.centerY, marquee.depth / 2, marqueeBarMat);
+    const marqueeMat = THREE.standardMaterial({
+      color: FACE_TINT,
+      map: THREE.canvasTexture(
+        paintMarquee(
+          makeCanvas,
+          p.title,
+          toCss(ROOM_BLACK),
+          toCss(p.marqueeHue),
+          MARQUEE_CAP_M,
+          marquee.width,
+          marquee.height,
+        ),
+      ),
+      roughness: 0.95,
+    });
+    mount(marquee.width, marquee.height, FACE_T, marquee.centerY, marquee.depth + FACE_T / 2, marqueeMat);
+
+    // Screen: Card Ink bezel frame, then the live face (attract + scan in
+    // the machine's hue, NEXT in marquee amber — the mockup's .attract /
+    // .next colours). Painted at step 0; the frame side repaints.
+    const bezel = SHELL.bezel;
+    mount(bezel.width, bezel.height, bezel.depth, bezel.centerY, bezel.depth / 2, bezelMat);
+    const screenCanvas = paintScreen(
+      makeCanvas,
+      p.screenZones,
+      0,
+      toCss(ROOM_BLACK),
+      toCss(p.hue),
+      toCss(p.marqueeHue),
+      SCREEN_ATTRACT_CAP_M,
+      MARQUEE_CAP_M,
+      SHELL.screen.width,
+      SHELL.screen.height,
+    );
+    const screenTexture = THREE.canvasTexture(screenCanvas);
+    const screenMat = THREE.standardMaterial({ color: FACE_TINT, map: screenTexture, roughness: 1 });
+    mount(
+      SHELL.screen.width,
+      SHELL.screen.height,
+      FACE_T,
+      SHELL.screen.centerY,
+      bezel.depth + FACE_T / 2,
+      screenMat,
+    );
+    screens.push({ id: p.volumeId, canvas: screenCanvas, texture: screenTexture });
+
+    // Coin door + the coin-slot detail riding it, posed CLOSED at build.
+    const pose = coinDoorPose(p.volumeId, false);
+    const apply = (placed: Placed, one: { x: number; y: number; z: number; yaw: number }): void => {
+      placed.position.set(one.x, one.y, one.z);
+      placed.rotation.set(0, one.yaw, 0);
+    };
+    const door = SHELL.coinDoor;
+    const panel = THREE.mesh(
+      THREE.boxGeometry(door.width, door.height, door.thickness),
+      doorMat,
+    );
+    apply(panel, pose.panel);
+    scene.add(panel);
+    const slot = SHELL.coinSlot;
+    const slotMesh = THREE.mesh(
+      THREE.boxGeometry(slot.width, slot.height, slot.thickness),
+      slotMat,
+    );
+    apply(slotMesh, pose.slot);
+    scene.add(slotMesh);
+    doors.push({ id: p.volumeId, mesh: panel, slot: slotMesh });
+
+    // Cabinet glow: marquee spill in the marquee family + screen halo in
+    // the machine's family, in front of the face at each part's height
+    // (hues from LIGHTS, never painted glow — 1.3's identity law).
+    const spill = THREE.pointLight(p.marqueeHue, CABINET_LIGHT_INTENSITY, CABINET_LIGHT_REACH);
+    spill.position.set(g.front.x + g.facing.x * 0.3, marquee.centerY, g.front.z + g.facing.z * 0.3);
+    scene.add(spill);
+    const halo = THREE.pointLight(p.hue, CABINET_LIGHT_INTENSITY, CABINET_LIGHT_REACH);
+    halo.position.set(g.front.x + g.facing.x * 0.3, SHELL.screen.centerY, g.front.z + g.facing.z * 0.3);
+    scene.add(halo);
+  }
+
   // Provisional identity lighting: hues from lights, never painted glow
   // (spec Design Notes item 7 — "readable at 6m" is the lead's smoke check).
   for (const zone of zones) addLight(THREE, scene, zone.light);
@@ -265,4 +442,6 @@ export function buildRoomScene(THREE: Three, scene: RoomScene, makeCanvas: Canva
   doorGlow.position.set(0, DOOR_GLOW_Y, DOOR_GLOW_Z);
   scene.add(doorGlow);
   scene.add(THREE.ambientLight(ROOM_BLACK, AMBIENT_INTENSITY));
+
+  return { screens, doors };
 }

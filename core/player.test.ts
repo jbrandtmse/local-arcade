@@ -5,8 +5,8 @@
 // magnitude, circle-vs-AABB blocking against the AUTHORED walls/pillars/
 // door with wall slide, head bob by distance with settle to 1.60m,
 // center-of-view targeting against test-local targetable fixtures
-// (targeting is controller behaviour; the authored room has no cabinets
-// until 1.4), E-press edges once with no consumer -> no state change and
+// (targeting is controller behaviour — these pins stay fixture-driven; the
+// authored room carries 1.4's one shell, pinned in core/room/cabinets.test.ts), E-press edges once with no consumer -> no state change and
 // no event, and the "Integration" row: two headless loop runs with
 // identical scripted device views produce identical player transcripts.
 // Tests pin volume IDS, not raw coords, wherever they can (Shared surfaces).
@@ -57,7 +57,8 @@ function stepN(p: PlayerController, n: number, v: DeviceView): void {
 
 // Test-local targetable fixture (Code Map: targeting is controller behaviour
 // — pass a synthetic volume list to the injectable constructor; the authored
-// room has no cabinets until 1.4 places shells into slots).
+// room now carries 1.4's cabinet-B0, but these controller pins stay
+// self-contained on fixtures).
 function fixtureCabinet(id: string, faceZ: number): CollisionVolume {
   return {
     id,
@@ -154,7 +155,8 @@ test("head bob: amplitude holds while walking, phase rides distance, settles to 
 
 // Targeting pins run against a test-local targetable fixture (Code Map:
 // targeting is controller behaviour — the authored room's targetable set is
-// empty until 1.4's shells).
+// the one 1.4 shell, pinned where the shells are authored; these pins stay
+// fixture-driven).
 test("targeting: center-of-view within reach sets targetId; turning/moving off clears to null", () => {
   const p = createPlayerController([fixtureCabinet("qa-cabinet", -4.0)], { x: 0, z: -1.9 });
   stepN(p, 1, view());
@@ -227,9 +229,9 @@ interface Session {
 // and a visibility clear. Identical scripted device events must yield
 // identical observable player transcripts.
 // The real authored volume list plus one test-local targetable shell
-// (the authored room has no cabinets until 1.4; targeting is controller
-// behaviour, so the scripted session drives it with a fixture the room
-// data would legitimately hold once shells land).
+// (targeting is controller behaviour; the scripted session drives the x=0
+// line against its own fixture so its transcripts never depend on where
+// the authored room's shells stand).
 const sessionVolumes: CollisionVolume[] = [...collisionVolumes, fixtureCabinet("qa-shell", -4.95)];
 
 function scriptedSession(): Session {

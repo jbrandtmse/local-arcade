@@ -89,6 +89,7 @@ test("dev serve (real HTTP): the served body is unchanged, the 1.2 shell modules
       "/core/player.ts",
       "/core/input/index.ts",
       "/core/room/collision-volumes.ts",
+      "/core/room/cabinets.ts",
       "/core/room/slot-config.ts",
       "/core/room/zones.ts",
       "/core/room/signage.ts",

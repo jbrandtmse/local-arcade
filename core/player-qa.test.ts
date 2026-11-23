@@ -58,7 +58,9 @@ test("side walls block: X-face clamp stops the center at face minus radius; walk
 });
 
 // Targeting is controller behaviour — run against a test-local targetable
-// fixture (the authored room has no cabinets until 1.4's shells).
+// fixture (the authored room now carries 1.4's one shell, pinned in
+// core/room/cabinets.test.ts; this probe stays fixture-local so it can
+// stand anywhere in the room).
 test("targeting respects pitch: looking steeply up past the cabinet top clears the target (AC4)", () => {
   const fixture: CollisionVolume = {
     id: "qa-cabinet",

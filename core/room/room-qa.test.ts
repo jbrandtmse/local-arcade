@@ -23,6 +23,7 @@ import {
   type CollisionVolume,
 } from "./collision-volumes.ts";
 import { ROADMAP_STRETCH_SLOTS, WALL_SLOT_REVISION, wallSlots, type WallSlot } from "./slot-config.ts";
+import { cabinetPlacements } from "./cabinets.ts";
 import { CASUAL_ALLEY, roadmap, zones } from "./zones.ts";
 import { paintFlyer, type PaintContext, type PaintSurface } from "./surfaces.ts";
 import { WELCOME_FLYER } from "./signage.ts";
@@ -263,9 +264,17 @@ test("aisle probes: main aisle and corridor depths clear the 1.20m contract, pil
   assert.ok(pillarSlotMin >= 5.0, `recorded pillar->slot min ${pillarSlotMin} >= 5.0m`);
 
   // Per-slot approach: corridor point -> slot face, clearing every blocker.
+  // 1.4 twist: on a filled slot the shell IS the face, so the segment ends
+  // at the visitor's standing point 0.8m (inference — arm's reach off the
+  // face) in front of it and the shell itself joins the probe like every
+  // other blocker (no skip).
   for (const s of wallSlots) {
-    const faceX = s.center.x + s.facing.x * (s.footprint.depth / 2);
-    const faceZ = s.center.z + s.facing.z * (s.footprint.depth / 2);
+    let faceX = s.center.x + s.facing.x * (s.footprint.depth / 2);
+    let faceZ = s.center.z + s.facing.z * (s.footprint.depth / 2);
+    if (cabinetPlacements.some((p) => p.slotId === s.id)) {
+      faceX += s.facing.x * 0.8;
+      faceZ += s.facing.z * 0.8;
+    }
     const corridorX = s.wall === "back" ? s.center.x : s.facing.x > 0 ? -4.5 : 4.5;
     const corridorZ = s.wall === "back" ? -1.25 : s.center.z;
     for (const v of collisionVolumes) {
@@ -329,6 +338,14 @@ test("sampled sightlines from the entry spawn: backmost side slots break on exac
   const r5 = center("R5");
   assert.deepEqual(occludersHit(ENTRY_SPAWN.x, ENTRY_SPAWN.z, l6.x, l6.z), [], "roadmap stretch L6 visible");
   assert.deepEqual(occludersHit(ENTRY_SPAWN.x, ENTRY_SPAWN.z, r5.x, r5.z), [], "roadmap stretch R5 visible");
+  // 1.4: the stand-up shells joined the ONE list — the roadmap stretch
+  // sightlines from the entry spawn must read clear of THEM too. A shell
+  // is not an authored occluder this story (Epic 2 decides that set), but
+  // a cabinet blocking the doorway roadmap view would be a layout defect.
+  for (const v of collisionVolumes.filter((c) => c.kind === "cabinet")) {
+    assert.ok(!segHitsRect(ENTRY_SPAWN.x, ENTRY_SPAWN.z, l6.x, l6.z, volRect(v)), `${v.id} must not block spawn->L6`);
+    assert.ok(!segHitsRect(ENTRY_SPAWN.x, ENTRY_SPAWN.z, r5.x, r5.z, volRect(v)), `${v.id} must not block spawn->R5`);
+  }
   // The occluder subset is the pillar-kind entries of the ONE list Epic 2 will
   // raycast — and every occluder blocks movement too ("what blocks the ear
   // blocks the eye", AD-7).
