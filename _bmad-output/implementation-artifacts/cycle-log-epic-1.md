@@ -87,3 +87,5 @@
 2026-11-23T01:58:24Z	Story 1.3	stage_spawned	stage=implement spawn_at=2026-11-23T01:58:24Z agent_name=1-3-room-implement-3 cycle_iteration=3
 2026-11-23T03:14:26Z	Story 1.3	dev_complete	spawn_at=2026-11-23T01:58:24Z build_sha=ec2258d baseline_revision=e641824 review_loop_iteration=1 followup_review_recommended=false deferred=0 files=3 loc_added=89 loc_removed=19 cycle_iteration=3 note=rework_iter2_lighting_retune;self-review_pass4_0high_2med_patched
 2026-11-23T03:15:06Z	Story 1.3	report_error	fault=lead field=spawn_at reported=2026-11-23T01:57:45Z actual=2026-11-23T01:58:24Z impact=telemetry-only_line-corrected-same-turn
+2026-11-23T03:19:05Z	Story 1.3	adr_verifications_complete	tool=node_cli	acs=ac4,ac7	result=pass	mutations=ac4:zone-intensity-floor-breach-150to0,ac4:built-side-desync-30,ac7:wall-material-emissive	reverts=byte-identical	suite=157/157	cycle_iteration=3	note=in-range_retune_150to120_stays_green_by_design_floor-law_not-exact-pin
+2026-11-23T03:19:05Z	Story 1.3	stage_spawned	stage=code-review spawn_at=2026-11-23T03:19:05Z agent_name=1-3-room-cr-3 cycle_iteration=3
