@@ -105,3 +105,4 @@
 2026-11-23T09:06:07Z	Story 1.4	stage_spawned	stage=qa	spawn_at=2026-11-23T09:06:07Z	agent_name=1-4-cabinet-qa-1	cycle_iteration=1
 2026-11-23T09:27:57Z	Story 1.4	qa_complete	spawn_at=2026-11-23T09:06:07Z	tests_added=6	mutations_demonstrated=5	first_run_failures=0	clarifications=0	closing_sections_present=true	suite=177/177	qa_files=core/room/cabinets-qa.test.ts	note=uppercase_law_gap_found_closed_QA_only;pose_invariants;full-op-log_determinism_leg;NEXT-amber_adjudication_respected
 2026-11-23T09:28:11Z	Story 1.4	report_error	fault=lead	field=spawn_at(qa_complete)	reported=2026-11-23T08:52:43Z	actual=2026-11-23T09:06:07Z	impact=telemetry-only;recalled_from_memory_then_first_fix_mis-parsed_field;corrected_before_cr_dispatch
+2026-11-23T09:28:58Z	Story 1.4	stage_spawned	stage=code-review	spawn_at=2026-11-23T09:28:58Z	agent_name=1-4-cabinet-cr-1	cycle_iteration=1
