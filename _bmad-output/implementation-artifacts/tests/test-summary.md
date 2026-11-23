@@ -1,3 +1,35 @@
+# Test Automation Summary — Story 1.4 (QA stage, 2026-11-23)
+
+Target: the implemented deliverable of Story 1.4 (`git diff --name-only de093fc..HEAD` — code only: the new authored module `core/room/cabinets.ts` + derived `cabinet-B0` entry in `collision-volumes.ts`, the `paintMarquee`/`paintScreen`/`repaintScreen` additions to `surfaces.ts`, the extended Three seam in `scene.ts` (rotation, texture marker, per-placement parts + lights, returned handles), the `main.ts` wiring, and the story's own test pins). Acceptance criteria: the spec's Tasks & Acceptance + I/O & Edge-Case Matrix. Framework: the project's existing convention — `node --test` with native TS type-stripping (`*.test.ts` under `core/`, `ci/`, `tools/`); no new dependency (spine-pinned set). The "Chrome vs Edge" matrix row stays the lead's browser smoke (DW-12 precedent — a browser harness would be an escalation).
+
+## Generated Tests
+
+### Cabinet shell QA probes
+- [x] `core/room/cabinets-qa.test.ts` (QA) — AC1: the REAL 1.2 resolver walks against the derived entry (pressed flush at body-front + PLAYER_RADIUS, side slide, same-entry centred targeting — the smoke's "the body stops the walk" now has an automated leg) and an independent test-local re-derivation of the footprint from the slot record + SHELL spec; AC2: the painter uppercase law at mixed-case input (the authored record is already uppercase — the law had no pin until this probe); AC3: liveness/determinism/repaint-cost through the REAL `createKernelLoop` — equal-tick runs paint byte-identical FULL op-logs, 0-tick differs from 30-tick, 4 repaints across 31 frame reads; AC4: the pose law as geometric invariants (hinge fixed, exact 90 deg axis-swap about the SAME point, lever preserved, slot rigid); AC5: every SHELL part built exactly once at its spec dims, every part colour a tokens.ts hex (material leg of the token law).
+
+## Coverage
+- AC1: exact-id + derived-AABB pins (implement) + QA: real-resolver blocking/slide/target walk, independent geometry re-derivation.
+- AC2: cap equality + marquee op-log + fontPx pins (implement) + QA: uppercase law at mixed-case input (the pre-QA suite was blind to a dropped toUpperCase).
+- AC3: phase/paint-step + scan-law + same-canvas pins (implement) + QA: byte-identical full op-logs via the real kernel loop, repaint-cost counting.
+- AC4: Rule-1 integration + exact pose numbers (implement) + QA: pose-law invariants (hinge/slot rigidity independent of the exact values).
+- AC5: light-hue set + text-set + mesh-formula pins (implement) + QA: part-mesh existence + token-colour material law.
+- Real dev-serve + DOM scans stay as the implement extended them; Chrome-vs-Edge stays the lead's smoke.
+
+## Verification run (post-QA)
+- `npm test`: 177/177 pass (171 pre-QA + 6 QA).
+- `npm run typecheck`: 0. `node ci/depcheck.mjs`: 0. `node ci/lint-bans.mjs`: 0.
+- `node tools/gen-registry.mjs && git diff --exit-code -- generated/`: byte-identical, registry 0 entries.
+- `npm run build`: green (same three.js chunk-size warning as 1.3 — unchanged).
+- QA file green standalone and against its neighbours in both run orders (hermeticity spot-check).
+- Rule 19: 5 QA mutation demonstrations — one per AC, none re-running the lead's five gate classes or the four review-pass lines: blocksMovement flip (walk passes through the body), toUpperCase drop (implement suites stay green — the QA probe is the discriminator), bandOffset decoupled from the paint step (dead screen), hinge flipped to visitor-right (axis-swap breaks), raw near-miss hex on the coin-slot material (token-set red). Each red observed with attribution, reverted, `git diff --stat` byte-identical, suite re-green 177/177. Recorded in the spec's `## Verification` QA block.
+- Gap hunt finding: the uppercase law (AC2's "exactly the placement title verbatim, uppercased") had no executable pin — the authored record satisfies it by construction; closed by the QA probe, no implementation change needed.
+
+## Next Steps
+- Lead commits the QA test files (this stage forbids committing).
+- 1.5 driving attract content through the shell will move the QA AC3 op-log probes only if the zone record changes (they read it from `placementByVolumeId`, never retype it).
+
+---
+
 # Test Automation Summary — Story 1.3 (QA stage, 2026-11-22; lead refresh for rework pass 1 + cr-2 — DW-18)
 
 Target: the implemented deliverable of Story 1.3 (`git diff --name-only 438b840..HEAD` — story_base to head, covering rework pass 1 `a85fa07` and cr-2's test patches; the QA stage itself ran from the pre-rework baseline `cbc66b65` —
