@@ -1,3 +1,32 @@
+# Test Automation Summary — Story 1.5 (QA stage, 2026-11-23)
+
+Target: the implemented deliverable of Story 1.5 (`git diff --name-only 584110e..HEAD` — the vendored Moon Patrol plugin `games/moon-patrol/sim|presentation`, the wrapper `play(seed)` seam, `core/seat.ts` + the extended input/player/cabinets/surfaces/main legs, the one-entry registry, and the story's own test pins). Acceptance criteria: the spec's Tasks & Acceptance + I/O & Edge-Case Matrix. Framework: the project's existing convention — `node --test` with native TS type-stripping (`*.test.ts` under `core/`, `ci/`, `tools/`; `games/**/*.test.js` joined this story); no new dependency (spine-pinned set). The "E2E" surface is the scripted module surface (real kernel loop, real wrapper instance from the generated registry, real seat service) — `window.arcadeDebug` execution and the Chrome+Edge matrix rows stay the lead's browser smoke (DW-12/DW-15 precedent: the executed browser tier lands with the Epic-3 harness).
+
+## Generated Tests
+
+### Control-mapping QA probes
+- [x] `core/seat-controls.test.ts` (QA) — AC4's executed declared-slot law beyond the move-letter leg the implement suite drove: KeyX/KeyK jump ('jump' fx drains + buggy airborne vs a grounded no-key twin), KeyZ/KeyJ fire (the fwd+up volley — buggy-exclusive, so the twin's never-shooting pin is airtight vs tank 'fire' fx — plus 'fire' fx), ArrowRight→fast cap 190 / ArrowLeft→slow floor 100 with the free-run-shortfall arithmetic. Plus the UX-DR24 legend law as a three-way set identity (adapter on-screen legend text ↔ core/main.ts authored SEAT_KEYS ↔ the key set these tests drive), nine keys both directions — the defect class that once advertised PAUSE/MUTE on a dead vocab had no tie between screen text and kernel map; closed at the established source-pin tier (DW-15).
+- [x] `core/visit-arc.test.ts` (QA) — the whole-visit E2E on the module surface, one run: walk, E opens, E sits (seeded play, play pose, debug record), die mid-seat, attract resumes ALIVE in place (hash advances 120 ticks), Enter restarts on a fresh kernel seed (rebuilt world at spawn x), E stands (exact pose restore, door closed, attract), the cycle RE-ARMS (open/sit/play/stand again — the 1.4 door law survives a full death cycle), room walking resumes; plus drained pair order + plain-data identity + bounded arcadeDebug.seat event record. The stand-after-death-and-restart and second-sit path was covered by no single implement test.
+
+## Coverage
+- AC1/AC2: untouched by QA — fully pinned at the gate + wrapper tier (provenance/PROVISIONAL scans, depcheck sim leg, conformance tests with recorded mutations).
+- AC3: cycle-hash + adapter op-log pins (implement) + QA: mid-visit attract liveness inside a whole play session, legend set-identity.
+- AC4: E-law + move-axis + transcript-identity pins (implement) + QA: jump/fire/arrow slots executed with twins, stand + re-sit on the repeat cycle.
+- AC5: death/Enter/seed-role pins (implement) + QA: the same facts asserted on the arc run (pair order, plain data, fresh-seed restart, bounded window) with independent stub seeds [8, 5150, 77].
+- AC6: gates re-run at QA finalize (245/245); registry drift still exact.
+
+## Verification run (post-QA)
+- `npm test`: 245/245 pass (238 pre-QA + 7 QA). New files green standalone and in either run order (hermeticity spot-check).
+- `npm run typecheck`: 0. `node ci/depcheck.mjs`: 0. `node ci/lint-bans.mjs`: 0.
+- `node tools/gen-registry.mjs && git diff --exit-code -- generated/`: byte-identical, one entry.
+- Rule 19: 5 QA mutation demonstrations — seat buttons loop narrowed to the first slot (KeyX jump red), standUp skips the door close (arc door pin red), sim stops emitting scoreSubmitted (arc pair-order red, reads 'burst'), attract clock frozen (arc hash-advance red), legend drops 'X or K' alt (legend set-identity red). Each named pin went red, reverted, file md5-verified byte-identical (seat.ts d2fbb78…, sim/index.js d114310…, adapter.js a5d6c5c…), tree verified clean after every revert, final full-suite sweep green 245/245 plus all gates. Recorded in the spec's `## Verification` QA block.
+
+## Next Steps
+- Lead commits the QA test files + this block (this stage forbids committing), then runs the fresh-environment forward/reverse check (Rule 19 fresh_check) and the Chrome+Edge smoke.
+- 1.6 autoplay/scheduler will touch the arc rig only through the registry entry and the seat track entry — the QA probes read both from `generated/game-registry.ts`, never retype them.
+
+---
+
 # Test Automation Summary — Story 1.4 (QA stage, 2026-11-23)
 
 Target: the implemented deliverable of Story 1.4 (`git diff --name-only de093fc..HEAD` — code only: the new authored module `core/room/cabinets.ts` + derived `cabinet-B0` entry in `collision-volumes.ts`, the `paintMarquee`/`paintScreen`/`repaintScreen` additions to `surfaces.ts`, the extended Three seam in `scene.ts` (rotation, texture marker, per-placement parts + lights, returned handles), the `main.ts` wiring, and the story's own test pins). Acceptance criteria: the spec's Tasks & Acceptance + I/O & Edge-Case Matrix. Framework: the project's existing convention — `node --test` with native TS type-stripping (`*.test.ts` under `core/`, `ci/`, `tools/`); no new dependency (spine-pinned set). The "Chrome vs Edge" matrix row stays the lead's browser smoke (DW-12 precedent — a browser harness would be an escalation).
