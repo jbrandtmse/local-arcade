@@ -285,13 +285,45 @@ export const MARQUEE_LETTER_SPACING_EM_FLOOR = -0.5;
  * and the NEXT row, which paints at MARQUEE_CAP_M). */
 export const SCREEN_ATTRACT_CAP_M = 0.08;
 
-/** Cabinet point lights at the door-glow candela scale (1.3 light-constant
- * pin idiom): marquee spill amber + screen halo cyan, hues from the
- * placement record. (inference, "tuned by eye at the smoke".) */
-export const CABINET_LIGHT_INTENSITY = 15;
-export const CABINET_LIGHT_REACH = 8;
+/** Cabinet point lights in three's physical candela units: marquee spill
+ * amber + screen halo cyan, hues from the placement record. Each hangs on
+ * its face's centre axis 0.45m out (marquee face 0.58m, screen face 0.44m
+ * — both FACE_TINT on the 0.60m body), so the candela law binds: a
+ * light's own contribution at a face point is INTENSITY / d². The first
+ * reading reused the door-glow candela scale (15 cd at 0.30m = ~266
+ * own-contribution on the face) and washed both painted faces white at
+ * the smoke. This triple keeps each light's OWN contribution inside the
+ * CABINET_FACE_ILLUMINANCE_CEILING / _FLOOR bounds below; summed scene
+ * exposure (this pair + the sibling glow light + the 1.3 zone fill) is
+ * the lead's smoke adjudication, as every brightness reading in this home
+ * always has been.
+ * (inference — candela-law derived at rework; "tuned by eye at the smoke"
+ * binds at the lead's re-smoke.) */
+export const CABINET_LIGHT_INTENSITY = 0.25;
+export const CABINET_LIGHT_REACH = 4;
 
 /** How far in front of the body front plane both cabinet glow lights hang,
  * metres along the facing (inference — the "tuned by eye at the smoke"
- * sibling of the intensity/reach pair; scene pins derive from it). */
-export const CABINET_LIGHT_STANDOFF_M = 0.3;
+ * sibling of the intensity/reach pair; scene pins derive from it). 0.30m
+ * failed the rework smoke — the light sat inside its own face's hot spot;
+ * 0.45m spreads the inverse-square falloff across the face. Spill
+ * containment is the intensity/reach pair's job — this hang reaches
+ * slightly farther into the room, by design. */
+export const CABINET_LIGHT_STANDOFF_M = 0.45;
+
+/** Own-glow exposure bounds for the cabinet lights — each light's own
+ * contribution at the painted face under the candela law (own-contribution
+ * = INTENSITY / d², times the N·L incidence factor off-axis). The scene
+ * pin checks the point directly under each light against the ceiling and
+ * that face's far corner (cosined) against the floor, for the marquee and
+ * the screen face each — the authored pair's incremental budget, NOT the
+ * summed scene exposure (the sibling glow light and the 1.3 zone fill ride
+ * on top; totals are the smoke's call). Ceiling 2: painted faces are
+ * FACE_TINT (white) carrying token-hued maps — the 266 reading clipped the
+ * lettering to white at the failed smoke; 2 leaves headroom above the
+ * authored peak for the pair sum and the fill. Floor 0.5: own-glow under
+ * it is invisible on its own, and a face that reads dark is a Dead
+ * Machine by law. (inference — the by-eye pair this retune pins so CI
+ * sees a blown-out or dead re-tune, not just the lead's smoke.) */
+export const CABINET_FACE_ILLUMINANCE_CEILING = 2;
+export const CABINET_FACE_ILLUMINANCE_FLOOR = 0.5;

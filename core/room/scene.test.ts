@@ -21,6 +21,8 @@ import { EMPTY_BASEPLATE, wallSlots } from "./slot-config.ts";
 import { CASUAL_ALLEY, PINBALL_CORNER, SNACK_BAR, WORKSHOP, ZONE_LIGHT_DISTANCE, ZONE_LIGHT_INTENSITY, roadmap, zones } from "./zones.ts";
 import { WELCOME_FLYER, signSurfaces } from "./signage.ts";
 import {
+  CABINET_FACE_ILLUMINANCE_CEILING,
+  CABINET_FACE_ILLUMINANCE_FLOOR,
   CABINET_LIGHT_INTENSITY,
   CABINET_LIGHT_REACH,
   CABINET_LIGHT_STANDOFF_M,
@@ -409,9 +411,58 @@ test("static authored scene: the build emits exactly one mesh per volume + wains
 // --- Story 1.4: the stand-up shells' extrusion + returned handles -----------
 
 // The constant-IS-the-value drift pin (the marquee-cap idiom): the derived
-// standoff pin below cannot see its own constant move.
-test("the cabinet light standoff constant IS 0.30m (both cabinet glow lights hang this far in front of the face plane)", () => {
-  assert.equal(CABINET_LIGHT_STANDOFF_M, 0.3, "0.30m standoff, the intensity/reach pair's sibling");
+// standoff pin below cannot see its own constant move. Re-pinned 0.30 ->
+// 0.45 with the rework-iteration-1 exposure retune (the 0.30m hang put the
+// light inside its own face's hot spot — the failed smoke).
+test("the cabinet light standoff constant IS 0.45m (both cabinet glow lights hang this far in front of the face plane)", () => {
+  assert.equal(CABINET_LIGHT_STANDOFF_M, 0.45, "0.45m standoff, the intensity/reach pair's sibling");
+});
+
+// Rework iteration 1 (failed smoke, AC2/AC3 exposure legs): 15 cd hanging
+// 0.30m off a FACE_TINT face put ~266 own-contribution on both painted
+// faces — white-hot marquee, white-rectangle screen. Three's physical
+// point lights attenuate as INTENSITY / d^2 (times N.L off-axis), so the
+// authored light triple has to keep each light's OWN contribution on each
+// painted face inside these bounds — the pair sum and the 1.3 zone fill
+// ride on top, and summed scene exposure is the lead's smoke call. The
+// built-equality pins in the 1.4 shell-build test move WITH the constants
+// (they cannot see a re-tune); the IS-value pins here are the drift cures
+// (the CR-A1/A2 idiom — a derived inequality alone cannot see its own
+// constants move). The proud offsets come from the shell-build test's
+// exact face-position pins: each face sits at exactly SHELL depth +
+// FACE_T/2 proud, so each face's nearest point sits directly under its
+// light at standoff - proud, and its far corner is that depth plus the
+// half-width/half-height diagonal (cosined by dNear/dFar, three's N.L).
+test("cabinet glow exposure law: each light's own contribution on both painted faces sits inside the blow-out ceiling and above the dead-face floor (rework smoke AC2/AC3 exposure legs)", () => {
+  const faces = [
+    { name: "marquee", proud: SHELL.marquee.depth + FACE_T / 2, w: SHELL.marquee.width, h: SHELL.marquee.height },
+    { name: "screen", proud: SHELL.bezel.depth + FACE_T / 2, w: SHELL.screen.width, h: SHELL.screen.height },
+  ];
+  // The inequalities first: a blown-out re-tune reddens HERE, at the
+  // exposure law, not merely at the drift pins below.
+  for (const f of faces) {
+    const dNear = CABINET_LIGHT_STANDOFF_M - f.proud;
+    const eNear = CABINET_LIGHT_INTENSITY / (dNear * dNear);
+    assert.ok(
+      eNear <= CABINET_FACE_ILLUMINANCE_CEILING,
+      `"${f.name}" face peak own-illuminance ${eNear.toFixed(2)} exceeds the ${CABINET_FACE_ILLUMINANCE_CEILING} blow-out ceiling (white-hot face — the failed smoke)`,
+    );
+    const dFar = Math.sqrt(dNear * dNear + (f.w / 2) * (f.w / 2) + (f.h / 2) * (f.h / 2));
+    // N.L at the far corner: the face normal runs along the facing, so the
+    // incidence factor is the depth ratio dNear/dFar (three's cosine term).
+    const eFar = (CABINET_LIGHT_INTENSITY * (dNear / dFar)) / (dFar * dFar);
+    assert.ok(
+      eFar >= CABINET_FACE_ILLUMINANCE_FLOOR,
+      `"${f.name}" face far-corner own-illuminance ${eFar.toFixed(2)} is under the ${CABINET_FACE_ILLUMINANCE_FLOOR} dead-face floor (a dark face is a Dead Machine by law)`,
+    );
+  }
+  // IS-value drift pins last: the inequalities above read their constants,
+  // so a raised ceiling or re-inflated candela value that keeps the
+  // inequality green (a moved ceiling) still reddens here.
+  assert.equal(CABINET_LIGHT_INTENSITY, 0.25, "the cabinet glow candela value IS the authored 0.25 (drift pin)");
+  assert.equal(CABINET_LIGHT_REACH, 4, "the cabinet glow reach constant IS 4 (drift pin — the spill-range cutoff; the face law is cutoff-independent at these depths)");
+  assert.equal(CABINET_FACE_ILLUMINANCE_CEILING, 2, "the face-illuminance ceiling constant IS 2 (drift pin)");
+  assert.equal(CABINET_FACE_ILLUMINANCE_FLOOR, 0.5, "the face-illuminance floor constant IS 0.5 (drift pin)");
 });
 
 function meshByDims(w: number, h: number, d: number): MeshRec {
@@ -434,7 +485,10 @@ test("1.4 shell build: marquee bar + painted face, bezel + live screen face, coi
     assert.equal(face.mat.params["color"], FACE_TINT, "painted face carries the neutral tint (hues come from the map)");
     assert.ok(typeof face.mat.params["map"] === "object", "marquee face is texture-mapped");
     const proud = (face.x - g.front.x) * g.facing.x + (face.z - g.front.z) * g.facing.z;
-    assert.ok(proud > 0 && proud < 0.1, "marquee face sits proud of the body front along the facing");
+    // EXACT, not a window: the exposure law reads this offset, so the
+    // built face must sit where that law says it sits (a mount nudge that
+    // puts the face inside the light's hot spot reddens HERE).
+    assert.ok(Math.abs(proud - (SHELL.marquee.depth + FACE_T / 2)) < 1e-12, "marquee face sits exactly marquee.depth + FACE_T/2 proud of the body front along the facing");
     const marqueeTexts = built.canvasTexts.find((t) => t.length === p.title.toUpperCase().split(/\s+/).length && t.every((s) => p.title.toUpperCase().includes(s)));
     assert.ok(marqueeTexts, "a canvas carries the marquee title lines");
     assert.deepEqual(marqueeTexts, p.title.toUpperCase().split(/\s+/), "marquee lettering is exactly the title record's words, uppercased");
@@ -445,6 +499,11 @@ test("1.4 shell build: marquee bar + painted face, bezel + live screen face, coi
     const screenFace = screenFaces[0]!;
     assert.ok(typeof screenFace.mat.params["map"] === "object", "the screen face is texture-mapped (painted, not emissive)");
     assert.ok(!("emissive" in screenFace.mat.params), "the live screen carries NO emissive — hues come from its lights");
+    // Same exact proud law as the marquee face — the exposure law reads
+    // this offset for the screen's dNear; the proud was previously pinned
+    // nowhere, so a mount nudge could re-blow the screen face with CI green.
+    const sProud = (screenFace.x - g.front.x) * g.facing.x + (screenFace.z - g.front.z) * g.facing.z;
+    assert.ok(Math.abs(sProud - (SHELL.bezel.depth + FACE_T / 2)) < 1e-12, "screen face sits exactly bezel.depth + FACE_T/2 proud of the body front along the facing");
 
     // Coin door + slot: built at the CLOSED pose, numbers from the pose law.
     const pose = coinDoorPose(p.volumeId, false);
