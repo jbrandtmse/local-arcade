@@ -85,3 +85,5 @@
 2026-11-23T01:57:31Z	Story 1.3	smoke_complete	method=browser result=fail iterations=2 defects_caught=1 evidence=_bmad-output/implementation-artifacts/evidence/story-1-3-smoke-*.png note=flyer_verbatim_fixed_and_legible;spawn_door_dom_faults_pass;six_vantages_dark_owner_confirmed_DW-17;edge_leg_deferred_to_re-smoke
 2026-11-23T01:57:31Z	Story 1.3	rework_opened	cycle_iteration=3 iteration=2 trigger=smoke items=DW-17 scope_baseline=8961dc2
 2026-11-23T01:58:24Z	Story 1.3	stage_spawned	stage=implement spawn_at=2026-11-23T01:58:24Z agent_name=1-3-room-implement-3 cycle_iteration=3
+2026-11-23T03:14:26Z	Story 1.3	dev_complete	spawn_at=2026-11-23T01:58:24Z build_sha=ec2258d baseline_revision=e641824 review_loop_iteration=1 followup_review_recommended=false deferred=0 files=3 loc_added=89 loc_removed=19 cycle_iteration=3 note=rework_iter2_lighting_retune;self-review_pass4_0high_2med_patched
+2026-11-23T03:15:06Z	Story 1.3	report_error	fault=lead field=spawn_at reported=2026-11-23T01:57:45Z actual=2026-11-23T01:58:24Z impact=telemetry-only_line-corrected-same-turn
