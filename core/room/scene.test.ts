@@ -36,7 +36,7 @@ import {
   WALL_PANEL,
   WALL_WARM,
 } from "./tokens.ts";
-import type { PaintContext, PaintSurface } from "./surfaces.ts";
+import { FLYER_PX_PER_M, type PaintContext, type PaintSurface } from "./surfaces.ts";
 
 const SCENE_SRC = path.join(import.meta.dirname, "scene.ts");
 
@@ -153,7 +153,7 @@ function fakeWorld(): {
         texts.push(text);
       },
       // Deterministic generous per-character estimate (0.92em of the set
-      // font) - same fake-metric family as surfaces.test.ts (rework 1).
+      // font) - same fake-metric family as surfaces.test.ts (rework pass 1).
       measureText(text) {
         const m = /(\d+(?:\.\d+)?)px/.exec(ctx.font);
         if (!m) throw new Error("fake measureText: font string carries no px size");
@@ -271,6 +271,13 @@ test("empty Wall Slots get baseplate meshes (20, Wall Panel, raised), and the on
   // the painter drew the verbatim control line onto an injected canvas
   const tex = built.textures.find((t) => t === map);
   assert.ok(tex, "the flyer texture came from an injected canvas");
+  // The canvas follows the record's sheet metres at the scene tier too:
+  // texture aspect == mesh aspect, no stretch (rework pass 1 contract).
+  assert.deepEqual(
+    [tex.source.width, tex.source.height],
+    [Math.round(flyer.width * FLYER_PX_PER_M), Math.round(flyer.height * FLYER_PX_PER_M)],
+    "the flyer canvas measures the record's sheet metres - mesh and texture share one aspect",
+  );
   const texts = built.canvasTexts.find((list) => list.length > 0);
   assert.ok(texts && texts.length > 0, "the painter drew onto the injected canvas");
   // Verbatim, in the metric-robust form (rework pass 1 word-wrap): every

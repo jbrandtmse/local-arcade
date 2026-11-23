@@ -2,7 +2,7 @@
 title: 'Story 1.3: The Arcade Room — slots, pillars, zones, and the roadmap wall'
 type: 'feature'
 created: '2026-11-21'
-status: 'done'
+status: 'in-progress'
 review_loop_iteration: 1
 followup_review_recommended: false
 baseline_revision: 'ef103129356a46f53f8c7383b042590c8ce4c4d4'
@@ -103,9 +103,13 @@ deferred:
 - [low] [wontfix-accepted DW-19] the 0.92em fake `measureText` metric is duplicated in three test fakes (room-qa/scene/scene-qa) while surfaces.test.ts holds the helper - blind-hunter; Rule 2 weak-reason copy (family comments state the lockstep); unify when the next pass must touch the metric (reopen_if in the entry).
 - rejected: NaN sheet/cap guard for `paintFlyer` (edge-case-hunter - false: room.test.ts:449's edge pin reddens a NaN width, and the only real factory `new OffscreenCanvas` throws on non-finite dims - blank-silent-paint is unreachable); smoke-tier sequencing observation (blind-hunter/acceptance-auditor - the lead's Chrome+Edge re-smoke is the scheduled post-review gate, DW-12 tier precedent); the regex-miss fake-throw lacking a red->revert record (verification-gap - a test tripwire, not an AC pinning test, Rule 19 duty does not apply); the pass-3 tally reconciliation and the AC6 repaired-character naming (blind-hunter - fixes edit the spec under review; build-auto's records for the lead).
 
+### Smoke findings
+
+- [ ] [Smoke] Unlit faces read near-black at ALL six 6m vantage screenshots (evidence/story-1-3-smoke-{pinball,workshop,casual,snack,roadmap-left,roadmap-right}.png, iteration 2, 2026-11-22) — `core/room/scene.ts` lighting + the intensity pins — rework pass 2 under Design Notes item 7's own "tuned by eye at the smoke — 'readable at 6m' is the smoke check" clause; the owner was present at the smoke and asked for more light (verbatim under ## Design Notes). The fix raises the fill (ambient and/or zone/amber intensities, or light distance/decay) so unlit wall faces, the cabinet row and the roadmap baseplates READ at 6m while keeping DESIGN.md's dark-arcade identity: hues stay zone tokens + roadmap amber + door glow (no new colours), ambient stays the Room Black token. The scene tests pin intensity <= 0.2 for the ambient and exact zone intensities — those pins move with the re-tune (update the pins to the new authored values, do not weaken the id/hex/position guards). DW-17 re-opened by its standing condition.
+
 ## Spec Change Log
 
-(none yet)
+- 2026-11-22 rework iteration 2 (trigger=smoke, item=DW-17): lighting legibility re-tune; see the Smoke findings item and Design Notes rework pass 2 note.
 
 ## Review Triage Log
 
@@ -195,6 +199,8 @@ deferred:
 10. The candidate "signature of the one volume list = walls+pillars+door+street, occluder subset = pillar-kind entries" needs no spine write: the Conventions row added 2026-11-22 already states it (the 1.2 item 9 convention landed as a spine row; this story is its first consumer).
 
 **Rework pass 1 — decided in-stage (smoke: flyer text clipped at the paint canvas):** item 8's A5 sheet is superseded for the sheet size only — at the AC6 cap floor (0.06m) the longest split line measures ~0.50m wide even in a condensed stack and ~0.64m in a plain sans fallback, so no A5-width canvas holds it at a legible cap; shrinking the cap below 60mm is barred by AC6. The chosen fix: `PaintContext` gains `measureText` (the real 2D API already has it — OffscreenCanvas satisfies the seam); `paintFlyer` takes the sheet metres from the signage record, splits on `" · "` as before, word-wraps each split line at spaces so every painted line measures ≤ sheet width − 2×12px margin (inference: margin), and lays baselines at `height/(lines+1)` requiring ≥ 1.35×cap leading (inference: legibility leading); a single word too wide for the sheet, or a wrapped layout that no longer fits the height, throws loudly (the need2d law's sibling — smoke fails visibly instead of clipping silently). Sheet becomes 0.40 × 0.60 m (inference — sized from worst-case fallback-font word widths + margin: widest wrapped word ~0.32m; height sized for the 6-line narrow-font wrap at the leading floor); centre stays (1.15, 1.45, 6.24), cap 0.06m, stock/ink/verbatim unchanged. The mesh follows the signage size so canvas and mesh aspects match (no texture stretch). Reversible: a later token or story can retune the sheet; the revision-free authored data moves with it. Fake test contexts model text width with a deterministic generous per-character estimate so the containment pin guards the contract (measured ≤ canvas) regardless of the estimate's realism.
+
+**Rework pass 2 — owner feedback at the smoke (DW-17 re-opened per its standing condition):** owner, verbatim, twice mid-smoke: "it's very dark in there, probably going to need a little more light". Lead's six 6m vantage screenshots agree: wall faces away from the zone pools read near-black, the cabinet row and roadmap baseplates barely separate from the floor. Item 7's by-design note already anticipated this ("reopen at the lead's 6m smoke if unlit faces read too dark"). Direction, within item 7's own guardrails: raise the authored fill — Room-Black ambient above 0.15 and/or zone PointLight intensities above 3.0 and/or their distance/decay — until unlit faces read at 6m; identity stays (dark arcade, hues only from zone tokens + amber + door glow, ambient stays token-coloured); the intensity pins move with the new authored values.
 
 ## Verification
 

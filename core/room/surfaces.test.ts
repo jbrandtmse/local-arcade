@@ -24,7 +24,8 @@ import {
 import { WELCOME_FLYER } from "./signage.ts";
 import { CARPET_BASE, CARPET_PATTERN, CARD_INK, PAPER_CARD, toCss } from "./tokens.ts";
 
-// Middle dot built by code point so this file stays pure ASCII (Rule 14).
+// Middle dot built by code point so every string literal stays ASCII (Rule 14;
+// comments carry the project's conventional em dashes).
 const DOT = String.fromCharCode(0xb7);
 const SEP = ` ${DOT} `;
 // Painted-line width estimate: the fake context models text as 0.92em per
@@ -33,7 +34,7 @@ const SEP = ` ${DOT} `;
 // inside the wrap budget's margin window, so the margin term itself is
 // observable, not just the canvas-fit term). A font string without a px
 // size fails the fake loudly instead of collapsing every width to zero
-// (review pass 1).
+// (review pass 3).
 function fakeTextWidth(text: string, font: string): number {
   const m = /(\d+(?:\.\d+)?)px/.exec(font);
   if (!m) throw new Error("fake measureText: font string carries no px size");
@@ -119,7 +120,7 @@ test("paintFlyer puts the verbatim control line on the sheet: word-wrapped insid
   }
   // Word-boundary wrap: every token of every painted line is a whole word
   // of the verbatim string - the wrap law breaks lines at spaces, never
-  // mid-word (review pass 1: substring + char order alone tolerate it).
+  // mid-word (review pass 3: substring + char order alone tolerate it).
   const words = WELCOME_FLYER.text.split(new RegExp("[\\s" + DOT + "]+", "u"));
   for (const t of rec.texts) {
     for (const w of t.text.split(" ")) {

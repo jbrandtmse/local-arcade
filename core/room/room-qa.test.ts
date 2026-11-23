@@ -355,7 +355,7 @@ test("paintFlyer prints only the injected string, split on the middot separator 
       styles.push(ctx.fillStyle);
     },
     // Deterministic generous per-character estimate (0.92em of the set
-    // font) - the same fake-metric family as surfaces.test.ts (rework 1).
+    // font) - the same fake-metric family as surfaces.test.ts (rework pass 1).
     measureText(text) {
       const m = /(\d+(?:\.\d+)?)px/.exec(ctx.font);
       if (!m) throw new Error("fake measureText: font string carries no px size");

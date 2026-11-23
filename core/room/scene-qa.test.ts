@@ -107,7 +107,7 @@ const built = (() => {
         texts.push(t);
       },
       // Deterministic generous per-character estimate (0.92em of the set
-      // font) - same fake-metric family as surfaces.test.ts (rework 1).
+      // font) - same fake-metric family as surfaces.test.ts (rework pass 1).
       measureText(text) {
         const m = /(\d+(?:\.\d+)?)px/.exec(ctx.font);
         if (!m) throw new Error("fake measureText: font string carries no px size");
