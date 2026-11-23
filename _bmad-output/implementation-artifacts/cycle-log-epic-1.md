@@ -74,3 +74,9 @@
 2026-11-22T18:52:29Z	Story 1.3	cr_complete	spawn_at=2026-11-22T16:38:09Z	resolved=4	fixed_at_source=3	by_design=0	wontfix_theoretical=0	routed=0	escalated=0	decision_pending=0	deferred=1	dismissed=4	high=0	med=1	low=4	rows=17	unresolved_high_med=0	clarifications=0	closing_sections_present=true	cycle_iteration=2	note=exit_condition_no_HIGH;DW-19_terminal_by=cr;DW-18_trailer_restated;tracker_already_done_by_reviewer
 2026-11-22T18:52:56Z	Story 1.3	hold_saved	story=1-3-the-arcade-room-slots-pillars-zones-and-the-roadmap-wall	stage=code-review	patch=_bmad-output/unattended/patches/epic-1/1-3-the-arcade-room-slots-pillars-zones-and-the-roadmap-wall-code-review.patch	tree=clean
 2026-11-22T18:52:56Z	Epic 1	hold_complete	shas=973cbf0 story=1-3 stage_after=code-review next=ledger_adjudicated
+2026-11-23T01:43:41Z	Epic 1	session_model	model=qwen3.8-flash-next-iq3_s subagent_model=qwen3.8-flash-next-iq3_s
+2026-11-23T01:43:41Z	Epic 1	launch_env	depth=default watchdog=0 bash_max_ms=default context=262144 api_timeout_ms=default
+2026-11-23T01:43:41Z	Epic 1	runtime_gate	bmad=6.12.4 uv=0.12.5 ci=none
+2026-11-23T01:43:41Z	Epic 1	permission_mode_attested	mode=bypassPermissions via=owner_answer_interactive_resume
+2026-11-23T01:43:41Z	Epic 1	notify_unavailable	reason=no_push_notification_tool_in_session
+2026-11-23T01:43:41Z	Epic 1	unattended_resumed	run=20261121T0537Z-1-7 policy=cc3dfe318c687a5f4549d7b653ec4a5278cbb9f7 doctrine=1ac9e3987fa47aeddd6db0265385923232cbe42e lock_token=1795398206-1675 via=interactive_hold_clear
