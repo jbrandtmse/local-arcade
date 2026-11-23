@@ -100,6 +100,12 @@ test("presPath + controls emit; the vocab keys are fixed-order regardless of lis
     JSON.stringify([{ id: "alpha", simPath: "sims/alpha/sim.js", controls: { vocab: true, axes: [], buttons: [], aim: [] } }]),
   );
   expectFailure(dir, "controls.vocab must be a finite number");
+
+  writeFileSync(
+    path.join(dir, "list.json"),
+    JSON.stringify([{ id: "alpha", simPath: "sims/alpha/sim.js", controls: { vocab: 1, axes: ["move"], buttons: ["fire"], aim: [], butons: ["fire"] } }]),
+  );
+  expectFailure(dir, "unknown controls field"); // a "butons" typo must not silently drop the buttons leg
 });
 
 test("empty provisional list emits an empty registry", () => {

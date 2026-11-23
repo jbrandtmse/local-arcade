@@ -12,6 +12,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: _bmad-output/implementation-artifacts/spec-1-1-project-bootstrap-and-the-deterministic-kernel-core.md | severity: med | fix-risk: low | footprint: core/
 - evidence: review G12/blind-2,edge-16; needs supervisor-wrapped per-instance boot
 - 2026-11-21T12:01:42Z status=routed owner=1-7-fault-containment-a-broken-game-never-kills-the-room by=harvest note=containment seam belongs to 1.7
+- 2026-11-23T23:39:01Z occurrence=1-5-moon-patrol-plays-in-place-vendored-wrapped-alive by=cr note=frame() re-armed rAF only after renderer.render, so a throwing game draw (pres.drawFrame/compositeScreen) killed the render chain permanently; instance patched in-story (rAF re-armed first, main-glue order pin, probe M-cr3 red then reverted); fault-containment root cause stays routed to 1-7
 
 ### DW-3: unbounded growth in long-lived processes: supervisor.faults uncapped (60/s from a broken sim); loop.eventQueue never drained once games register
 - source: _bmad-output/implementation-artifacts/spec-1-1-project-bootstrap-and-the-deterministic-kernel-core.md | severity: med | fix-risk: low | footprint: core/
@@ -66,6 +67,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - evidence: verification-gap demo: hoisting input.takeView() out of the addSystem callback -> page cannot walk/look; npm test stays 113/113; no test imports or executes core/main.ts
 - 2026-11-22T06:53:54Z status=routed owner=burndown by=cr note=browser harness = new dep, Epic 3 scope; lead Chrome+Edge smoke is the Epic 1 gate; distinct from DW-11 in-view half
 - 2026-11-23T11:12:59Z occurrence=1-4-the-standard-stand-up-cabinet-shell-marquee-live-screen
+- 2026-11-23T23:39:02Z occurrence=1-5-moon-patrol-plays-in-place-vendored-wrapped-alive by=cr note=seat/wrapper and the new draw-chain legs stay pinned by source-text asserts + dev-serve text only (acceptance-auditor A3/A1); executed-host tier still open
 
 ### DW-13: requestPointerLock synchronous throw escapes the promise catch, logging to console and breaking AC3 silent denial; no target engine throws synchronously
 - source: _bmad-output/implementation-artifacts/spec-1-2-first-person-walk-look-and-move-no-prompts.md | severity: low | fix-risk: low | footprint: in-story
@@ -81,6 +83,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: story 1.3 implement deferred: | severity: low | fix-risk: med | footprint: cross-cutting
 - evidence: spec-1-3 frontmatter deferred: + core/main-glue.test.ts source-pin tier added in review pass 1
 - 2026-11-22T11:32:43Z status=routed owner=burndown by=harvest note=DW-12 tier; Epic 3 browser harness (3.2/3.15) closes it
+- 2026-11-23T23:39:02Z occurrence=1-5-moon-patrol-plays-in-place-vendored-wrapped-alive by=cr note=the 1.5 drawFrame/compositeScreen chain adds real-THREE legs with no executed browser coverage; source-pin tier until the Epic-3 browser harness
 
 ### DW-16: Front wall open above the door head: no lintel volume over the door gap (visible see-through band y 2.1-3.0 when looking up at the door; 13cm recess behind the panel)
 - source: spec-1-3-the-arcade-room-slots-pillars-zones-and-the-roadmap-wall.md | severity: med | fix-risk: med | footprint: in-story
@@ -135,3 +138,18 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: story 1.5 implement review B3+E4 (shared root cause); spec-1-5 frontmatter deferred | severity: medium | fix-risk: small | footprint: games/moon-patrol/sim/world.js:106 respawn predicate; data shape sim/course.js:100; vendored law kept world.js unmodified below seam edits (AC1)
 - evidence: Spec 1.5 Review Triage Log B3/E4: respawn() filters with (o.x + o.w > padL && o.x < padR); minefields carry x1/x2 -> NaN -> never filtered. Present in vendored source C:/git/moonpatrol@49c3519... Settle: fix predicate for x1/x2 kinds (upstream first, then re-vendor) + sim test that respawns a run with a minefield on the pad.
 - 2026-11-23T20:25:26Z status=routed owner=1-6-one-busy-machine-a-patron-actually-plays by=dev note=1.6 drives the sim to a real end state via autoplay (AD-8 L1) — the respawn unfairness lands squarely in that path; fix upstream at C:/git/moonpatrol then re-vendor
+
+### DW-26: the PROVISIONAL play(seed) seam flips the wrapper to mode play even for a sim that ships no play hook (kernel-side restart owns the start verb)
+- source: spec-1-5-moon-patrol-plays-in-place-vendored-wrapped-alive.md | severity: low | fix-risk: low | footprint: in-story
+- evidence: wrapper.ts play() calls sim.play?.(seed) then sets mode unconditionally (edge-hunter E1+E2, blind B2); DN 4 declares the seam provisional and the no-ui-dom test pins the PROVISIONAL marker at all three entry points
+- 2026-11-23T23:39:50Z status=by-design owner=1-5-moon-patrol-plays-in-place-vendored-wrapped-alive by=cr note=spec-bound: DN 4 + AD-23's provisional occupation of the reserved play mode; AD-8 hook names untouched, no AD amendment; Epic 3 manifest/autoplay replaces the seam
+
+### DW-27: vendored in-play HUD flashes run at ~5/s (fuel) and ~8/s (warning, invuln) while only the attract PRESS ENTER blink (2/s) meets the 3-per-s comfort ceiling
+- source: spec-1-5-moon-patrol-plays-in-place-vendored-wrapped-alive.md | severity: low | fix-risk: med | footprint: games/moon-patrol/presentation/adapter.js play-HUD draw block
+- evidence: acceptance-auditor A6: fuel floor(t*1000/200), warning /180, invuln /120; the ceiling the spec pins binds the attract blink; M0 wrap is explicitly temporary (CAP-5)
+- 2026-11-23T23:40:42Z status=wontfix-accepted owner=1-5-moon-patrol-plays-in-place-vendored-wrapped-alive by=cr note=reopen_if=the lead's Chrome/Edge smoke or an L2 flashes-rate probe reports play-HUD flashes above 3/s as a comfort problem
+
+### DW-28: the moon-patrol control legend lives in four carriers with no shared source: SEAT_KEYS in core/main.ts, the controls block in tools/registry-list.json, the drawn legend in adapter.js, the set-identity pin in adapter.test.js
+- source: spec-1-5-moon-patrol-plays-in-place-vendored-wrapped-alive.md | severity: low | fix-risk: med | footprint: core/main.ts + tools/registry-list.json + games/moon-patrol/presentation/
+- evidence: blind-hunter B8: the lists agree today (nine-key set-identity source pin keeps them honest); unification needs the Epic-3 Manifest to carry the legend (AD-12: manifest never hand-written)
+- 2026-11-23T23:40:42Z status=wontfix-accepted owner=1-5-moon-patrol-plays-in-place-vendored-wrapped-alive by=cr note=reopen_if=Epic 3 registration lands a manifest legend carrier, or a key change lands in one carrier and the set-identity pin or the smoke legend check goes red

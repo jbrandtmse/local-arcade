@@ -141,6 +141,17 @@ export function createSeatService(opts: {
     seatedVolumeId = null;
     if (coinDoorOpen(opts.cabinets, entry.volumeId)) toggleCoinDoor(opts.cabinets, entry.volumeId);
     entry.instance.attract();
+    // The kernel-owned TickInput object the loop hands the sim EVERY tick
+    // must not keep the last seated mapping once the chair is empty: the
+    // contract delivers input to every tick, and an authored attract branch
+    // that reads controls would inherit phantom input from the stand frame.
+    // Neutralize the declared slots — the E-law restores state, not just
+    // the pose (AC4).
+    const axes: Record<string, number> = {};
+    for (const slot of entry.controls.axes) axes[slot] = 0;
+    const buttons: Record<string, { down: boolean; pressed: boolean }> = {};
+    for (const slot of entry.controls.buttons) buttons[slot] = { down: false, pressed: false };
+    entry.input.controls = { axes, buttons };
   }
 
   return {

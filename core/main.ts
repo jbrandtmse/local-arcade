@@ -211,6 +211,11 @@ loop.start();
 // still step costs no repaint at all.
 let lastScreenPaintStep = -1;
 function frame(): void {
+  // Re-arm FIRST, before any draw: drawFrame runs game adapter code and the
+  // composites read it — a throwing draw frame must strand the chain never.
+  // One bad frame costs at most itself; full fault containment is Story
+  // 1.7's tier (DW-2/DW-6).
+  requestAnimationFrame(frame);
   const p = player.state;
   camera.position.set(p.x, EYE_HEIGHT + math.sin(p.bobPhase) * p.bobAmp, p.z);
   camera.rotation.set(p.pitch, p.yaw, 0);
@@ -265,7 +270,6 @@ function frame(): void {
     three.markTextureUpdated(s.texture);
   }
   renderer.render(scene, camera);
-  requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 

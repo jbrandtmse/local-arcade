@@ -64,6 +64,15 @@ for (const [i, entry] of list.entries()) {
     if (typeof c !== "object" || c === null || Array.isArray(c)) {
       fail(`entry ${i} (${entry.id}): controls must be an object`);
     }
+    // Strict at the controls level too: a typo like "butons" would emit the
+    // entry with a silently missing slot leg (the emission below re-reads
+    // fixed keys), so an unknown controls key must die like an unknown
+    // entry key does.
+    for (const key of Object.keys(c)) {
+      if (key !== "vocab" && key !== "axes" && key !== "buttons" && key !== "aim") {
+        fail(`entry ${i} (${entry.id}): unknown controls field ${JSON.stringify(key)} (known: vocab, axes, buttons, aim)`);
+      }
+    }
     if (!Number.isFinite(c.vocab)) {
       fail(`entry ${i} (${entry.id}): controls.vocab must be a finite number`);
     }

@@ -8,16 +8,17 @@
 // (kernel seedFn reaches the wrapper play path; the attract seed is the
 // registry entry's number); game over while seated flips the machine to
 // attract in place and Enter restarts on a fresh seed; the seat drains the
-// loop's event queue exclusively and exposes the record.
+// loop's event queue exclusively and exposes the record; standing neutralizes the kernel TickInput's
+// declared slots; past SEAT_EVENT_WINDOW drains the exposed record holds exactly the last 32, in order.
 
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { createKernelLoop, MS_PER_TICK } from "./loop.ts";
+import { createKernelLoop, MS_PER_TICK, type EventRecord } from "./loop.ts";
 import { createInputService, type InputService } from "./input/index.ts";
 import { createPlayerController, EYE_HEIGHT, MOUSE_SENSITIVITY, type PlayerController } from "./player.ts";
-import { createSeatService, PLAY_STANDOFF_M, playPoseFor, type SeatKeyMap } from "./seat.ts";
+import { createSeatService, PLAY_STANDOFF_M, SEAT_EVENT_WINDOW, playPoseFor, type SeatKeyMap } from "./seat.ts";
 import { createGameInstance, type GameInstance, type TickInput } from "./contract/index.ts";
 import { ENTRY_SPAWN, collisionVolumes } from "./room/collision-volumes.ts";
 import { createCabinetRuntime, placementGeometry, SHELL, type CabinetRuntime } from "./room/cabinets.ts";
@@ -37,6 +38,9 @@ interface Visit {
   seat: ReturnType<typeof createSeatService>;
   instance: GameInstance;
   cabinets: CabinetRuntime;
+  /** The kernel-owned TickInput the loop hands the instance (the seat's
+   * mapping target — exposed for the standing-neutralization pin). */
+  tickInput: TickInput;
   clock: { ms: number };
   tick(): void;
   key(code: string, down: boolean): void;
@@ -75,6 +79,7 @@ function rig(seedFn: () => number): Visit {
     seat,
     instance,
     cabinets,
+    tickInput,
     clock,
     tick() {
       // A hair above the tick length: the accumulator residual never crosses
@@ -358,4 +363,45 @@ test("attract lives on the real loop: 3x720 ticks advance the state hash every b
   assert.deepEqual(twin, instance.snapshot(), "same entry seed -> identical attract snapshots (loop path == wrapper path)");
   const other = stepTwin(createGameInstance(entry.createSim, (entry.seed ?? 0) + 1));
   assert.notDeepEqual(other, instance.snapshot(), "the attract seed IS the registry entry's number (the kernelRng cursor carries it)");
+});
+
+test("standing neutralizes the kernel TickInput: the last seated mapping never outlives the chair (AC4 E-law state restore)", () => {
+  const v = walkToB0();
+  v.key("KeyE", true); v.tick(); v.key("KeyE", false); // open
+  v.key("KeyE", true); v.tick(); v.key("KeyE", false); // sit
+  const buttonIdle = {
+    start: { down: false, pressed: false },
+    jump: { down: false, pressed: false },
+    fire: { down: false, pressed: false },
+  };
+  v.key("KeyD", true);
+  for (let i = 0; i < 5; i++) v.tick();
+  assert.deepEqual(
+    v.tickInput.controls,
+    { axes: { move: 1 }, buttons: buttonIdle },
+    "the seated mapping is live on the kernel input object the loop hands the sim",
+  );
+  v.key("KeyD", false);
+  v.key("KeyE", true); v.tick(); v.key("KeyE", false); // stand
+  const neutral = { axes: { move: 0 }, buttons: buttonIdle };
+  assert.deepEqual(v.tickInput.controls, neutral, "standing zeroes every declared slot on the kernel input object");
+  for (let i = 0; i < 10; i++) v.tick();
+  assert.deepEqual(v.tickInput.controls, neutral, "standing attract ticks never write input back from the empty chair");
+});
+
+test("the seat's debug event record caps at SEAT_EVENT_WINDOW: past that many drains it holds exactly the last 32, in drain order (AC5 record bound)", () => {
+  const v = walkToB0(() => 8);
+  const all: EventRecord[] = [];
+  v.seat.setEventSink((rec) => all.push(rec));
+  v.key("KeyE", true); v.tick(); v.key("KeyE", false); // open
+  v.key("KeyE", true); v.tick(); v.key("KeyE", false); // sit on seed 8
+  v.key("KeyD", true);
+  v.key("KeyZ", true); // held fire: ~1 volley / 0.55s + tank volleys drain 'fire' records past the window
+  for (let i = 0; i < 2500 && all.length < SEAT_EVENT_WINDOW + 1; i++) v.tick();
+  v.key("KeyD", false);
+  v.key("KeyZ", false);
+  assert.ok(all.length > SEAT_EVENT_WINDOW, `the run drains more records than the window (${all.length})`);
+  const shown = v.seat.state().events;
+  assert.equal(shown.length, SEAT_EVENT_WINDOW, "the record is exactly the cap once the run exceeds it (the shift branch is exercised)");
+  assert.deepEqual(shown, all.slice(-SEAT_EVENT_WINDOW), "the window holds the LAST 32 drained records, in drain order");
 });

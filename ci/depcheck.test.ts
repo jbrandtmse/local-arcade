@@ -1,7 +1,9 @@
 // AC6 pinning: depcheck passes the real tree and fails a planted Core ->
-// games/** import, citing file:line (AD-1); Story 1.5 adds the AD-2 leg —
+// games/** import, citing file:line (AD-1); Story 1.5 adds the AD-2 legs —
 // a planted core import inside a sim SOURCE fails, while sim tests wiring
-// the real wrapper and self-contained sim sources stay green.
+// the real wrapper and self-contained sim sources stay green; a planted
+// cross-game or engine import inside a PRESENTATION source fails, while
+// three + Core + own-game specifiers stay green.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -101,6 +103,39 @@ test("sim tests may wire the real wrapper and sim sources may import their own t
     "games/x/sim/world.js": "export const w = 1;\n",
     // the matrix demands sim tests drive the sim through the REAL wrapper:
     "games/x/sim/index.test.js": 'import { createGameInstance } from "../../../core/contract/index.ts";\nvoid createGameInstance;\n',
+  });
+  const r = run(dir);
+  assert.equal(r.ok, true, r.stderr);
+});
+
+test("a planted cross-game import inside a presentation source fails with file:line (AD-2 presentation leg)", () => {
+  const dir = fixtureTree({
+    "games/x/presentation/adapter.js": 'import { CFG } from "../../y/sim/config.js";\nvoid CFG;\n',
+    "games/y/sim/config.js": "export const CFG = 1;\n",
+  });
+  const r = run(dir);
+  assert.equal(r.ok, false);
+  assert.match(r.stderr, /games[/\\]x[/\\]presentation[/\\]adapter\.js:1/);
+  assert.match(r.stderr, /presentation imports outside three\/Core\/its own game/);
+});
+
+test("a bare non-three engine import inside a presentation source fails (AD-2 presentation leg)", () => {
+  const dir = fixtureTree({
+    "games/x/presentation/adapter.js": 'import { Phaser } from "phaser";\nvoid Phaser;\n',
+  });
+  const r = run(dir);
+  assert.equal(r.ok, false);
+  assert.ok(r.stderr.includes('"phaser"'), r.stderr);
+});
+
+test("presentation sources may import three, Core, and their own game halves: green (AD-2 presentation leg's clean paths)", () => {
+  const dir = fixtureTree({
+    "games/x/presentation/adapter.js":
+      'import * as THREE from "three";\nimport { CFG } from "../sim/config.js";\nimport * as S from "./sprites.js";\nimport { math } from "../../../core/contract/index.ts";\nvoid THREE; void CFG; void S; void math;\n',
+    "games/x/presentation/sprites.js": "export const S = 1;\n",
+    "games/x/sim/config.js": "export const CFG = 1;\n",
+    "core/contract/index.ts": "export const math = 1;\n",
+    "core/room/tokens.ts": "export const t = 1;\n",
   });
   const r = run(dir);
   assert.equal(r.ok, true, r.stderr);

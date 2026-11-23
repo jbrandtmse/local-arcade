@@ -71,11 +71,18 @@ test("core/room modules are DOM-free: room data, scene builder, and painters nev
 
 // Story 1.5: the game's presentation half is DOM-free like the room painters
 // — the kernel hands it a canvas (injected makeCanvas), it never grows one,
-// and it never reaches for any other browser surface (AD-2/AD-11).
-test("the game presentation half is DOM-free: it paints on the kernel's injected canvas only", () => {
-  const src = readFileSync(path.join(REPO, "games", "moon-patrol", "presentation", "adapter.js"), "utf8");
-  for (const banned of ["document.", "window.", "localStorage", "navigator.", "createElement", "style."]) {
-    assert.ok(!src.includes(banned), `games/moon-patrol/presentation/adapter.js must not touch ${banned}`);
+// and it never reaches for any other browser surface (AD-2/AD-11). The scan
+// covers EVERY presentation source file, not just the entry adapter: a
+// second presentation module (sprites.js) is equally inside the ban.
+test("the game presentation half is DOM-free: every presentation source paints on the kernel's injected canvas only", () => {
+  const presDir = path.join(REPO, "games", "moon-patrol", "presentation");
+  const sources = readdirSync(presDir).filter((f) => f.endsWith(".js") && !f.endsWith(".test.js"));
+  assert.deepEqual(sources, ["adapter.js", "sprites.js"], "the presentation half's non-test sources are exactly adapter + sprites (a new presentation file enters this scan)");
+  for (const file of sources) {
+    const src = readFileSync(path.join(presDir, file), "utf8");
+    for (const banned of ["document.", "window.", "localStorage", "navigator.", "createElement", "style."]) {
+      assert.ok(!src.includes(banned), `games/moon-patrol/presentation/${file} must not touch ${banned}`);
+    }
   }
 });
 

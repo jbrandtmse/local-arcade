@@ -140,3 +140,13 @@ test("1.5 seat wiring: the seat service owns the game-cabinet E-law, the seated 
   assert.ok(body.includes("compositeScreen("), "the Core composites the game canvas under the Core-painted NEXT row");
   assert.ok(body.includes("presentations.has(placement.gameId)) continue;"), "a game-driven face skips the paint-step fallback (the gate governs the fallback path only)");
 });
+
+test("1.5 render-chain re-arm: frame() arms requestAnimationFrame BEFORE its draw legs (a throwing game draw must not strand the chain; AD-15 posture, DW-2/DW-6 fault family)", () => {
+  assert.equal((MAIN.match(/requestAnimationFrame\(frame\)/g) ?? []).length, 2, "exactly two rAF(frame) sites: the bootstrap kick and the in-frame re-arm");
+  const body = frameBody(MAIN);
+  const rearm = body.indexOf("requestAnimationFrame(frame);");
+  assert.ok(rearm >= 0, "the frame body re-arms its own chain");
+  assert.ok(rearm < body.indexOf("pres.drawFrame(instance.snapshot());"), "the re-arm precedes the game half's drawFrame (game adapter code may throw)");
+  assert.ok(rearm < body.indexOf("compositeScreen("), "and the Core composite");
+  assert.ok(rearm < body.indexOf("renderer.render("), "and the room render");
+});

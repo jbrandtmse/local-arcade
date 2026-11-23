@@ -1,12 +1,16 @@
 #!/usr/bin/env node
 // AD-1 dependency-direction gate: Core source imports no games/** at
 // authoring time — the only game-facing surface at runtime is the
-// build-generated registry. Story 1.5 adds the AD-2 purity leg: a game's
+// build-generated registry. Story 1.5 adds the AD-2 purity legs: a game's
 // SIM SOURCE (non-test files under a `sim` directory) imports nothing but
 // its own sim tree — the kernel reaches it only through injected ctx
 // (rng/math/gated), so no core, node, or engine import may hide in a sim.
-// Sim TESTS are exempt: the I/O matrix demands they drive the sim through
-// the REAL wrapper, which lives in core (test-only, never in the bundle).
+// The PRESENTATION SOURCE (non-test files under a `presentation`
+// directory) imports three + Core + its own game plugin only (AD-2's
+// per-half ban): cross-game, other bare, and absolute specifiers fail.
+// Sim/presentation TESTS are exempt: the I/O matrix demands they drive the
+// halves through the REAL wrapper, which lives in core (test-only, never
+// in the bundle).
 // This deterministic script (AD-18, zero LLM) fails any planted violation,
 // citing file:line.
 // Tokenizes with the pinned TypeScript compiler API (typescript/unstable/ast
@@ -129,8 +133,45 @@ for (const file of simSourceFiles(gamesDir)) {
   }
 }
 
+// AD-2 presentation leg: a presentation source file lives under a
+// `presentation` directory component; AD-2 allows it exactly three import
+// targets — three (bare, exactly), Core (relative resolving into core/**),
+// and its own game plugin (relative resolving inside games/<game-id>/, its
+// own sim and presentation siblings). Cross-game, other bare, and absolute
+// specifiers are violations.
+function presSourceFiles(dir) {
+  if (!existsSync(dir)) return [];
+  return listSourceFiles(dir).filter(
+    (f) => !TEST_FILE.test(f) && path.relative(dir, f).split(path.sep).includes("presentation"),
+  );
+}
+
+function gameRootOf(file) {
+  const rel = path.relative(gamesDir, file);
+  const sepIdx = rel.indexOf(path.sep);
+  return sepIdx < 0 ? gamesDir : path.join(gamesDir, rel.slice(0, sepIdx));
+}
+
+for (const file of presSourceFiles(gamesDir)) {
+  const gameRoot = gameRootOf(file);
+  for (const { spec, line, col } of specHits(file)) {
+    let allowed = spec === "three";
+    if (!allowed && spec.startsWith(".") && !path.isAbsolute(spec)) {
+      const target = path.resolve(path.dirname(file), spec);
+      allowed =
+        target === coreDir ||
+        target.startsWith(coreDir + path.sep) ||
+        target === gameRoot ||
+        target.startsWith(gameRoot + path.sep);
+    }
+    if (!allowed) {
+      violations.push(`${path.relative(root, file)}:${line}:${col}: presentation imports outside three/Core/its own game (AD-2): "${spec}"`);
+    }
+  }
+}
+
 if (violations.length > 0) {
   for (const v of violations) console.error(`depcheck: ${v}`);
-  console.error(`depcheck: ${violations.length} import-direction violation(s) found (AD-1: the registry is Core's only game surface; AD-2: a sim imports only its own sim tree)`);
+  console.error(`depcheck: ${violations.length} import-direction violation(s) found (AD-1: the registry is Core's only game surface; AD-2: a sim imports only its own sim tree; a presentation imports three/Core/its own game only)`);
   process.exit(1);
 }
