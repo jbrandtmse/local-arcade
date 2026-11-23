@@ -110,3 +110,4 @@
 2026-11-23T11:17:46Z	Story 1.4	ledger_adjudicated	owned=1	resolved=0	reowned=0	terminal=0	cycle_iteration=1	note=DW-22_terminal_at_birth_by_cr;DW-21_routed_to_3-5_stands;no_open_owned_by_1-4
 2026-11-23T11:26:39Z	Story 1.4	smoke_complete	method=browser	result=fail	iterations=1	defects_caught=2	evidence=evidence/story-1-4-smoke-front-door-open.png,story-1-4-smoke-front-2m-door-open.png,story-1-4-smoke-from-door-11m.png,story-1-4-smoke-corner-16m.png	note=walk-stop-slide_E-toggle_doorflip_dom-canvas_0faults_pass;marquee_and_screen_BLOWN_OUT_ac2_ac3_visual_legs;fit_law_held_real_browser
 2026-11-23T11:26:39Z	Story 1.4	rework_opened	cycle_iteration=2	iteration=1	trigger=smoke	items=smoke-marquee-exposure,smoke-screen-exposure	scope_baseline=9a96d68
+2026-11-23T11:26:39Z	Story 1.4	stage_spawned	stage=implement	spawn_at=2026-11-23T11:26:39Z	agent_name=1-4-cabinet-implement-2	cycle_iteration=2
