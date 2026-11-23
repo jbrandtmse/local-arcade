@@ -65,6 +65,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: _bmad-output/implementation-artifacts/spec-1-2-first-person-walk-look-and-move-no-prompts.md | severity: med | fix-risk: high | footprint: in-story
 - evidence: verification-gap demo: hoisting input.takeView() out of the addSystem callback -> page cannot walk/look; npm test stays 113/113; no test imports or executes core/main.ts
 - 2026-11-22T06:53:54Z status=routed owner=burndown by=cr note=browser harness = new dep, Epic 3 scope; lead Chrome+Edge smoke is the Epic 1 gate; distinct from DW-11 in-view half
+- 2026-11-23T11:12:59Z occurrence=1-4-the-standard-stand-up-cabinet-shell-marquee-live-screen
 
 ### DW-13: requestPointerLock synchronous throw escapes the promise catch, logging to console and breaking AC3 silent denial; no target engine throws synchronously
 - source: _bmad-output/implementation-artifacts/spec-1-2-first-person-walk-look-and-move-no-prompts.md | severity: low | fix-risk: low | footprint: in-story
@@ -114,3 +115,8 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: spec-1-4-the-standard-stand-up-cabinet-shell-marquee-live-screen.md | severity: low | fix-risk: low | footprint: in-footprint
 - evidence: spec 1.4 Design Notes AD-24 boundary note: screen zone kinds declared in core/room/cabinets.ts; DESIGN lists the screen as a surface treatment outside the four paper stocks; no spine amendment claimed by 1.4
 - 2026-11-23T05:39:33Z status=routed owner=3-5-instruction-cards-from-the-manifest-and-the-character-lint by=lead note=adjudicate at 3.5's plan: extend the lint family taxonomy or amend AD-24 (U7 bounds); marquee kind already declared in the signage.ts whitelist home
+
+### DW-22: drawScreen score-rows branch unreachable until a score zone has rows (1.4 shipped an honestly-empty score zone; the branch paints rows but no authored data reaches it)
+- source: spec-1-4-the-standard-stand-up-cabinet-shell-marquee-live-screen | severity: low | fix-risk: low | footprint: in-story
+- evidence: surfaces.ts drawScreen score loop never entered: p.screenZones.score === [] pinned by cabinets.test.ts:68; no user-reachable failure today
+- 2026-11-23T11:12:59Z status=wontfix-theoretical owner=1-4-the-standard-stand-up-cabinet-shell-marquee-live-screen by=cr note=reopen_if=score zone gets its first row (1.8); pin the row layout + NEXT/score collision then

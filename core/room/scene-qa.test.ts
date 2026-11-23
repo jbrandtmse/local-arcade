@@ -16,7 +16,7 @@ import { DOOR_HALF_W, INTERIOR, WALL_T, WALL_TOP } from "./collision-volumes.ts"
 import { signSurfaces, WELCOME_FLYER } from "./signage.ts";
 import { cabinetPlacements } from "./cabinets.ts";
 import { zones } from "./zones.ts";
-import { GLOW_CYAN, GLOW_MARQUEE, GLOW_RED, ROOM_BLACK } from "./tokens.ts";
+import { GLOW_CYAN, GLOW_MARQUEE, GLOW_RED, ROOM_BLACK, toCss } from "./tokens.ts";
 import type { PaintContext, PaintSurface } from "./surfaces.ts";
 
 interface GeoRec {
@@ -100,10 +100,13 @@ function fakeThree() {
 const built = (() => {
   const f = fakeThree();
   const canvasTexts: string[][] = [];
+  const canvasTextStyles: string[][] = [];
   const scene: RoomScene = { add() {} };
   const factory = (width: number, height: number): PaintSurface => {
     const texts: string[] = [];
+    const styles: string[] = [];
     canvasTexts.push(texts);
+    canvasTextStyles.push(styles);
     const ctx: PaintContext = {
       fillStyle: "",
       font: "",
@@ -111,6 +114,7 @@ const built = (() => {
       fillRect() {},
       fillText(t) {
         texts.push(t);
+        styles.push(ctx.fillStyle);
       },
       // Deterministic generous per-character estimate (0.92em of the set
       // font) - same fake-metric family as surfaces.test.ts (rework pass 1).
@@ -123,7 +127,7 @@ const built = (() => {
     return { width, height, getContext: (kind) => (kind === "2d" ? ctx : null) };
   };
   buildRoomScene(f.three, scene, factory);
-  return { ...f, canvasTexts };
+  return { ...f, canvasTexts, canvasTextStyles };
 })();
 
 // --- AC7: the ceiling is Room Black, token-derived, resting on the walls ----
@@ -179,6 +183,36 @@ test("build-time text law: every painted string is an authored record's string â
     for (const s of screen) assert.ok(allowed.has(s), `screen painted "${s}", which is no zone string of the record`);
   }
   assert.equal(signSurfaces.length, 1, "the paper signage whitelist still holds exactly one surface");
+});
+
+// --- 1.4 AC5: the NEXT/marquee lettering hue law at the scene tier ----------
+
+test("1.4 lettering hues: marquee and the screen's NEXT row carry the placement's marquee hue, the attract rows the machine hue â€” through the scene builder's own injected canvases (1.4 AC5, mockup .next/.attract)", () => {
+  for (const p of cabinetPlacements) {
+    const titleWords = p.title.toUpperCase().split(/\s+/);
+    const next = p.screenZones.next.toUpperCase();
+    const marqueeI = built.canvasTexts.findIndex((t) => t.length === titleWords.length && t.every((s) => titleWords.includes(s)));
+    const screenI = built.canvasTexts.findIndex((t) => t.includes(next));
+    assert.ok(marqueeI >= 0 && screenI >= 0, "marquee + screen canvases exist for the placement");
+    const marqueeStyles = built.canvasTextStyles[marqueeI]!;
+    assert.equal(marqueeStyles.length, titleWords.length, "every marquee line was recorded with its style");
+    for (const style of marqueeStyles) {
+      assert.equal(style, toCss(p.marqueeHue), `marquee lettering style ${style} is not the placement's marquee hue`);
+    }
+    const screenTexts = built.canvasTexts[screenI]!;
+    const screenStyles = built.canvasTextStyles[screenI]!;
+    assert.equal(screenTexts.length, screenStyles.length, "every screen line was recorded with its style");
+    let nextSeen = 0;
+    for (let k = 0; k < screenTexts.length; k++) {
+      if (screenTexts[k] === next) {
+        nextSeen += 1;
+        assert.equal(screenStyles[k], toCss(p.marqueeHue), `the NEXT row carries ${String(screenStyles[k])}, not the marquee-amber family the mockup's .next colour (lead adjudication) demands`);
+      } else {
+        assert.equal(screenStyles[k], toCss(p.hue), `attract row "${screenTexts[k]}" carries ${String(screenStyles[k])}, not the machine's own hue family`);
+      }
+    }
+    assert.equal(nextSeen, 1, "the screen canvas lettered the NEXT row exactly once");
+  }
 });
 
 // --- AC4 consumption: the builder lights zones + roadmap from authored data --

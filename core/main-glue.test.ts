@@ -115,6 +115,10 @@ test("1.4 cabinet wiring: the phase advances as a kernel system, coin doors togg
   assert.ok(body.includes("screenPaintStep(cabinets)"), "the repaint cadence is tick-derived state, not wall-clock");
   assert.ok(body.includes("paintStep !== lastScreenPaintStep"), "screens repaint only when the paint step changed");
   assert.ok(body.includes("lastScreenPaintStep = paintStep;"), "the gate records the step it just painted (else every frame would repaint)");
+  assert.ok(body.includes("repaintScreen("), "the gate's body actually repaints (a gate with no paint call leaves every screen frozen)");
+  assert.ok(body.includes("s.canvas,"), "the repaint rewrites the handle's own canvas (repaint-into-the-same-canvas leg)");
+  assert.ok(body.includes("placement.screenZones,"), "the repaint re-reads the placement's authored zone records");
+  assert.ok(body.includes("paintStep,"), "the repaint receives the tick-derived paint step (liveness source)");
   assert.ok(body.includes("three.markTextureUpdated(s.texture)"), "a repaint marks the SAME texture dirty (no second canvas)");
   assert.ok(MAIN.includes("window.arcadeDebug = { player, loop, cabinets };"), "the console smoke can read the cabinet runtime");
   for (const banned of ["performance.now", "Date.now", "Math.random", "tickCount"]) {

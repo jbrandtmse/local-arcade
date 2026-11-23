@@ -196,6 +196,15 @@ export const SCREEN_SCAN_THICK_PX = 2;
 export const SCREEN_SCAN_AREA_PX = 77;
 export const SCREEN_SCAN_DRIFT_PX = 2;
 
+/** Screen face top/bottom edge inset, fraction of the face height in px
+ * (inference — the attract block's top margin and the NEXT row's bottom
+ * band; pins derive from it, never retype). */
+export const SCREEN_EDGE_RATIO = 0.02;
+
+/** CRT scan band width, fraction of the face width in px (inference — the
+ * mockup's band sits centered under half the face width; pins derive). */
+export const SCREEN_BAND_WIDTH_RATIO = 0.4;
+
 /** Title lettering for the marquee / attract zone: uppercased, split into
  * one line per word (the mockup stacks "MOON" over "PATROL"). */
 function titleLines(title: string): string[] {
@@ -312,7 +321,7 @@ function drawScreen(
   ctx.fillRect(0, 0, w, h);
   ctx.textAlign = "center";
   const maxLineWidth = w - 2 * MARQUEE_MARGIN_PX;
-  const edge = Math.round(h * 0.02);
+  const edge = Math.round(h * SCREEN_EDGE_RATIO);
   const attractLines = titleLines(zones.attract);
   const attractCap = Math.round(attractCapM * pxPerM);
   const attractPitch = Math.round(attractCap * MARQUEE_LINE_PITCH_RATIO);
@@ -345,7 +354,7 @@ function drawScreen(
   }
   const bandSpan = SCREEN_SCAN_AREA_PX - ((SCREEN_SCAN_ROWS - 1) * SCREEN_SCAN_PITCH_PX + SCREEN_SCAN_THICK_PX);
   const bandOffset = ((step * SCREEN_SCAN_DRIFT_PX) % bandSpan + bandSpan) % bandSpan;
-  const bandWidth = Math.round(w * 0.4);
+  const bandWidth = Math.round(w * SCREEN_BAND_WIDTH_RATIO);
   ctx.fillStyle = attractCss;
   for (let k = 0; k < SCREEN_SCAN_ROWS; k++) {
     ctx.fillRect(

@@ -45,6 +45,7 @@ import { EMPTY_BASEPLATE, wallSlots } from "./slot-config.ts";
 import {
   CABINET_LIGHT_INTENSITY,
   CABINET_LIGHT_REACH,
+  CABINET_LIGHT_STANDOFF_M,
   MARQUEE_CAP_M,
   SHELL,
   SCREEN_ATTRACT_CAP_M,
@@ -52,6 +53,11 @@ import {
   coinDoorPose,
   placementGeometry,
 } from "./cabinets.ts";
+
+// Painted faces (marquee + screen) are thin as paper — the FLYER_T
+// sibling; exported so the test pins derive from it, never retype (the
+// one-geometry-source law in the pins' direction).
+export const FACE_T = 0.005;
 
 // --- Three seam -------------------------------------------------------------
 // Method-style factories (not constructor types) so a `* as THREE` adapter
@@ -319,7 +325,6 @@ export function buildRoomScene(
   const bezelMat = THREE.standardMaterial({ color: CARD_INK, roughness: 0.9 });
   const doorMat = THREE.standardMaterial({ color: WALL_WARM, roughness: 0.85 }); // mockup .coindoor bg
   const slotMat = THREE.standardMaterial({ color: SIGN_CHALK, roughness: 0.6 }); // mockup .slot bg
-  const FACE_T = 0.005; // painted faces thin as paper (FLYER_T sibling)
   for (const p of cabinetPlacements) {
     const g = placementGeometry(p.slotId);
     const facesX = g.facing.x !== 0;
@@ -427,10 +432,10 @@ export function buildRoomScene(
     // the machine's family, in front of the face at each part's height
     // (hues from LIGHTS, never painted glow — 1.3's identity law).
     const spill = THREE.pointLight(p.marqueeHue, CABINET_LIGHT_INTENSITY, CABINET_LIGHT_REACH);
-    spill.position.set(g.front.x + g.facing.x * 0.3, marquee.centerY, g.front.z + g.facing.z * 0.3);
+    spill.position.set(g.front.x + g.facing.x * CABINET_LIGHT_STANDOFF_M, marquee.centerY, g.front.z + g.facing.z * CABINET_LIGHT_STANDOFF_M);
     scene.add(spill);
     const halo = THREE.pointLight(p.hue, CABINET_LIGHT_INTENSITY, CABINET_LIGHT_REACH);
-    halo.position.set(g.front.x + g.facing.x * 0.3, SHELL.screen.centerY, g.front.z + g.facing.z * 0.3);
+    halo.position.set(g.front.x + g.facing.x * CABINET_LIGHT_STANDOFF_M, SHELL.screen.centerY, g.front.z + g.facing.z * CABINET_LIGHT_STANDOFF_M);
     scene.add(halo);
   }
 

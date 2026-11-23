@@ -22,7 +22,6 @@ import {
   MARQUEE_CAP_M,
   SCREEN_ATTRACT_CAP_M,
   SHELL,
-  cabinetPlacements,
   coinDoorPose,
   createCabinetRuntime,
   placementByVolumeId,
@@ -36,7 +35,7 @@ import { PLAYER_RADIUS, createPlayerController } from "../player.ts";
 import { createKernelLoop, MS_PER_TICK } from "../loop.ts";
 import type { DeviceView } from "../input/index.ts";
 import { paintMarquee, paintScreen, type PaintContext, type PaintSurface } from "./surfaces.ts";
-import { buildRoomScene, type Placed, type RoomScene, type Three } from "./scene.ts";
+import { FACE_T, buildRoomScene, type Placed, type RoomScene, type Three } from "./scene.ts";
 import {
   CARD_INK,
   FACE_TINT,
@@ -246,7 +245,7 @@ test("QA AC3: through the real kernel loop — 30 ticks cycle the phase, the pai
   assert.equal(b.logs.length, 4, "30 ticks visit paint steps 0..3 — four repaints, not thirty");
   assert.deepEqual(b.steps, [0, 1, 2, 3], "the repaint gate fires only on paint-step change");
   assert.equal(b.frames, 31, "31 frame reads cost 4 repaints — the other 27 frames repaint nothing");
-  assert.equal(b2.logs[b2.logs.length - 1], b.logs[b.logs.length - 1], "two fresh 30-tick runs paint byte-identical final op-logs (byte identity, not slices)");
+  assert.deepEqual(b2.logs, b.logs, "two fresh 30-tick runs paint byte-identical op-log SEQUENCES — every repaint, not just the final one");
   assert.notEqual(a.logs[0], b.logs[b.logs.length - 1], "the 30-tick screen differs from the 0-tick screen (the scan band moved — a dead screen fails)");
   assert.ok(b.logs.every((l) => l.length > 0), "every transcript is a real painted screen (two empty runs compared would be no evidence)");
 });
@@ -258,9 +257,12 @@ test("QA AC4: the coin-door pose law keeps its visitor-left hinge fixed, rotates
   const open = coinDoorPose("cabinet-B0", true);
   const g = placementGeometry("B0");
   const halfW = SHELL.coinDoor.width / 2;
-  // The hinge is the panel centre pulled half the panel width along -right.
-  const hx = closed.panel.x - g.right.x * halfW;
-  const hz = closed.panel.z - g.right.z * halfW;
+  // The hinge, derived INDEPENDENTLY of the pose law: the front plane at
+  // half the door thickness proud, pulled half the panel width along
+  // -right — authored slot + shell records only (a hinge re-derived from
+  // the pose under test would be a tautology).
+  const hx = g.front.x + g.facing.x * (SHELL.coinDoor.thickness / 2) - g.right.x * halfW;
+  const hz = g.front.z + g.facing.z * (SHELL.coinDoor.thickness / 2) - g.right.z * halfW;
   const dcx = closed.panel.x - hx;
   const dcz = closed.panel.z - hz;
   const dox = open.panel.x - hx;
@@ -335,7 +337,6 @@ test("QA AC5: the built scene carries every SHELL part exactly once at its autho
   buildRoomScene(three, scene, factory);
 
   // B0 faces +Z: part width runs along X, part depth along Z.
-  const FACE_T = 0.005; // the scene's painted-face thickness (FLYER_T sibling)
   const parts: { label: string; geo: { w: number; h: number; d: number }; color: number }[] = [
     { label: "body box (from the volume bounds)", geo: { w: SHELL.body.width, h: SHELL.body.height, d: SHELL.body.depth }, color: WALL_PANEL },
     { label: "marquee bar", geo: { w: SHELL.marquee.width, h: SHELL.marquee.height, d: SHELL.marquee.depth }, color: ROOM_BLACK },
@@ -345,16 +346,16 @@ test("QA AC5: the built scene carries every SHELL part exactly once at its autho
     { label: "coin-door panel", geo: { w: SHELL.coinDoor.width, h: SHELL.coinDoor.height, d: SHELL.coinDoor.thickness }, color: WALL_WARM },
     { label: "coin-slot detail", geo: { w: SHELL.coinSlot.width, h: SHELL.coinSlot.height, d: SHELL.coinSlot.thickness }, color: SIGN_CHALK },
   ];
-  const tokenHues = new Set<number>([WALL_PANEL, ROOM_BLACK, FACE_TINT, CARD_INK, WALL_WARM, SIGN_CHALK]);
   for (const part of parts) {
     const hits = meshes.filter(
       (m) => near(m.geo.w, part.geo.w) && near(m.geo.h, part.geo.h) && near(m.geo.d, part.geo.d),
     );
     assert.equal(hits.length, 1, `exactly one mesh carries the "${part.label}" dims`);
     const hit = hits[0]!;
-    assert.ok(
-      typeof hit.color === "number" && tokenHues.has(hit.color),
-      `"${part.label}" colour ${String(hit.color)} is not a home token — AC5: every new material colour is a tokens.ts hex`,
+    assert.equal(
+      hit.color,
+      part.color,
+      `"${part.label}" must carry the mockup token 0x${part.color.toString(16)} (got ${String(hit.color)}) — AC5: part colours come from tokens.ts`,
     );
   }
 });

@@ -276,7 +276,7 @@ export const MARQUEE_CAP_M = 0.18;
  * in ems of the cap height — (inference; the spec's residual-risk note
  * pre-authorised this lever, and it was pulled in stage: at the 1.3 fake-
  * measure idiom's ~0.92em condensed advance, a 6-char word on the <=0.60m
- * body-width bar at the 0.18m floor needs ~ -0.44em, so the first reading
+ * body-width bar at the 0.18m floor needs ~ -0.486em, so the first reading
  * of -0.25em cannot close the gap. The 0.18m cap itself is NOT a lever.) */
 export const MARQUEE_LETTER_SPACING_EM_FLOOR = -0.5;
 
@@ -290,3 +290,8 @@ export const SCREEN_ATTRACT_CAP_M = 0.08;
  * placement record. (inference, "tuned by eye at the smoke".) */
 export const CABINET_LIGHT_INTENSITY = 15;
 export const CABINET_LIGHT_REACH = 8;
+
+/** How far in front of the body front plane both cabinet glow lights hang,
+ * metres along the facing (inference — the "tuned by eye at the smoke"
+ * sibling of the intensity/reach pair; scene pins derive from it). */
+export const CABINET_LIGHT_STANDOFF_M = 0.3;

@@ -39,6 +39,8 @@ import { MOUSE_SENSITIVITY, createPlayerController } from "../player.ts";
 import type { DeviceView } from "../input/index.ts";
 import {
   MARQUEE_MARGIN_PX,
+  SCREEN_BAND_WIDTH_RATIO,
+  SCREEN_EDGE_RATIO,
   SCREEN_SCAN_DRIFT_PX,
   SCREEN_SCAN_PITCH_PX,
   SCREEN_SCAN_ROWS,
@@ -267,7 +269,7 @@ test("marquee painter: exactly the title's words stacked at the 0.18m CONTRACT c
   assert.ok(f.rects.length === 1 && f.rects[0]!.style === "#15110e", "the ground is the injected background colour");
 });
 
-test("marquee/screen fit laws die loudly: an over-long title past the spacing floor, an empty title, and an over-tall stack all throw instead of clipping (AC2/AC7, paintFlyer sibling)", () => {
+test("marquee/screen fit laws die loudly: an over-long title past the spacing floor, an empty title, and an over-tall stack all throw instead of clipping (AC2, paintFlyer sibling)", () => {
   const f = fakePainter();
   assert.throws(
     () => paintMarquee(f.factory, "SUPERMONSTERMASH", "#15110e", "#ffc46b", MARQUEE_CAP_M, SHELL.marquee.width, SHELL.marquee.height),
@@ -292,11 +294,27 @@ test("screen painter: attract block, scan band, NEXT at the 0.18m minimum; the b
   for (const t of f.texts.filter((t2) => t2.text !== "NEXT")) {
     assert.equal(t.fontPx, attractPx, "attract words paint AT the authored attract cap");
   }
+  // The constant-IS-the-value drift pins (the marquee-cap/CARPET_PATTERN
+  // idiom): a derived pin alone cannot see its own constant move.
+  assert.equal(SCREEN_EDGE_RATIO, 0.02, "the screen edge inset IS the 2% of face height the painter and pins share");
+  assert.equal(SCREEN_BAND_WIDTH_RATIO, 0.4, "the scan band IS 0.4 of the face width (mockup detail, centered)");
   const faceHpx = Math.round(SHELL.screen.height * SURFACE_PX_PER_M);
-  assert.ok(nextText.y === faceHpx - Math.round(faceHpx * 0.02), "NEXT sits on its bottom band baseline");
+  assert.ok(nextText.y === faceHpx - Math.round(faceHpx * SCREEN_EDGE_RATIO), "NEXT sits on its bottom band baseline");
+  // Steady-text law: across paint steps the lettered rows (text AND
+  // baseline) are identical — only the scan band moves. A step-dependent
+  // text placement fails this while the band pins below stay green.
+  const textsAtStep = (step: number): { text: string; y: number }[] => {
+    const g2 = fakePainter();
+    paintScreen(g2.factory, p.screenZones, step, "#15110e", "#5bc8ff", "#ffc46b", SCREEN_ATTRACT_CAP_M, MARQUEE_CAP_M, SHELL.screen.width, SHELL.screen.height);
+    return g2.texts.map((t2) => ({ text: t2.text, y: t2.y }));
+  };
+  assert.deepEqual(textsAtStep(24), textsAtStep(0), "the cycle-wrap step 24 letters identically to step 0 (steady attract law)");
+  assert.deepEqual(textsAtStep(7), textsAtStep(13), "attract rows and NEXT never move between paint steps (only the band drifts)");
   // The scan band: SCREEN_SCAN_ROWS lines in the attract hue at the scan pitch.
   const band = f.rects.filter((r) => r.style === "#5bc8ff");
   assert.equal(band.length, SCREEN_SCAN_ROWS, "the band is exactly the authored row count");
+  const faceWpx = Math.round(SHELL.screen.width * SURFACE_PX_PER_M);
+  for (const r of band) assert.equal(r.w, Math.round(faceWpx * SCREEN_BAND_WIDTH_RATIO), "band rows carry the authored band width");
   const bandAtStep = (step: number): number[] => {
     const g = fakePainter();
     paintScreen(g.factory, p.screenZones, step, "#15110e", "#5bc8ff", "#ffc46b", SCREEN_ATTRACT_CAP_M, MARQUEE_CAP_M, SHELL.screen.width, SHELL.screen.height);
@@ -384,7 +402,7 @@ function visitSession(): {
   return { transcriptEnd: player.snapshot(), doors: { ...rt.coinDoors }, phase: rt.phase, walkTicks, ticksAtOpen };
 }
 
-test("Rule 1 integration: scripted visit on the REAL volumes + REAL controller — walk to cabinet-B0, E flips the coin door same-tick, E closes it, off-centre E is a no-op, and two runs are bit-identical (AC4/AC6)", () => {
+test("Rule 1 integration: scripted visit on the REAL volumes + REAL controller — walk to cabinet-B0, E flips the coin door same-tick, E closes it, off-centre E is a no-op, and two runs are bit-identical (AC4)", () => {
   const a = visitSession();
   const b = visitSession();
   assert.deepEqual(a.transcriptEnd, b.transcriptEnd, "identical scripted devices -> identical player transcripts");

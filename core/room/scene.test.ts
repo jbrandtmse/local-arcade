@@ -15,7 +15,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { AMBIENT_INTENSITY, buildRoomScene, DOOR_GLOW_INTENSITY, DOOR_GLOW_REACH, type Placed, type RoomScene, type Three } from "./scene.ts";
+import { AMBIENT_INTENSITY, buildRoomScene, DOOR_GLOW_INTENSITY, DOOR_GLOW_REACH, FACE_T, type Placed, type RoomScene, type Three } from "./scene.ts";
 import { DOOR_TOP, INTERIOR, WALL_T, WALL_TOP, collisionVolumes } from "./collision-volumes.ts";
 import { EMPTY_BASEPLATE, wallSlots } from "./slot-config.ts";
 import { CASUAL_ALLEY, PINBALL_CORNER, SNACK_BAR, WORKSHOP, ZONE_LIGHT_DISTANCE, ZONE_LIGHT_INTENSITY, roadmap, zones } from "./zones.ts";
@@ -23,6 +23,7 @@ import { WELCOME_FLYER, signSurfaces } from "./signage.ts";
 import {
   CABINET_LIGHT_INTENSITY,
   CABINET_LIGHT_REACH,
+  CABINET_LIGHT_STANDOFF_M,
   SHELL,
   SHELL_PART_MESHES,
   cabinetPlacements,
@@ -407,13 +408,19 @@ test("static authored scene: the build emits exactly one mesh per volume + wains
 
 // --- Story 1.4: the stand-up shells' extrusion + returned handles -----------
 
+// The constant-IS-the-value drift pin (the marquee-cap idiom): the derived
+// standoff pin below cannot see its own constant move.
+test("the cabinet light standoff constant IS 0.30m (both cabinet glow lights hang this far in front of the face plane)", () => {
+  assert.equal(CABINET_LIGHT_STANDOFF_M, 0.3, "0.30m standoff, the intensity/reach pair's sibling");
+});
+
 function meshByDims(w: number, h: number, d: number): MeshRec {
   const found = built.meshes.filter((m) => m.geo.w === w && m.geo.h === h && m.geo.d === d);
   assert.equal(found.length, 1, `exactly one mesh with dims ${w}x${h}x${d}`);
   return found[0]!;
 }
 
-test("1.4 shell build: marquee bar + painted face, bezel + live screen face, coin-door panel + coin-slot detail posed CLOSED by the pose law, two glow lights per shell in the placement hues, and door/screen handles handed back (1.4 AC1/AC3/AC7)", () => {
+test("1.4 shell build: marquee bar + painted face, bezel + live screen face, coin-door panel + coin-slot detail posed CLOSED by the pose law, two glow lights per shell in the placement hues, and door/screen handles handed back (1.4 AC1/AC4/AC5)", () => {
   for (const p of cabinetPlacements) {
     const g = placementGeometry(p.slotId);
     // Materials follow the close-up mockup: marquee bg Room Black, screen
@@ -421,7 +428,7 @@ test("1.4 shell build: marquee bar + painted face, bezel + live screen face, coi
     const bar = meshByDims(SHELL.marquee.width, SHELL.marquee.height, SHELL.marquee.depth);
     assert.equal(bar.mat.params["color"], ROOM_BLACK, "marquee bar is Room Black (mockup .marquee bg)");
     assert.equal(bar.y, SHELL.marquee.centerY);
-    const faces = built.meshes.filter((m) => m.geo.w === SHELL.marquee.width && m.geo.h === SHELL.marquee.height && m.geo.d <= 0.006);
+    const faces = built.meshes.filter((m) => m.geo.w === SHELL.marquee.width && m.geo.h === SHELL.marquee.height && m.geo.d === FACE_T);
     assert.equal(faces.length, 1, "exactly one thin painted face on the marquee bar");
     const face = faces[0]!;
     assert.equal(face.mat.params["color"], FACE_TINT, "painted face carries the neutral tint (hues come from the map)");
@@ -433,7 +440,7 @@ test("1.4 shell build: marquee bar + painted face, bezel + live screen face, coi
     assert.deepEqual(marqueeTexts, p.title.toUpperCase().split(/\s+/), "marquee lettering is exactly the title record's words, uppercased");
     const bezel = meshByDims(SHELL.bezel.width, SHELL.bezel.height, SHELL.bezel.depth);
     assert.equal(bezel.mat.params["color"], CARD_INK, "screen bezel is Card Ink (mockup .screen border)");
-    const screenFaces = built.meshes.filter((m) => m.geo.w === SHELL.screen.width && m.geo.h === SHELL.screen.height && m.geo.d <= 0.006);
+    const screenFaces = built.meshes.filter((m) => m.geo.w === SHELL.screen.width && m.geo.h === SHELL.screen.height && m.geo.d === FACE_T);
     assert.equal(screenFaces.length, 1, "exactly one thin live face inside the bezel");
     const screenFace = screenFaces[0]!;
     assert.ok(typeof screenFace.mat.params["map"] === "object", "the screen face is texture-mapped (painted, not emissive)");
@@ -459,7 +466,7 @@ test("1.4 shell build: marquee bar + painted face, bezel + live screen face, coi
       assert.equal(l.intensity, CABINET_LIGHT_INTENSITY);
       assert.equal(l.distance, CABINET_LIGHT_REACH);
       const lp = (l.x - g.front.x) * g.facing.x + (l.z - g.front.z) * g.facing.z;
-      assert.ok(lp > 0, "cabinet lights hang in front of the face, inside the room");
+      assert.ok(Math.abs(lp - CABINET_LIGHT_STANDOFF_M) < 1e-12, "cabinet lights hang exactly the authored standoff in front of the face");
     }
 
     // Handles the entry animates every frame.
@@ -467,6 +474,12 @@ test("1.4 shell build: marquee bar + painted face, bezel + live screen face, coi
     const screen = built.handles.screens.find((s) => s.id === p.volumeId);
     assert.ok(door && screen, "door + screen handles returned for the placement");
     assert.equal(screen.canvas.width, Math.round(SHELL.screen.width * 1000), "screen canvas aspect == face metres (1000 px/m)");
+    // The repaint marks the handle's texture; it only reaches the visible
+    // face if the face's map IS that texture AND that texture's source IS
+    // the handle's canvas — object identity, not parallel structures.
+    const faceMap = screenFace.mat.params["map"] as { source?: unknown };
+    assert.ok(faceMap === screen.texture, "the screen face's map IS the returned handle's texture (a repaint marks that texture and this face shows it)");
+    assert.ok(faceMap.source === screen.canvas, "and that texture's source is the handle's canvas (one canvas, one texture, one face)");
     assert.ok(built.canvasTexts.some((t) => t.includes(p.screenZones.next.toUpperCase())), "the screen canvas is lettered with the NEXT zone at build (step 0)");
     assert.ok(built.textureUpdateCount() === 0, "the BUILD itself never marks textures updated (repaint is frame-side)");
   }
