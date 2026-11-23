@@ -527,6 +527,15 @@ test("1.4 shell build: marquee bar + painted face, bezel + live screen face, coi
       const lp = (l.x - g.front.x) * g.facing.x + (l.z - g.front.z) * g.facing.z;
       assert.ok(Math.abs(lp - CABINET_LIGHT_STANDOFF_M) < 1e-12, "cabinet lights hang exactly the authored standoff in front of the face");
     }
+    // Centring law: the exposure model puts each light's nearest point
+    // directly under it and takes symmetric half-width/half-height far
+    // corners, so each built glow light must share its painted face's
+    // centre on BOTH axes the proud/standoff pins leave open — lateral
+    // (visitor-right) and height. A drift on either re-deads the face's
+    // far side with the law's constants untouched.
+    const lat = (q: { x: number; z: number }): number => (q.x - g.front.x) * g.right.x + (q.z - g.front.z) * g.right.z;
+    assert.ok(Math.abs(lat(face) - lat(spill)) < 1e-12 && Math.abs(face.y - spill.y) < 1e-12, "the marquee face sits centred under its spill light (the exposure law's nearest-point + symmetric-corner model)");
+    assert.ok(Math.abs(lat(screenFace) - lat(halo)) < 1e-12 && Math.abs(screenFace.y - halo.y) < 1e-12, "the screen face sits centred under its halo light (same law)");
 
     // Handles the entry animates every frame.
     const door = built.handles.doors.find((d) => d.id === p.volumeId);

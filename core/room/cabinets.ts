@@ -320,8 +320,11 @@ export const CABINET_LIGHT_STANDOFF_M = 0.45;
  * summed scene exposure (the sibling glow light and the 1.3 zone fill ride
  * on top; totals are the smoke's call). Ceiling 2: painted faces are
  * FACE_TINT (white) carrying token-hued maps — the 266 reading clipped the
- * lettering to white at the failed smoke; 2 leaves headroom above the
- * authored peak for the pair sum and the fill. Floor 0.5: own-glow under
+ * lettering to white at the failed smoke; 2 sits 0.34 above the authored
+ * own-peak — LESS than the sibling glow's ~0.38 at the same point, so the
+ * pair sum already crosses the bound at the marquee centre (the 1.3 fill
+ * rides on top; summed exposure is the smoke's adjudication, never this
+ * bound). Floor 0.5: own-glow under
  * it is invisible on its own, and a face that reads dark is a Dead
  * Machine by law. (inference — the by-eye pair this retune pins so CI
  * sees a blown-out or dead re-tune, not just the lead's smoke.) */

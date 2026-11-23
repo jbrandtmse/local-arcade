@@ -120,3 +120,8 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: spec-1-4-the-standard-stand-up-cabinet-shell-marquee-live-screen | severity: low | fix-risk: low | footprint: in-story
 - evidence: surfaces.ts drawScreen score loop never entered: p.screenZones.score === [] pinned by cabinets.test.ts:68; no user-reachable failure today
 - 2026-11-23T11:12:59Z status=wontfix-theoretical owner=1-4-the-standard-stand-up-cabinet-shell-marquee-live-screen by=cr note=reopen_if=score zone gets its first row (1.8); pin the row layout + NEXT/score collision then
+
+### DW-23: exposure-law ceiling/floor assume three's NoToneMapping + default decay=2; no pin observes them — a tone-mapping change greens CI while invalidating the bound
+- source: spec-1-4-the-standard-stand-up-cabinet-shell-marquee-live-screen.md | severity: low | fix-risk: low | footprint: in-story
+- evidence: grep: main.ts builds the WebGLRenderer with no toneMapping anywhere; the 2/0.5 bounds encode inverse-square+linear semantics (three decay=2); a tone-map change re-derives them with the suite green — spec residual risks already label this
+- 2026-11-23T14:03:41Z status=wontfix-theoretical owner=1-4-the-standard-stand-up-cabinet-shell-marquee-live-screen by=cr note=reopen_if: tone mapping lands in main.ts or the exposure constants move under a non-linear tone curve
