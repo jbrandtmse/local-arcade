@@ -121,3 +121,5 @@
 2026-11-23T14:13:51Z	Story 1.4	report_error	fault=lead	field=dev_complete-iter2-row-ts	reported=ts=2026-11-23T12:55:30Z	actual=ts=2026-11-23T12:54:49Z(git-committer-time-of-7065c91)	impact=telemetry-only;recall-again-in-repair;corrected-this-beat
 2026-11-23T14:29:58Z	Story 1.4	smoke_complete	method=browser	result=pass	iterations=2	defects_caught=0	env=chrome-page5+edge-headless-swiftshader	note=re-smoke_iter2_pass;marquee+screen_exposure_legible_2m_11m;band_drift_two_phases;door_E_both;roadmap_unaffected;faults_0_console_0_both_browsers;both_Smoke_boxes_ticked
 2026-11-23T14:32:08Z	Story 1.4	fresh_check	env=clean-checkout	tests=87	result=pass	order=forward,reverse	clone=/tmp/fresh-13/clone@eda8512	node=26.13.1-portable	files=11	cycle_iteration=2
+2026-11-23T14:32:09Z	Story 1.4	committed	sha=fe81c5b	submodules=none	ci=none
+2026-11-23T14:32:09Z	Story 1.4	story_cycle	plan_to_commit_min=577	implement_passes=2	reviews=2	rework=1	first_ci=none
