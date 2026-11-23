@@ -114,3 +114,4 @@
 2026-11-23T11:26:39Z	Story 1.4	dev_complete	spawn_at=	build_sha=8008ec2	baseline_revision=fb3dda9	review_loop_iteration=0	followup_review_recommended=false	deferred=0	files=3	loc_added=160	loc_removed=14	cycle_iteration=2	note=rework_iter1_exposure_retune_0.25cd_4m_0.45m;band_ceiling2_floor0.5;self-review_0high_3med_patched;180/180
 2026-11-23T12:54:47Z	Story 1.4	adr_verifications_complete	tool=node_cli	acs=ac2,ac3	result=pass	mutations=m17:spill-intensity-zone-scale-desync,m18:spill-standoff-0.3-desync	reverts=byte-identical	suite=180/180	cycle_iteration=2	note=built-side_desync_classes_new_to_this_story
 2026-11-23T12:55:14Z	Story 1.4	report_error	fault=lead	field=loc(dev_complete-iter2)	reported=96/12	actual=160/14	impact=telemetry-only;typed-before-computing;corrected_same_beat
+2026-11-23T12:55:14Z	Story 1.4	stage_spawned	stage=code-review	spawn_at=2026-11-23T12:55:14Z	agent_name=1-4-cabinet-cr-2	cycle_iteration=2
