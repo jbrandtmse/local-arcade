@@ -1,3 +1,34 @@
+# Test Automation Summary — Story 1.7 (QA stage, 2026-11-24)
+
+Target: the implemented deliverable of Story 1.7 (`git diff --name-only 131ad25..e214182` on ARC-1-epic1 — the new `core/containment.ts` seam (boot guard, guardInstance quarantine, stall watcher, injectFault), the widened supervisor (ring cap + HookName), the optional `faultedFor` legs in seat/scheduler, and the main.ts rewiring + moved pins). Acceptance criteria: the spec's Tasks & Acceptance + I/O & Edge-Case Matrix. Framework: the project's existing convention — `node --test` over co-located `*.test.ts` (`npm test`); no new dependency; no browser harness this epic (DW-12/DW-15 precedent — the `arcadeDebug.containment.injectFault` flow and the Chrome+Edge row stay the lead's smoke).
+
+## Generated Tests
+
+### Fault-site QA probes
+- [x] `core/containment-fault-sites.test.ts` (QA) — the three kernel→sim sites whose FIRST-fault path had never been executed: (1) the watcher's own stateHash sample — a throwing stateHash quarantines at its own site, one record under hook "stateHash" at the cycle boundary (not "tick", not "stall"), the watcher stops sampling without synthesizing a stall, the frozen hash stays the safe total; (2) the composed Rule 1 consumer integration — the scheduler's dwell launch through the boot-seam guard into a throwing autoplay(): one `moon-patrol.autoplay#1` record at the launch tick, the Patron lifts on the next dispatch (occupancy attract, figure off, queue void), and across 480 further ticks the launch gate never relaunches while the loop keeps ticking (runCount/lastSeed/raw-hook counters all frozen at the fault); (3) the snapshot() site nothing on the tick path calls — first-fault quarantine at a non-tick site freezes the loop-driven tick hooks too, and post-quarantine reads stay total.
+
+## Gap-hunt result
+Every other matrix row and AC pin was already executed by the implement suite with recorded mutations (the 11-row review triage plus 11 demonstrated mutations stand); the site legs above were the unexecuted remainder. Notably, mutation 1.7m (watcher sampling stateHash unguarded) reddens ONLY the new QA pin — the entire pre-QA containment suite stays green — the discriminator this QA tier adds.
+
+## Coverage
+- AC1: tick/events sites (implement) + QA: stateHash, snapshot, autoplay site quarantines (every wrapped hook, not just the tick-path ones).
+- AC4: stall predicate + live-half pins (implement) + QA: a throwing stateHash at the watcher is a hook fault, not a stall.
+- AC5: figure-lift/no-relaunch pins (implement) + QA: the launch SITE as the fault origin, composed through the real attach seam + loop + scheduler.
+- AC6: cap/drain/stamp-order pins (implement) — no QA addition needed; gates re-run at QA finalize.
+- Lead-tier rows (fresh environment forward/reverse, Chrome+Edge injectFault smoke) untouched per dispatch.
+
+## Verification run (post-QA)
+- `npm test`: 298/298 pass (295 at dev finalize + 3 QA).
+- `npm run typecheck`: 0. `node ci/depcheck.mjs`: 0. `node ci/lint-bans.mjs`: 0.
+- `node tools/gen-registry.mjs && git diff --exit-code -- generated/`: no drift. `npm run build`: green (entry-chunk warning precedent).
+- QA file green standalone and against scheduler/scheduler-breaks/seat neighbours in BOTH orders (hermeticity spot-check; every rig builds its own loop/instances).
+- Rule 19: 3 QA mutation demonstrations (1.7m watcher direct-sample — pre-QA suite blind, QA pin red; 1.7n launch-gate delete — composed pin red; 1.7o snapshot-leg bypass — QA pin red + two corroborating containment pins). Each red observed, reverted, `git status`/`git diff --stat` byte-identical, suite re-green 298/298. Recorded in the spec's `## Verification` QA block.
+
+## Next Steps
+- Lead commits the QA test file + the spec Verification block (this stage forbids committing), then runs the fresh-environment check and the Chrome+Edge injectFault smoke.
+
+---
+
 # Test Automation Summary — Story 1.5 (QA stage, 2026-11-23)
 
 Target: the implemented deliverable of Story 1.5 (`git diff --name-only 584110e..HEAD` — the vendored Moon Patrol plugin `games/moon-patrol/sim|presentation`, the wrapper `play(seed)` seam, `core/seat.ts` + the extended input/player/cabinets/surfaces/main legs, the one-entry registry, and the story's own test pins). Acceptance criteria: the spec's Tasks & Acceptance + I/O & Edge-Case Matrix. Framework: the project's existing convention — `node --test` with native TS type-stripping (`*.test.ts` under `core/`, `ci/`, `tools/`; `games/**/*.test.js` joined this story); no new dependency (spine-pinned set). The "E2E" surface is the scripted module surface (real kernel loop, real wrapper instance from the generated registry, real seat service) — `window.arcadeDebug` execution and the Chrome+Edge matrix rows stay the lead's browser smoke (DW-12/DW-15 precedent: the executed browser tier lands with the Epic-3 harness).
