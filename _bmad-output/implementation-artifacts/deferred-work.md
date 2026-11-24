@@ -156,3 +156,8 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: spec-1-5-moon-patrol-plays-in-place-vendored-wrapped-alive.md | severity: low | fix-risk: med | footprint: core/main.ts + tools/registry-list.json + games/moon-patrol/presentation/
 - evidence: blind-hunter B8: the lists agree today (nine-key set-identity source pin keeps them honest); unification needs the Epic-3 Manifest to carry the legend (AD-12: manifest never hand-written)
 - 2026-11-23T23:40:42Z status=wontfix-accepted owner=1-5-moon-patrol-plays-in-place-vendored-wrapped-alive by=cr note=reopen_if=Epic 3 registration lands a manifest legend carrier, or a key change lands in one carrier and the set-identity pin or the smoke legend check goes red
+
+### DW-29: Cabinet shell reads as a vending machine, not an upright arcade cabinet: wants a real marquee box on top plus cabinet contours (shaped side panels, screen bezel/hood, control-deck silhouette)
+- source: owner walkthrough of :5173 build, 2026-11-24 | severity: med | fix-risk: med | footprint: core
+- evidence: owner verbatim: 'it looks like a vending machine now... hoping for something more like a real arcade cabinet, with a marquee on top and contours like a real cabinet'; current stand-up shell is a flat slab with a lit marquee band (1.4 geometry)
+- 2026-11-24T14:24:52Z status=routed owner=burndown by=lead note=owner-initiated; NOT an AC miss for 1-4 (marquee-lit law met) - enhancement beyond current ACs; priority-rank at the Epic 1 burndown gate, candidate new story (visual polish) on the decision sheet; geometry lives in core/room/cabinets.ts + collision volumes + screen surface mapping
