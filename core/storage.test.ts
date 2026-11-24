@@ -21,6 +21,16 @@
 // rowsFor stays byte-stable while the room keeps ticking. All storage access
 // is the injected Map-backed fake (Node has no localStorage; identity seeded
 // per test through uuidFn — hermetic).
+//
+// QA-stage additions (the matrix halves left unexecuted by the implement
+// pass): the executed integration chain (the real table's rowsFor output
+// composed into the authored fallback zones exactly as main.ts composes them,
+// painted by the real painter across a quarantined run), the shipped
+// browser-edge DEFAULT port (a globalThis.localStorage planted and removed by
+// the test alone — Node has no real store to touch — plus the default
+// crypto.randomUUID), the two-boot Patron reload replay ("same seed -> same
+// initials next reload" executed, not composed from the pure derivation),
+// and the corrupt-PB-value self-heal.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -40,6 +50,7 @@ import {
   rowText,
   sanitizeInitials,
   visitorPseudonym,
+  type PatronRunRow,
   type StoragePort,
   type StorageService,
 } from "./storage.ts";
@@ -49,7 +60,8 @@ import { createFigurePresenter } from "./patrons/presenter.ts";
 import { createSeatService, type SeatKeyMap, type SeatService } from "./seat.ts";
 import { createPlayerController } from "./player.ts";
 import { ENTRY_SPAWN, collisionVolumes } from "./room/collision-volumes.ts";
-import { createCabinetRuntime } from "./room/cabinets.ts";
+import { MARQUEE_CAP_M, SCREEN_ATTRACT_CAP_M, SHELL, cabinetPlacements, createCabinetRuntime } from "./room/cabinets.ts";
+import { paintScreen, type PaintContext, type PaintSurface } from "./room/surfaces.ts";
 import { guardInstance, type GameGuard } from "./containment.ts";
 import {
   createGameInstance,
@@ -680,4 +692,177 @@ test("storage law at the source: the module reads no wall clock and no Math.rand
   for (const banned of ["Date.now", "performance.now", "Math.random", "new Date"]) {
     assert.ok(!src.includes(banned), `core/storage.ts must not read ${banned}`);
   }
+});
+
+// --- QA stage: the halves the implement pass left unexecuted -------------------
+
+// A recording fake canvas for the chain test (the cabinets.test.ts
+// fake-painter idiom, narrowed to what the chain law reads: lettered texts
+// and their baselines). The 0.92em condensed advance is the deterministic
+// fake metric the surfaces pins share.
+function fakeCanvas() {
+  const texts: { text: string; y: number }[] = [];
+  const factory = (width: number, height: number): PaintSurface => {
+    const ctx: PaintContext = {
+      fillStyle: "",
+      font: "",
+      textAlign: "",
+      letterSpacing: "",
+      fillRect() {},
+      drawImage() {},
+      fillText(text, _x, y) {
+        texts.push({ text, y });
+      },
+      measureText(text) {
+        const m = /(\d+(?:\.\d+)?)px/.exec(ctx.font);
+        if (!m) throw new Error("fake measureText: font string carries no px size");
+        return { width: text.length * 0.92 * Number(m[1]) };
+      },
+    };
+    return { width, height, getContext: (kind) => (kind === "2d" ? ctx : null) };
+  };
+  return { factory, texts };
+}
+
+// Rule 1's integration row EXECUTED across tiers + AC5's paint half: the
+// shipped entry's composition (authored zones spread, score leg replaced by
+// the service's rows) feeding the REAL fallback painter, across the REAL
+// quarantine. The glue pins prove the shipped frame() composes; the storage
+// suite proves the table never churns; the surfaces tier proves the layout —
+// nothing yet ran the service's actual rowsFor output THROUGH the painter
+// step after step. mutation: the drawScreen rows-branch keeps painting the
+// attract block (drop the AD-28 yield) -> the first row baseline collides
+// with NEXT and the throw escapes this test -> red; revert.
+test("QA chain (Rule 1 executed + AC5 paint half): the quarantined table's rowsFor output composed as main.ts composes it paints on the REAL fallback face through the 720-tick fallback run — the row keeps lettering at the AD-28 baseline, the attract block stays yielded, nothing throws, no new row", () => {
+  const fake = fakePort();
+  const r = schedulerRig(fake, UUID_A);
+  for (let i = 0; i < ATTRACT_DWELL_TICKS; i++) r.tick();
+  r.stub.fire({ type: "scoreSubmitted", payload: { score: 12000 } });
+  r.tick();
+  const p = cabinetPlacements[0]!;
+  assert.equal(p.gameId, ENTRY.id, "the authored B0 placement is wired to the gameId the rig runs (the composition gate main.ts applies)");
+  const rows = r.storage.rowsFor(ENTRY.id);
+  assert.equal(rows.length, 1, "the Patron row exists before the fault — the table has a CURRENT state the face must keep painting");
+  const expected = [...rows, p.screenZones.next.toUpperCase()];
+
+  r.guard.injectFault("smoke: dead machine");
+  for (let i = 0; i < 720; i++) {
+    r.tick();
+    if (i % 120 !== 0) continue;
+    // The exact shipped composition from main.ts frame(): spread the
+    // authored record, replace ONLY the score leg with the table's rows.
+    const zones = p.gameId != null ? { ...p.screenZones, score: r.storage.rowsFor(p.gameId) } : p.screenZones;
+    const f = fakeCanvas();
+    paintScreen(f.factory, zones, r.loop.tickCount, "#15110e", "#5bc8ff", "#ffc46b", SCREEN_ATTRACT_CAP_M, MARQUEE_CAP_M, SHELL.screen.width, SHELL.screen.height);
+    assert.deepEqual(
+      f.texts.map((t) => t.text),
+      expected,
+      `tick ${r.loop.tickCount}: the face still letters the CURRENT table row and NEXT only — no dead table, no attract revival, no invented row`,
+    );
+    assert.equal(f.texts[0]!.y, 177, "the Patron row holds the measured AD-28 baseline (177) all the way through the fallback run");
+  }
+  assert.equal(r.storage.state().patronRuns.length, 1, "the painter saw no churn: the guard emitted nothing across the whole run");
+  assert.deepEqual(r.storage.rowsFor(ENTRY.id), rows, "rowsFor byte-stable end to end (the matrix's quarantine row, chain tier)");
+});
+
+// AC6's degradation law at the tier the whole suite otherwise cannot reach:
+// the SHIPPED browser-edge wiring (no injected port, no injected uuidFn).
+// The global store is a planted fake this test creates and removes (Node has
+// no localStorage global; there is no real store here to touch — hermetic).
+// mutation: the service's write() drops its try/catch -> the missing-global
+// and quota sections throw past visitorId() -> red; revert.
+test("QA default port (AC6 browser-edge tier): the shipped service writes through a planted globalThis.localStorage and the default crypto.randomUUID mints a real v4; a missing global or a throwing store degrades INSIDE the service at boot (the fake global is created and removed by this test alone)", () => {
+  const G = globalThis as { localStorage?: { getItem(k: string): unknown; setItem(k: string, v: string): void } };
+  const prev = G.localStorage; // verified absent on this Node — the idiom's premise
+  const restore = (): void => {
+    if (prev === undefined) delete G.localStorage;
+    else G.localStorage = prev;
+  };
+  try {
+    const store = new Map<string, string>();
+    G.localStorage = {
+      getItem: (k) => store.get(k) ?? null,
+      setItem: (k, v) => {
+        store.set(k, v);
+      },
+    };
+    const svc = createStorageService(); // no options: the exact shipped boot wiring
+    const id = svc.visitorId();
+    assert.match(id, UUID_V4_SHAPE, "the default uuidFn (crypto.randomUUID) mints a legal v4 — executed at the browser edge, not inferred");
+    assert.equal(store.get(VISITOR_KEY), id, "the default port wrote the id THROUGH to the device store");
+    assert.equal(svc.state().degraded, false, "a working store never flags degraded");
+    svc.recordScoreSubmitted({ gameId: "g", score: 10, initials: "abc" }, "visitor", null, 1);
+    assert.equal(store.get(`${PB_KEY_PREFIX}${id}.g`), JSON.stringify({ initials: "ABC", score: 10 }), "the PB persists through the DEFAULT port — the shipped reload path");
+    const svc2 = createStorageService(); // reload at the default wiring
+    assert.equal(svc2.visitorId(), id, "and the reload reads the same id back");
+  } finally {
+    restore();
+  }
+  try {
+    delete G.localStorage; // the Node condition the injected-fake idiom hides
+    const svc = createStorageService();
+    assert.match(svc.visitorId(), UUID_V4_SHAPE, "boot survives a missing store — the id resolves from the session overlay");
+    assert.equal(svc.state().degraded, true, "and the condition is flagged (labelled), never faulted");
+    assert.deepEqual(svc.rowsFor("g"), [], "the overlay's empty table paints the honest empty zone");
+  } finally {
+    restore();
+  }
+  try {
+    G.localStorage = {
+      getItem: () => {
+        throw new Error("quota exceeded (private mode)");
+      },
+      setItem: () => {
+        throw new Error("quota exceeded (private mode)");
+      },
+    };
+    const svc = createStorageService();
+    assert.match(svc.visitorId(), UUID_V4_SHAPE, "a quota-throwing store degrades the session, never the room");
+    assert.equal(svc.state().degraded, true, "flagged through the default port too");
+  } finally {
+    restore();
+  }
+});
+
+// AC2's reload half of "same seed -> same initials next reload", EXECUTED as
+// two boots rather than composed from the pure derivation + the scheduler's
+// replay pins: a fresh service + fresh scheduler over the authored B0 data
+// replays run 0 with the same resolved seed and spells the same Patron
+// regular. mutation: the patron seed leg becomes the record tick (patron
+// initials keyed on sim time, not the resolved seed) -> the seed-keying pin
+// reds while the boot-to-boot equality alone would survive; revert.
+test("QA reload replay (AC2/AD-4): a FRESH room (new service + new scheduler over the authored B0 data) replays the Patron run with the SAME resolved seed and the SAME initials; the name keys on the run's RESOLVED seed, not on time", () => {
+  const boot = (): { row: PatronRunRow; rows: readonly string[] } => {
+    const r = schedulerRig(fakePort(), UUID_A);
+    for (let i = 0; i < ATTRACT_DWELL_TICKS; i++) r.tick();
+    assert.equal(r.b0().occupancy, "patron-autoplay");
+    assert.equal(r.b0().lastSeed, derivedSeed(ENTRY.seed!, 0), "boot N resolves run 0 on the authored seed's first derived value");
+    r.stub.fire({ type: "scoreSubmitted", payload: { score: 12000 } });
+    r.tick();
+    return { row: r.storage.state().patronRuns[0]!, rows: r.storage.rowsFor(ENTRY.id) };
+  };
+  const a = boot();
+  const b = boot();
+  assert.deepEqual(b.row, a.row, "boot two replays boot one row-for-row: the same Patron regular returns with the same scoreboard name");
+  assert.deepEqual(b.rows, a.rows, "and the score zone shows the same best-1 Patron row");
+  assert.equal(a.row.initials, patronPseudonym(derivedSeed(ENTRY.seed!, 0)), "the name keys on the run's RESOLVED seed (AD-4 currency) — not on any time or boot counter");
+});
+
+// The corrupt-PB self-heal the module header claims but no pin ran: a value
+// that parses but carries the wrong shape never reaches the score zone, and
+// the next accepted score rewrites the key. mutation: parsePb relaxes the
+// score-shape check (Number.isFinite -> != null) -> an "ABX 12" row appears
+// from the corrupt value -> red; revert.
+test("QA self-heal (AC4 honesty half): a corrupt PB value on the port renders NO row (a garbage value never enters the score zone); the next accepted score rewrites the key", () => {
+  const key = `${PB_KEY_PREFIX}${UUID_A}.g`;
+  const fake = fakePort({
+    [key]: '{"initials":"AB","score":"12"}', // parses fine, wrong score shape
+    [`${PB_KEY_PREFIX}${UUID_A}.h`]: "{not json", // does not parse at all
+  });
+  const svc = createStorageService({ storage: fake.port, uuidFn: () => UUID_A });
+  assert.deepEqual(svc.rowsFor("g"), [], "a wrong-shape PB value is no PB at all — rowsFor stays honest (CAP-8)");
+  assert.deepEqual(svc.rowsFor("h"), [], "an unparseable value likewise renders nothing and never throws");
+  svc.recordScoreSubmitted({ gameId: "g", score: 5, initials: "aaa" }, "visitor", null, 1);
+  assert.deepEqual(svc.rowsFor("g"), ["AAA 5"], "the next accepted score heals the key");
+  assert.equal(JSON.parse(fake.map.get(key)!).score, 5, "and the write lands — the corrupt value never wedges the read path");
 });
