@@ -173,3 +173,4 @@
 2026-11-24T15:11:24Z	Story 1.7	fresh_check	env=clean-checkout	tests=68	result=pass	order=forward,reverse	files=10	clone=/tmp/fresh-17/clone@309a834	note=story_test_files_git_diff_131ad25..309a834_*.test.*;npm_install_fresh;forward_68/68_reverse_68/68
 2026-11-24T15:12:30Z	Story 1.7	committed	sha=b1bad87	submodules=none	ci=none	note=story_code=e214182+bdac3a5(QA_tier)+309a834(CR_close);smoke_fresh_rows=b1bad87;pushed_on_close
 2026-11-24T15:12:30Z	Story 1.7	story_cycle	plan_to_commit_min=441	implement_passes=1	reviews=1	rework=0	first_ci=n/a	note=CR_caught_HIGH(pres-half_boot_fault_never_marked_faultedFor→seated_visitor_plays_blind);QA_closed_first-fault-site_class(3_pins);lead_L1_six_legs_2_mutations;DW-2/DW-3/DW-6→resolved;tracker_deviation_recurring_3/3_CR_stages_repaired
+2026-11-24T15:13:14Z	Story 1.8	stage_spawned	stage=plan	spawn_at=2026-11-24T15:13:14Z	agent_name=1-8-room-knows-you-plan-1	cycle_iteration=1
