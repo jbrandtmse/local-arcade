@@ -165,3 +165,8 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: owner walkthrough of :5173 build, 2026-11-24 | severity: med | fix-risk: med | footprint: core
 - evidence: owner verbatim: 'it looks like a vending machine now... hoping for something more like a real arcade cabinet, with a marquee on top and contours like a real cabinet'; current stand-up shell is a flat slab with a lit marquee band (1.4 geometry)
 - 2026-11-24T14:24:52Z status=routed owner=burndown by=lead note=owner-initiated; NOT an AC miss for 1-4 (marquee-lit law met) - enhancement beyond current ACs; priority-rank at the Epic 1 burndown gate, candidate new story (visual polish) on the decision sheet; geometry lives in core/room/cabinets.ts + collision volumes + screen surface mapping
+
+### DW-30: boot identity uses crypto.randomUUID outside any supervisor: a runtime without Web Crypto (insecure-context http origin) throws at boot instead of degrading — settle with the deploy origin's scheme (droplet https vs plain http)
+- source: 1-8-the-room-knows-you-without-an-account | severity: medium | fix-risk: low | footprint: core
+- evidence: core/main.ts boot storage.visitorId() -> default uuidFn crypto.randomUUID; missing API throws before loop.start; spec DN9 verified-present for Node 26 + evergreen Chrome/Edge only; storage port degrade law does NOT cover this (the throw is at key generation, not storage access)
+- 2026-11-24T19:59:30Z status=routed owner=3-15-the-public-posture-one-sealed-bundle-to-one-droplet by=lead note=harvested from spec 1-8 frontmatter deferred; fix-risk low = one-line fallback uuid generator or https-only settle; footprint core (boot wiring)
