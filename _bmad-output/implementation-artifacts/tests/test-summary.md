@@ -247,3 +247,48 @@ the browser smoke stays with the lead's per-story check per spec intent-3).
   moon-patrol entry rather than fixtures.
 - Full browser-console serve check happens at the lead's per-story smoke (and the CI browser
   target needs an owned decision if it is ever automated — new dependency class).
+
+---
+
+# Test Automation Summary — Story 1.6 (QA stage, 2026-11-23)
+
+Target: the implemented deliverable of Story 1.6 (`git diff --name-only 4f334c1..HEAD` on ARC-1-epic1).
+Framework: the project's existing convention — `node --test` over co-located `*.test.ts` /
+`*.test.js` (`npm test`). No new dependency; no browser harness this epic (DW-12/DW-15 precedent —
+the `window.arcadeDebug` execution row and the Chrome+Edge matrix stay the lead's smoke).
+
+## Generated Tests
+
+### Patron scheduler — canonical-break coverage
+- [x] `core/patrons/scheduler-breaks.test.ts` (QA) — the roundBreak half of the break law,
+  unpinned by every executed rig leg (all natural autoplay/gameover drains are gameEnded): present
+  claim honoured at a level-clear break through the SeatHandover seam, and the absent claim's
+  same-break re-offer on the next derived seed with the wait persisting.
+
+## Gap-hunt result
+The implement suite (scheduler/presenter/autoplay suites + moved 1.5 pins + gen-registry fixtures +
+no-ui-dom provenance scan) executes every other I/O-matrix row and all six AC pins with recorded
+mutations — no re-demonstration needed. One matrix leg left unpinned by choice, recorded in the
+stage's Decisions: the wait row's "a second cabinet's E while waiting" error cell is unreachable
+at M0 (exactly one busy placement — pinned; byGame uniqueness — pinned; the triage's IA5 rejected
+the same two-claimant class). The lead-tier rows (fresh environment, Chrome+Edge) untouched.
+
+## Coverage
+- AC1/AC2/AC3/AC6: implement pins stand (executed + mutations recorded in the spec); no QA addition needed.
+- AC4/AC5: implement gameEnded pins + QA roundBreak pins (the previously unexecuted half).
+- Matrix: every automatable row now has an executed test; error-cell and lead rows as above.
+
+## Verification run (post-QA)
+- `npm test`: 274/274 pass (272 at dev finalize + 2 QA).
+- `npm run typecheck`: 0. `node ci/depcheck.mjs`: 0. `node ci/lint-bans.mjs`: 0.
+- `node tools/gen-registry.mjs && git diff --exit-code -- generated/`: clean.
+- QA file green standalone; forward and reverse order against `scheduler.test.ts` (hermeticity).
+- Rule 19: 1 QA mutation demonstrated — `drop roundBreak from the break-kind condition` killed both
+  new pins red (gameEnded rig pins stayed green; the pre-existing impulse-scope pin also dies,
+  confirming the condition's other leg), reverted byte-identical (blob a12ebc29 before/after);
+  recorded in the spec's `## Verification`.
+
+## Next Steps
+- Lead commits the QA test file + spec Verification line (stage forbids this agent from committing).
+- Epic 3's second busy placement makes the wait row's second-cabinet leg executable — pair it with
+  the Manifest `busy` story's QA pass.
