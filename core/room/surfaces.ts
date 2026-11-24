@@ -305,6 +305,16 @@ export function paintMarquee(
  * line goes through the same width/spacing fit law as the marquee; px per
  * metre is derived from the surface height and the face metres (canvas
  * aspect == mesh aspect).
+ *
+ * AD-28 fit law (Story 1.8 unattended ruling, measured — executed probe of
+ * this painter against authored B0 data, 2026-11-24): when the score zone
+ * CARRIES rows, the attract title block YIELDS — it is not painted and the
+ * scan band rises to the top margin, so rows paint below the live band
+ * above the NEXT floor (the authored B0 face fits exactly 2 rows,
+ * baselines 177/309; the Core table caps at 2, and the row/NEXT collision
+ * throw stays the loud guard for cap bugs). With an empty zone every
+ * branch below stays byte-identical to the 1.4 law (CAP-8 honesty — the
+ * 1.4 pins are untouched).
  */
 function drawScreen(
   surface: PaintSurface,
@@ -334,7 +344,12 @@ function drawScreen(
   if (nextTop < 0) {
     throw new Error(`paintScreen: NEXT cap ${nextCapM}m does not fit the ${faceHeightM}m face`);
   }
-  if (attractLines.length > 0) {
+  // AD-28: rows present -> the attract block yields (not painted, and the
+  // scan band rises to the top margin). Empty zone -> every branch below
+  // runs exactly as Story 1.4 authored it.
+  const rowsPresent = zones.score.length > 0;
+  const attractPainted = attractLines.length > 0 && !rowsPresent;
+  if (attractPainted) {
     const blockHeight = (attractLines.length - 1) * attractPitch + attractCap;
     if (edge + blockHeight > nextTop) {
       throw new Error(`paintScreen: attract block does not fit above the NEXT row`);
@@ -347,10 +362,12 @@ function drawScreen(
     });
   }
   // Scan band area starts under the attract block (or at the top margin
-  // when the attract zone is empty). The mockup's scan lines are 2px at a
-  // 9px pitch — the SCREEN_SCAN_* constants mirror that detail.
+  // when the attract zone is empty — and, AD-28, when rows made the block
+  // yield: the band stays live at the top either way). The mockup's scan
+  // lines are 2px at a 9px pitch — the SCREEN_SCAN_* constants mirror that
+  // detail.
   const scanTop =
-    attractLines.length > 0
+    attractPainted
       ? edge + (attractLines.length - 1) * attractPitch + attractCap + edge
       : edge;
   if (scanTop + SCREEN_SCAN_AREA_PX > nextTop) {
@@ -368,7 +385,9 @@ function drawScreen(
       SCREEN_SCAN_THICK_PX,
     );
   }
-  // Score rows: the zone renders nothing until scores exist (Story 1.8).
+  // Score rows: the zone renders nothing until scores exist (1.4's CAP-8
+  // honesty; Story 1.8's table feeds it under the AD-28 cap-2 view). The
+  // NEXT-collision throw below stays the loud guard for cap bugs.
   if (zones.score.length > 0) {
     ctx.fillStyle = attractCss;
     ctx.font = `600 ${attractCap}px ${MARQUEE_FONT_STACK}`;

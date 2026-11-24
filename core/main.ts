@@ -16,6 +16,7 @@ import { createPlayerController, EYE_HEIGHT, type PlayerController } from "./pla
 import { createSeatService, type BusyGate, type SeatKeyMap, type SeatService } from "./seat.ts";
 import { createPatronScheduler, type PatronScheduler } from "./patrons/scheduler.ts";
 import { createFigurePresenter, type FigurePresenter } from "./patrons/presenter.ts";
+import { createStorageService, type StorageService } from "./storage.ts";
 import { ENTRY_SPAWN, collisionVolumes } from "./room/collision-volumes.ts";
 import { buildRoomScene, type Three } from "./room/scene.ts";
 import { ROOM_BLACK, WALL_WARM, toCss } from "./room/tokens.ts";
@@ -46,7 +47,10 @@ declare global {
      * per busy cabinet + queue) and the figure presenter (reaction); 1.7
      * adds the containment handle — faultedFor reads + injectFault, the
      * console-only smoke trigger that drives the real fault chain
-     * (UX-DR18: zero UI announces a fault; the fallback IS the fiction). */
+     * (UX-DR18: zero UI announces a fault; the fallback IS the fiction);
+     * 1.8 adds the storage/identity service (AD-16: visitorId + Personal
+     * Bests + Patron-run table — the console smoke reads the table, zero
+     * UI announces it). */
     arcadeDebug: {
       player: PlayerController;
       loop: KernelLoop;
@@ -55,6 +59,7 @@ declare global {
       scheduler: PatronScheduler;
       presenter: FigurePresenter;
       containment: Containment;
+      storage: StorageService;
     };
   }
 }
@@ -209,6 +214,17 @@ for (const p of cabinetPlacements) {
   });
 }
 
+// Story 1.8 (AD-16): the storage/identity service — the spine's SVC box,
+// created beside seat/scheduler with the same options-injection posture
+// (browser-edge defaults: the device-store port behind the service's own
+// try/catch, crypto.randomUUID for the id — the glue itself never names the
+// store, the no-ui-dom single-owner scan binds that). The identity is generated
+// EAGERLY at boot — "first visit generates" — the id exists before the
+// door opens (1.9's boot beat rides this wiring). The score table below
+// reaches ONLY the presentation half (AD-16/AD-28): the sim never sees it.
+const storage = createStorageService();
+storage.visitorId();
+
 // Story 1.6 (AC2): the Patron figure — three hard-cornered boxes (legs,
 // torso, head) in the Wall Warm token, built ONCE like every other scene
 // part and standing at the cabinet's authored play pose (the seat law,
@@ -291,6 +307,26 @@ loop.addSystem("patrons", () => {
   // variable instead of touching the loop's clock (the 1.4 frame ban on
   // tickCount reads stays byte-unchanged).
   drawTick = loop.tickCount;
+  // 1.8 (AC2/AD-6/AD-23): the storage ingest leg rides these SAME drained
+  // records — the one new per-tick consumer, riding the existing drain (no
+  // second drainEvents anywhere). It sits inside this supervisor-wrapped
+  // system (AD-15: a throwing storage op degrades inside the service, the
+  // room keeps ticking) and BEFORE scheduler.dispatch: during a Patron run
+  // the scheduler's occupancy is the live run and lastSeed is the run's
+  // RESOLVED seed (AD-4 currency) — a post-dispatch ingest would credit
+  // the score to the NEXT run's seed. Classification reads the plain-data
+  // state() views (zero scheduler/seat interface widening): occupancy
+  // first, then the seat's chair, else idle.
+  storage.ingest(patronsRecords, {
+    kindOf: (gameId) => {
+      const occ = scheduler.state().cabinets.find((c) => c.gameId === gameId)?.occupancy;
+      if (occ === "patron-autoplay") return "patron";
+      const chair = seat.state();
+      return chair.seated && chair.gameId === gameId ? "visitor" : "idle";
+    },
+    seedOf: (gameId) => scheduler.state().cabinets.find((c) => c.gameId === gameId)?.lastSeed ?? 0,
+    tick: drawTick,
+  });
   presenter.step(loop.tickCount);
   scheduler.dispatch(patronsRecords, loop.tickCount);
 });
@@ -388,9 +424,21 @@ function frame(): void {
         !containment.faultedFor(placement.gameId) &&
         !drawFaulted.has(placement.gameId);
       if (faceComposites) continue;
+      // 1.8 (AC3/AD-28): the table feeds the EXISTING score-zone painter
+      // path through a re-composed ScreenZones at paint time — the authored
+      // placement data (cabinets.ts) stays readonly, the rows come from the
+      // service. Empty table -> rows [] -> the zone renders nothing (the
+      // 1.4 CAP-8 law intact); rows present -> the face yields the attract
+      // block and paints under the live scan band (AD-28). Composite faces
+      // keep the 1.5 pixel law: the raw authored zones stay there (the
+      // vendored adapter's session HI-SCORE is NOT the table).
+      const zones =
+        placement.gameId != null
+          ? { ...placement.screenZones, score: storage.rowsFor(placement.gameId) }
+          : placement.screenZones;
       repaintScreen(
         s.canvas,
-        placement.screenZones,
+        zones,
         paintStep,
         toCss(ROOM_BLACK),
         toCss(placement.hue),
@@ -453,5 +501,8 @@ window.addEventListener("resize", () => {
 // presenter (reaction state) for the busy-machine console smoke; 1.7 adds
 // the containment handle (faultedFor + injectFault) so the lead's smoke
 // drives the real fault chain from the console — the fault law path, not
-// a scripted one, and still zero UI (UX-DR18/AD-24).
-window.arcadeDebug = { player, loop, cabinets, seat, scheduler, presenter, containment };
+// a scripted one, and still zero UI (UX-DR18/AD-24); 1.8 adds the storage
+// service (visitorId + Personal Bests + Patron-run table — the lead's
+// smoke reads the table's initials + score keyed by gameId, never any PII
+// beyond the UUID, and the score zone renders these rows read-only).
+window.arcadeDebug = { player, loop, cabinets, seat, scheduler, presenter, containment, storage };

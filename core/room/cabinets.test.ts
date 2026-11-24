@@ -41,12 +41,15 @@ import { MOUSE_SENSITIVITY, createPlayerController } from "../player.ts";
 import type { DeviceView } from "../input/index.ts";
 import { gameRegistry } from "../../generated/game-registry.ts";
 import {
+  MARQUEE_LINE_PITCH_RATIO,
   MARQUEE_MARGIN_PX,
   SCREEN_BAND_WIDTH_RATIO,
   SCREEN_EDGE_RATIO,
+  SCREEN_SCAN_AREA_PX,
   SCREEN_SCAN_DRIFT_PX,
   SCREEN_SCAN_PITCH_PX,
   SCREEN_SCAN_ROWS,
+  SCREEN_SCAN_THICK_PX,
   SURFACE_PX_PER_M,
   compositeScreen,
   paintMarquee,
@@ -349,6 +352,70 @@ test("screen painter: attract block, scan band, NEXT at the 0.18m minimum; the b
     assert.ok(firstRowYs[k]! > firstRowYs[k - 1]!, `step ${k}: band row ${firstRowYs[k]} must advance past ${firstRowYs[k - 1]} (no backward snap)`);
   }
   assert.equal(firstRowYs[cycleSteps]!, firstRowYs[0]!, "the cycle wrap continues the drift (paint step 24 == step 0)");
+});
+
+// Story 1.8 (AD-28, the 2026-11-24 unattended ruling — measured against THIS
+// painter with authored B0 data): with score rows present the fallback face
+// YIELDS — the attract title block is not painted, the scan band rises to the
+// top margin, and the rows paint at the measured baselines 177/309. The
+// authored B0 face fits exactly 2 rows; the 3rd collides with the NEXT floor
+// and the throw stays the loud guard for cap bugs (the Core table's cap 2 —
+// SCORE_ROW_CAP — is what keeps it unreachable by law). The empty-zone path
+// above is the 1.4 law untouched: byte-identical branches, pins unedited.
+test("AD-28: score rows present -> the attract block yields, the scan band lives at the top margin, rows sit at the measured baselines 177/309, and the 3rd row collides with NEXT loudly", () => {
+  const p = cabinetPlacements[0]!;
+  assert.ok(p.screenZones.attract.length > 0, "B0 authors an attract zone — the yield branch is the one under test (an empty attract zone would paint nothing either way)");
+  const rows = ["AAA 12345", "BBB 6789"];
+  const zones = { ...p.screenZones, score: rows };
+  const f = fakePainter();
+  paintScreen(f.factory, zones, 0, "#15110e", "#5bc8ff", "#ffc46b", SCREEN_ATTRACT_CAP_M, MARQUEE_CAP_M, SHELL.screen.width, SHELL.screen.height);
+  assert.deepEqual(f.texts.map((t) => t.text), [...rows, p.screenZones.next.toUpperCase()], "rows then NEXT — no MOON/PATROL: the attract title block yields to the table (mutation: keep painting attract over rows and this reds)");
+
+  const faceHpx = Math.round(SHELL.screen.height * SURFACE_PX_PER_M);
+  const edge = Math.round(faceHpx * SCREEN_EDGE_RATIO);
+  const attractCap = Math.round(SCREEN_ATTRACT_CAP_M * SURFACE_PX_PER_M);
+  const attractPitch = Math.round(attractCap * MARQUEE_LINE_PITCH_RATIO);
+  const scanTop = edge; // the band rose to the top margin (AD-28)
+  const baselineOf = (i: number): number => scanTop + SCREEN_SCAN_AREA_PX + edge + i * attractPitch + attractCap;
+  const rowTexts = f.texts.filter((t) => rows.includes(t.text));
+  assert.deepEqual(rowTexts.map((t) => t.y), [baselineOf(0), baselineOf(1)], "row baselines follow the yielded layout formula (derived from the painter's own constants)");
+  assert.deepEqual(rowTexts.map((t) => t.y), [177, 309], "the ruling's MEASURED baselines on the B0 face — 177/309");
+  const nextTop = faceHpx - edge - Math.round(MARQUEE_CAP_M * SURFACE_PX_PER_M);
+  assert.ok(baselineOf(1) <= nextTop, "row 1 clears the NEXT cap block");
+  assert.ok(baselineOf(2) > nextTop, "the 3rd baseline would collide with the 0.18m NEXT floor — the measured cap-2 fit law");
+  for (const t of rowTexts) {
+    assert.equal(t.fontPx, attractCap, "rows paint at the authored attract cap (the yield buys room, not a shrink)");
+  }
+
+  // The scan band stays LIVE after the yield: SCREEN_SCAN_ROWS rects rising to
+  // the top margin (step 0 sits at scanTop), at the authored thickness/pitch.
+  const band = f.rects.filter((r) => r.style === "#5bc8ff");
+  assert.equal(band.length, SCREEN_SCAN_ROWS, "the band keeps painting when the attract block yields (the face keeps breathing behind the table)");
+  assert.deepEqual(band.map((r) => r.y), Array.from({ length: SCREEN_SCAN_ROWS }, (_, k) => scanTop + k * SCREEN_SCAN_PITCH_PX), "at step 0 the band sits at the top margin (mutation: keep it under the un-painted attract block and this reds)");
+  for (const r of band) assert.equal(r.h, SCREEN_SCAN_THICK_PX, "band thickness unchanged by the yield");
+
+  // Steady law for the yielded face: the lettered rows (text AND baseline)
+  // are identical across paint steps — only the band drifts.
+  const atStep = (step: number): { texts: { text: string; y: number }[]; bandY: number[] } => {
+    const g = fakePainter();
+    paintScreen(g.factory, zones, step, "#15110e", "#5bc8ff", "#ffc46b", SCREEN_ATTRACT_CAP_M, MARQUEE_CAP_M, SHELL.screen.width, SHELL.screen.height);
+    return {
+      texts: g.texts.map((t) => ({ text: t.text, y: t.y })),
+      bandY: g.rects.filter((r) => r.style === "#5bc8ff").map((r) => r.y),
+    };
+  };
+  assert.deepEqual(atStep(24).texts, atStep(0).texts, "rows + NEXT letter identically at the cycle wrap (no attract word ever re-appears behind the table)");
+  assert.deepEqual(atStep(7).texts, atStep(13).texts, "the rows never move between paint steps (only the band drifts)");
+  assert.equal(atStep(3).bandY[0]! - atStep(0).bandY[0]!, 3 * SCREEN_SCAN_DRIFT_PX, "the band drifts inside its risen area (liveness law intact under the yield)");
+
+  // The collision throw stays the loud guard: a cap bug (3 rows) dies loudly
+  // on the 3rd row, exactly where the fit law measured it.
+  const g = fakePainter();
+  assert.throws(
+    () => paintScreen(g.factory, { ...p.screenZones, score: [...rows, "CCC 1"] }, 0, "#15110e", "#5bc8ff", "#ffc46b", SCREEN_ATTRACT_CAP_M, MARQUEE_CAP_M, SHELL.screen.width, SHELL.screen.height),
+    /score row 2 collides with the NEXT row/,
+    "the row/NEXT collision guard is the enforcement behind the table's cap — cap bugs surface, they do not clip (mutation: relax this throw and a 3-row table paints over NEXT)",
+  );
 });
 
 test("repaint rewrites the SAME canvas — a live screen never grows a second canvas (and the texture-update marker rides that identity in main.ts) (AC5)", () => {

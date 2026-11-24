@@ -86,6 +86,40 @@ test("the game presentation half is DOM-free: every presentation source paints o
   }
 });
 
+// Story 1.8 (AD-16): the device store has ONE owner in core — core/storage.ts
+// — and no games source names storage, identity, or the table at all (the
+// sim never sees it; the score zone reaches the game cabinet only through
+// the presentation-side zone records the glue composes). Scans read CODE
+// (comments stripped) so a module can document a ban it enforces without
+// tripping the scan.
+test("1.8 single storage owner: only core/storage.ts touches the device store, and no games source names storage/identity at all (AD-16)", () => {
+  const strip = (src: string): string => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  const walk = (dir: string, ext: string): string[] => {
+    const files: string[] = [];
+    for (const ent of readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, ent.name);
+      if (ent.isDirectory()) files.push(...walk(full, ext));
+      else if (ent.name.endsWith(ext) && !ent.name.includes(".test.")) files.push(full);
+    }
+    return files;
+  };
+  const coreSources = walk(path.join(REPO, "core"), ".ts");
+  assert.ok(coreSources.length >= 10, "the core tree exists to scan (a moved/deleted module would silently shrink this scan)");
+  const owners = coreSources
+    .filter((f) => strip(readFileSync(f, "utf8")).includes("localStorage"))
+    .map((f) => path.relative(REPO, f).replace(/\\/g, "/"));
+  assert.deepEqual(owners, ["core/storage.ts"], "core/storage.ts is the ONLY core module that touches the device store — the glue, room, input, seat, scheduler, and contract stay store-blind");
+
+  const gamesSources = walk(path.join(REPO, "games"), ".js");
+  assert.equal(gamesSources.length, 9, "the games tree has exactly 9 non-test sources to scan (the provenance test counts all 15 .js files) — a new game file automatically enters this ban list");
+  for (const file of gamesSources) {
+    const src = strip(readFileSync(file, "utf8"));
+    for (const banned of ["localStorage", "arcade.visitor", "arcade.pb", "visitorId", "rowsFor", "storage."]) {
+      assert.ok(!src.includes(banned), `games/${path.relative(path.join(REPO, "games"), file)} must not name ${banned} — the table never reaches the game halves (AD-16)`);
+    }
+  }
+});
+
 // Story 1.5 honesty scans (AC1/AC5 Verification pins): every file under the
 // games tree that came from the vendored source carries the provenance sha
 // in its header; the authored seams carry the PROVISIONAL marker so the
@@ -167,6 +201,7 @@ test("dev serve (real HTTP): the served body is unchanged, the 1.2 shell modules
       "/core/seat.ts",
       "/core/patrons/scheduler.ts",
       "/core/patrons/presenter.ts",
+      "/core/storage.ts",
       "/generated/game-registry.ts",
       "/games/moon-patrol/presentation/adapter.js",
     ]) {

@@ -2,15 +2,28 @@
 title: 'Story 1.8: The room knows you without an account'
 type: 'feature'
 created: '2026-11-24'
-status: 'in-progress'
+status: 'done'
 review_loop_iteration: 0
 followup_review_recommended: false
-baseline_revision: '70767f60564ccd53b6093ebe49137162276e5411'
+baseline_revision: '57fa9a128ae452be7605669e2a493f53ef59f800'
 context:
   - _bmad-output/planning-artifacts/architecture/architecture-local-arcade-2026-11-19/ARCHITECTURE-SPINE.md
   - docs/game-authoring.md
 warnings: ['oversized']
-deferred: []
+deferred:
+  - summary: >-
+      The boot identity uses the default uuidFn (crypto.randomUUID) outside any supervisor: on a
+      runtime where the Web Crypto API is unavailable (e.g. an insecure-context http origin) the
+      room would throw at boot instead of degrading.
+    evidence: |-
+      storage.visitorId() at boot calls crypto.randomUUID (labelled spec-verified for Node 26 +
+      evergreen Chrome/Edge); if the API is missing it throws before loop.start. Would settle: the
+      deploy origin's scheme — the droplet serves https (unreachable); plain http (reachable).
+      Intent picks crypto.randomUUID as verified-present, so the story complies; this entry only
+      records the unproven edge.
+    location: >-
+      core/main.ts (boot storage.visitorId() call)
+    severity: medium (unverified)
 ---
 
 <intent-contract>
@@ -92,6 +105,35 @@ deferred: []
 
 ## Review Triage Log
 
+### 2026-11-24 — Review pass
+- verdicts: 25 findings — high 0, medium 1, low 12, false 10, maybe-false 2
+- findings:
+  - `[low]` `[reject]` Spec Code Map stale vs the ruling (line "UNCHANGED: core/room/surfaces.ts", the 4-row cap) — fix is a spec edit for this build (rejected on that rule); the 2026-11-24 Spec Change Log entry already records the surfaces.ts change + cap 4→2; lead syncs Code Map in bookkeeping if desired.
+  - `[false]` `[reject]` "Auto Run Result still says blocked" — the finalize step rewrites that section; a mid-run transient state is not a defect.
+  - `[false]` `[reject]` "review_loop_iteration not advanced" — the field counts this skill's bad_spec loopbacks (0 this pass), not story rounds; the round count lives in the Spec Change Log.
+  - `[low]` `[reject]` no negative caching of PB misses (port.getItem per paint step) — ~6 Hz getItem on one fallback face; not met in everyday use, and the fix adds cache complexity (rejection rule for low).
+  - `[low]` `[patch]` storage.ts header attributed try/catch to the default port — PATCHED: header now says the default port reaches localStorage (missing global = thrown access) and the SERVICE wraps every port call.
+  - `[medium]` `[reject]` returning visitor sees the PB only on the faulted fallback face at M0 — the intent itself excludes it (Approach: fallback face; composite faces keep 1.5's pixel law/AD-16; Design Note 2 defers the literal adapter path to Epic 3); out-of-scope per the intent-exclusion rule.
+  - `[low]` `[patch]` naive comment-strip in the new scans could mask banned tokens — grouped with the scan-posture finding below; the masking path (banned token after `//` inside a string literal) is theoretical, the group's patch aligns scan posture.
+  - `[low]` `[reject]` no score-formatting law (fractional/huge scores render literally) — fix would invent a display law the intent does not carry; unlikely in everyday use (games emit integer scores); reopen_if: an authored game ships non-integer scores and a smoke shows broken rows (Epic-3 games tier).
+  - `[low]` `[reject]` Patron ring counts rows per scoreSubmitted, not per run (multi-score runs could evict other cabinets) — theoretical at M0: the only wired game emits one score per run (pinned), the ring bound is a labelled placeholder.
+  - `[maybe-false]` `[defer]` default uuidFn throwing (crypto missing / insecure context) kills boot before loop.start — real if the deploy origin is plain http; settles on the deploy-origin scheme. Captured in frontmatter `deferred:`.
+  - `[low]` `[patch]` a missing `globalThis.localStorage` (undefined, not throwing) silently regenerated the id per reload with `degraded` never set — PATCHED: `localStoragePort` now throws on a missing global, so the service's try/catch labels the degrade per the law.
+  - `[low]` `[reject]` two tabs of one visitor could clobber a newer PB (stale cache) — theoretical hardening: two tabs seated at the same cabinet is not the walk-in room fiction; one single-drainer loop per page.
+  - `[false]` `[reject]` painter collision throw uncaught mid-frame on a cap bug — the intent mandates the throw as the loud guard for cap bugs; the cap-2 law keeps it unreachable; loud failure on an unreachable state is correct behavior.
+  - `[false]` `[reject]` patron seed null aliases seed 0 — unreachable: main.ts's seedOf always returns a number; null seeds only occur on the visitor path.
+  - `[low]` `[patch]` PB_KEY_PREFIX comment claimed "the key's leading gameId leg" (gameId is the trailing leg of the stored key) — PATCHED: comment now states the key carries both legs of the (stable gameId, visitorId) pair, the gameId leg being AD-9's stable one.
+  - `[low]` `[patch]` vacuous assertion `inputKeys() === ["controls"]` in the visitor test (the wrapper gate makes it the only reachable value) — PATCHED: assertion + recording removed; the AD-16 sim-ignorance halves live at the pinned wrapper gate (core/contract/wrapper.ts, throw pinned in core/seat.test.ts) and the no-ui-dom games-source scan.
+  - `[low]` `[patch]` `!MAIN.includes("localStorage")` scanned raw source while sibling scans strip comments (over-strict: a documenting comment reds it) — PATCHED: the pin now comment-strips like the no-ui-dom scan (grouped with the masking finding above; one entry: consistent scan posture).
+  - `[false]` `[reject]` surfaces.ts edit "outside the rows-present branch" (R-A1 hunk-literal reading) — the ruling's own intent sentence ("the drawScreen rows-present branch yields the attract title block") demands R-A2: the rows-present condition reaching the attract gate and scanTop; the empty-zone behavior stays byte-law-identical (1.4 pins untouched, green; mutation proved).
+  - `[false]` `[reject]` new test inside `core/room/` (cabinets.test.ts) — the Never list binds the law sources (painters/placements/data); the ruling's Verification demands the AD-28 pins at the surfaces tier, and the 1.4 pins stay byte-unchanged.
+  - `[false]` `[reject]` tests exercise the fake port, never real localStorage — the intent's hermeticity law mandates the injected fake (Node has no localStorage); the device path is the lead's Chrome/Edge smoke tier per the matrix.
+  - `[false]` `[reject]` shipped-entry behavior proven at source-pin tier + parallel rigs, no end-to-end chain test — the intent fixes that surface itself ("the shipped frame() wiring is pinned at the main-glue source tier (established DW-12 convention)").
+  - `[maybe-false]` `[defer]` same uuid-boot-throw edge as the edge-case layer (grouped, same root cause) — settles on the deploy-origin scheme.
+  - `[false]` `[reject]` occupancy-before-seat precedence called an invention — the intent states it ("classification reads scheduler occupancy BEFORE scheduler.dispatch — during a Patron run that is the live run") and the Code Map's kindOf law pins the order.
+  - `[low]` `[patch]` pseudonym derivation lacked the contract's inference label — PATCHED: header now labels the derivation shape (inference).
+  - `[false]` `[reject]` moved 1.4 glue pin (`placement.screenZones,` → composed spread) — the Code Map explicitly moves that pin; only the painter-side CAP-8 pins were required byte-unchanged (they are).
+
 ## Design Notes
 
 **Ledger inbox (Rule 17):** EMPTY — `LEDGER slice 1-8-the-room-knows-you-without-an-account` returned no entries; nothing to address or decline.
@@ -140,5 +182,24 @@ deferred: []
 
 ## Auto Run Result
 
-Status: blocked
-Blocking condition: intent gap — the authored B0 fallback face cannot paint ANY score row: measured against `core/room/surfaces.ts` `drawScreen` + `core/room/cabinets.ts` authored data, the scan band ends at y=309 and the NEXT row's top sits at y=330 on the 0.52m face (2-word attract block, 0.08m attract cap, 0.18m contract NEXT cap), leaving 21px — the score-row branch throws "score row 0 collides with the NEXT row" on the FIRST row (reproduced by executing `paintScreen` with the authored B0 zones plus one row). The spec's geometry inference (baselines 191/260/329/398 fit, i=4→467 > nextTop 416) does not match the authored code. AC3's visible score-zone law, AC5's "fallback face keeps painting the CURRENT table rows through paint steps", and the lead-smoke score-rows clause are therefore un-implementable inside this story's Never-list (`core/room/**` untouched, surfaces.ts UNCHANGED, cabinets.ts authored-readonly, the 0.18m NEXT cap is a DESIGN contract floor). Recommended amendment options for the lead: (A) scope the visible score-zone rendering out of this story to Epic 3's adapter-rendered play face (the spec's own Design Note 2 already defers the literal adapter path), keeping the headless service + wiring + `arcadeDebug.storage` tiers; (B) owner-authorized re-authoring of the fallback face layout (e.g. attract block yields to rows when scores exist — 2 rows fit that way — a public face-rendering decision needing UX sign-off). Implement pass made no source changes (the handoff returned mid-flight with this finding; verified independently); baseline `70767f60564ccd53b6093ebe49137162276e5411` untouched.
+Status: done
+Blocking condition: none
+
+Summary (round 2 — this pass implements against the AD-28-amended spec): the storage/identity service lands as `core/storage.ts` (boot-time UUIDv4 identity, Personal Bests under `arcade.pb.<visitorId>.<gameId>`, runtime-only Patron-run ring, kernel pseudonyms, sanitize law, `rowsFor` content law under the cap-2 AD-28 view, `ingest` riding the already-drained patrons records, degrade-to-memory storage port); `core/main.ts` wires it (eager boot identity, patrons-body ingest leg between the tick stamp and presenter.step/dispatch, occupancy-before-seat classification, composed fallback-face zones, `arcadeDebug.storage`); the sanctioned `drawScreen` rows-present branch yields the attract block (band rises to the top margin, baselines 177/309, 3rd row still throws); 17 pins added/moved across four test files.
+
+Files changed:
+- `core/storage.ts` (new) — the service; module header states the laws.
+- `core/storage.test.ts` (new) — 14 tests: the I/O matrix executed (identity, visitor chain through the real wrapper+seat, Patron path on the real scheduler rig with the AD-4 off-by-one guard, occupancy precedence, content law + cap 2, rings, idle-records-neither, two-visitor no-bleed, degradation, quarantine byte-stability, constant drift pins, no-clock source scan).
+- `core/main.ts` — service at the browser edge, eager identity at boot, ingest leg, composed fallback zones, debug handle.
+- `core/room/surfaces.ts` — AD-28 rows-present branch only (attractPainted + scanTop conditionals); the empty-zone law and all 1.4 pins untouched.
+- `core/room/cabinets.test.ts` — +1 AD-28 fit test (yield, band at top, 177/309, 3rd-row throw, steady across steps); 1.4 tests byte-unchanged.
+- `core/main-glue.test.ts` — moved composed-zone pin, composite-keeps-raw pin, arcadeDebug pin updated, ingest-order + occupancy-first + boot-eager source pins.
+- `core/no-ui-dom.test.ts` — dev-serve module list + `/core/storage.ts`; new single-storage-owner scan (core + games trees, comment-stripped).
+- `spec-1-8-...md` — frontmatter (baseline, status, deferred, triage log, this result).
+
+Review findings breakdown: 25 findings — 6 patched entries (7 findings: three storage.ts header/comment corrections, port missing-global throw, vacuous-assertion removal, scan-posture alignment; all low), 1 deferred entry (maybe-false, medium-unverified: boot uuidFn throw on origins without Web Crypto — settles on the deploy origin's scheme), 18 rejected with reasons in the Review Triage Log (10 false, 1 intent-excluded medium, 7 low rejected under the disposition rules). No high, no intent_gap, no bad_spec.
+Follow-up review recommendation: false — patched counts by verdict: high 0, medium 0, low 6.
+
+Verification performed: `npm run typecheck` clean; `npm test` 315 pass / 0 fail (298 baseline at 315c998 + 17 new; matches the recorded arithmetic), run pre- and post-patch; `node ci/depcheck.mjs`, `node ci/lint-bans.mjs` green; `node tools/gen-registry.mjs && git diff --exit-code -- generated/` no drift; `npm run build` succeeds (the >500 kB chunk warning is the sealed three.js bundle's precedent tier). Rule 19 mutations demonstrated this pass, each reverted byte-identical: drop eager boot visitorId (main-glue red); ingest after dispatch (main-glue red); keep painting attract over rows (AD-28 test red, empty-zone pins stay green); rowsFor drops the PB row (storage red); sanitize passthrough (storage red); pbKey without the visitorId leg (storage red); storage write without try/catch (degrade test red). Matrix Test Audit: every row covered by an executed passing test (fresh-env and Chrome/Edge rows are the lead's tiers per the spec).
+
+Residual risks: shipped-entry behavior proven at the DW-12 source-pin tier only (the lead's Chrome+Edge smoke covers the browser halves per the spec); the default localStorage port's missing-global throw is not test-executed (Node has no localStorage by design — inject fakes only); the deferred boot-uuid edge above.

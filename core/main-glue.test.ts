@@ -138,12 +138,20 @@ test("1.4 cabinet wiring: the phase advances as a kernel system, coin doors togg
   assert.ok(body.includes("lastScreenPaintStep = paintStep;"), "the gate records the step it just painted (else every frame would repaint)");
   assert.ok(body.includes("repaintScreen("), "the gate's body actually repaints (a gate with no paint call leaves every screen frozen)");
   assert.ok(body.includes("s.canvas,"), "the repaint rewrites the handle's own canvas (repaint-into-the-same-canvas leg)");
-  assert.ok(body.includes("placement.screenZones,"), "the repaint re-reads the placement's authored zone records");
+  // 1.8 pin move: the fallback repaint no longer consumes the raw placement
+  // zones — it consumes the COMPOSED records (authored zones spread + the
+  // table's rows). The placement record itself is never edited (read-only
+  // room data).
+  assert.ok(
+    body.includes("{ ...placement.screenZones, score: storage.rowsFor(placement.gameId) }"),
+    "the composed zones spread the authored record and replace ONLY the score leg with the table's rows (mutation: paint the raw zones and the score zone stays empty forever — red here)",
+  );
+  assert.match(body, /repaintScreen\(\s*s\.canvas,\s*zones,/, "the repaint consumes the composed zone records");
   assert.ok(body.includes("paintStep,"), "the repaint receives the tick-derived paint step (liveness source)");
   assert.ok(body.includes("three.markTextureUpdated(s.texture)"), "a repaint marks the SAME texture dirty (no second canvas)");
   assert.ok(
-    MAIN.includes("window.arcadeDebug = { player, loop, cabinets, seat, scheduler, presenter, containment };"),
-    "the console smoke can read the cabinet runtime, the seat cycle (1.5), the Patron scheduler + figure presenter (1.6), and the containment handle with injectFault (1.7 — the smoke drives a REAL fault chain) — console-only, zero UI (AD-24)",
+    MAIN.includes("window.arcadeDebug = { player, loop, cabinets, seat, scheduler, presenter, containment, storage };"),
+    "the console smoke can read the cabinet runtime, the seat cycle (1.5), the Patron scheduler + figure presenter (1.6), the containment handle with injectFault (1.7 — the smoke drives a REAL fault chain), and the storage/identity service (1.8 — the smoke reads visitorId + rowsFor, console-only) — console-only, zero UI (AD-24)",
   );
   for (const banned of ["performance.now", "Date.now", "Math.random", "tickCount"]) {
     assert.ok(!body.includes(banned), `the 1.4 frame legs must not read ${banned} either (liveness derives from tick state)`);
@@ -173,6 +181,7 @@ test("1.5 seat wiring (1.6/1.7-moved pins): the seat service owns the game-cabin
   const body = frameBody(MAIN);
   assert.ok(body.includes("pres.drawFrame(instance.snapshot());"), "the game half paints from the instance snapshot every frame");
   assert.ok(body.includes("compositeScreen("), "the Core composites the game canvas under the Core-painted NEXT row");
+  assert.match(body, /compositeScreen\(\s*s\.canvas,\s*placement\.screenZones,/, "1.8: the COMPOSITE path keeps the raw authored zones — the table feeds the fallback face only, the vendored presentation's session HI-SCORE is not the Core table (AD-16)");
   assert.ok(body.includes("!containment.faultedFor(placement.gameId) &&"), "1.7: a quarantined sim half takes the fallback painter (the face gate widens past 'has a presentation')");
   assert.ok(body.includes("if (faceComposites) continue;"), "a compositing face still skips the paint-step fallback (the 1.5 gate law survives under the wider gate)");
 });
@@ -241,6 +250,32 @@ test("1.6 patrons wiring: one drain per tick in a patrons system registered BETW
   assert.ok(
     drainAt >= 0 && drainAt < pBody.indexOf("drawTick = loop.tickCount;") && pBody.indexOf("drawTick = loop.tickCount;") < stepAt,
     "1.7: the stamp rides right behind the drain, ahead of the legs a fault can cost — a throwing presenter/dispatch never leaves it a tick stale (mutation: moving the stamp below the dispatch reds this pin)",
+  );
+  // 1.8 (AC2/AD-23/AD-4): the storage ingest leg rides the SAME drained
+  // records (no second drainEvents — the count pin above stands), runs
+  // after the tick stamp (its ctx.tick reads drawTick) and BEFORE
+  // presenter.step + scheduler.dispatch: during a Patron run the scheduler
+  // occupancy and lastSeed are the LIVE run (AD-4 currency). Mutation: move
+  // the ingest leg below the dispatch and every pin below reds (the score
+  // would credit the NEXT run's derived seed).
+  const ingestAt = pBody.indexOf("storage.ingest(patronsRecords,");
+  assert.ok(ingestAt >= 0, "the patrons body carries the storage ingest leg on the drained records (the single-drainer law: ingest consumes patronsRecords, never a fresh drain)");
+  assert.ok(
+    pBody.indexOf("drawTick = loop.tickCount;") < ingestAt && ingestAt < stepAt,
+    "the ingest leg runs after the tick stamp and ahead of the presenter/dispatch legs (same-tick phase order in the shipped entry)",
+  );
+  assert.ok(pBody.includes("tick: drawTick,"), "the ingest ctx stamps sim time from the tick-state variable (AD-3: no wall clock in a storage path)");
+  assert.ok(pBody.includes("?.lastSeed ?? 0"), "the seedOf leg reads the scheduler's RESOLVED run seed (AD-4 currency for Patron pseudonyms)");
+  // Classification order (occupancy-first): the kindOf closure asks the
+  // scheduler state() view BEFORE the seat state() view. Mutation: ask the
+  // chair first and a Patron-run score classifies visitor-side — the
+  // executed storage suite's precedence test and this pin both red.
+  const kindBlock = pBody.match(/kindOf: \(gameId\) => \{([\s\S]*?)\n\s*\},/);
+  assert.ok(kindBlock, "kindOf is a closure over the scheduler + seat plain-data state() views (neither interface widens — the 1.7 pins stay byte-unchanged)");
+  const kindBody = kindBlock![1];
+  assert.ok(
+    kindBody.indexOf('occ === "patron-autoplay"') >= 0 && kindBody.indexOf("seat.state()") > kindBody.indexOf("scheduler.state()"),
+    "occupancy is consulted before the chair (occupancy-before-seat classification)",
   );
   assert.ok(frameBody(MAIN).includes("tick: drawTick,"), "the draw legs' fault records stamp the tick-stamped variable");
   // AD-23's fixed phase order realized as registration order: cabinets,
@@ -311,4 +346,27 @@ test("1.7 containment wiring: the boot body lives behind attachGameEntries with 
   assert.ok(body.includes("supervisor.invoke({"), "each draw+composite leg goes through the supervisor (AD-15), not a bare try/catch");
   assert.ok(body.includes('hook: "draw",'), "draw faults are attributed under hook \"draw\" with the gameId (AD-26 shape: <gameId>.draw#N)");
   assert.ok(body.includes("if (!draw.ok) drawFaulted.add(placement.gameId);"), "a draw fault flips ONLY that face — neighbours and the sim half keep performing (halves fault independently)");
+});
+
+// Story 1.8: the storage/identity service in the shipped entry. The executed
+// laws live in core/storage.test.ts (identity, table, pseudonyms, content
+// law, degradation); these pins prove the SHIPPED entry wires the service:
+// eager identity at boot, browser-edge defaults at creation, the ingest leg
+// on the patrons drain (order pins in the 1.6 test above), the composed
+// zones on the fallback face (moved pin in the 1.4 test), and the debug
+// handle exposure (console-only read-back, AC4's smoke half).
+test("1.8 storage wiring (AD-16): the service is a core import created with browser-edge defaults, the identity is generated EAGERLY at boot before loop.start, and the debug type carries the service", () => {
+  assert.ok(
+    MAIN.includes('import { createStorageService, type StorageService } from "./storage.ts";'),
+    "storage is a core module consumed by the glue (AD-1 import direction: core -> core, games import nothing)",
+  );
+  assert.ok(MAIN.includes("const storage = createStorageService();"), "the service is created with its browser-edge defaults (the localStorage port + crypto.randomUUID live behind the service's own try/catch — the glue reaches no device API directly)");
+  // Same comment-stripped scan posture as the no-ui-dom single-owner scan:
+  // the ban binds CODE, so a comment may document the law without tripping it.
+  const MAIN_CODE = MAIN.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  assert.ok(!MAIN_CODE.includes("localStorage"), "main.ts itself never names the device store in code — single-owner law: core/storage.ts is the only core file that does (the no-ui-dom scan enforces the rest)");
+  const bootAt = MAIN.indexOf("storage.visitorId();");
+  const startAt = MAIN.indexOf("loop.start();");
+  assert.ok(bootAt >= 0 && startAt >= 0 && bootAt < startAt, "the identity is generated EAGERLY at boot (\"first visit generates\"): the id exists before the loop runs — 1.9's boot beat rides this wiring");
+  assert.ok(MAIN.includes("storage: StorageService;"), "the arcadeDebug type carries the storage service (the console smoke reads the table — zero UI, AD-24)");
 });
