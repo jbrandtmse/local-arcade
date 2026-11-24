@@ -15,7 +15,13 @@
 // 1.6 moved two 1.5 pins (the seat creation no longer takes the loop; the
 // seat system takes forwarded records) and adds the patrons-wiring pins:
 // one drain per tick in a cabinets->patrons->seat registered order, and the
-// figure re-pose legs in frame() (banned wall-clock still banned).
+// figure re-pose legs in frame() (banned wall-clock still banned). Story
+// 1.7 moved the boot body to core/containment.ts (the seat/scheduler
+// creation pins drop to block tier to see the faultedFor injection, the
+// createPresentation pin travels to the containment-wiring test), widens
+// the face gate to containment.faultedFor + drawFaulted, and pins the
+// supervisor-wrapped draw legs (the wall-clock ban stands byte-unchanged —
+// frame() stamps draw-fault records from the drawTick tick-state variable).
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -23,11 +29,22 @@ import path from "node:path";
 
 const REPO = path.resolve(import.meta.dirname, "..");
 const MAIN = readFileSync(path.join(REPO, "core", "main.ts"), "utf8");
+const CONTAINMENT = readFileSync(path.join(REPO, "core", "containment.ts"), "utf8");
 
 function frameBody(src: string): string {
   const m = src.match(/function frame\(\): void \{([\s\S]*?)\n\}/);
   assert.ok(m, "core/main.ts has a frame() render function");
   return m[1]!;
+}
+
+// 1.7 block tier: the seat/scheduler creations became multi-line (the
+// faultedFor injection), so substring pins read the whole creation block —
+// the substring must sit INSIDE the named service's block, not just
+// somewhere in the file.
+function creationBlock(src: string, decl: string): string {
+  const m = src.match(new RegExp(`const ${decl} = create\\w+\\(\\{[\\s\\S]*?\\n\\}\\);`));
+  assert.ok(m, `core/main.ts creates "${decl}" in a multi-line creation block`);
+  return m[0];
 }
 
 test("render reads tick state only: camera position/rotation come from player state incl. the bob term (AC2, AD-3)", () => {
@@ -125,27 +142,39 @@ test("1.4 cabinet wiring: the phase advances as a kernel system, coin doors togg
   assert.ok(body.includes("paintStep,"), "the repaint receives the tick-derived paint step (liveness source)");
   assert.ok(body.includes("three.markTextureUpdated(s.texture)"), "a repaint marks the SAME texture dirty (no second canvas)");
   assert.ok(
-    MAIN.includes("window.arcadeDebug = { player, loop, cabinets, seat, scheduler, presenter };"),
-    "the console smoke can read the cabinet runtime, the seat cycle (1.5), and the Patron scheduler + figure presenter (1.6) — console-only, zero UI (AD-24)",
+    MAIN.includes("window.arcadeDebug = { player, loop, cabinets, seat, scheduler, presenter, containment };"),
+    "the console smoke can read the cabinet runtime, the seat cycle (1.5), the Patron scheduler + figure presenter (1.6), and the containment handle with injectFault (1.7 — the smoke drives a REAL fault chain) — console-only, zero UI (AD-24)",
   );
   for (const banned of ["performance.now", "Date.now", "Math.random", "tickCount"]) {
     assert.ok(!body.includes(banned), `the 1.4 frame legs must not read ${banned} either (liveness derives from tick state)`);
   }
 });
 
-test("1.5 seat wiring (1.6-moved pins): the seat service owns the game-cabinet E-law, the seated view law, the raw-code slot mapping in-tick, and the event sink to the presentation half (AC4/AC5 wiring)", () => {
-  assert.ok(MAIN.includes("const seat = createSeatService({ player, cabinets, busy: busyGate });"), "the seat is created over the kernel's own player/cabinets plus the scheduler's busy gate (1.6 pin move: the loop leg left with the drain)");
+test("1.5 seat wiring (1.6/1.7-moved pins): the seat service owns the game-cabinet E-law, the seated view law, the raw-code slot mapping in-tick, and the event sink to the presentation half (AC4/AC5 wiring)", () => {
+  const seatBlock = creationBlock(MAIN, "seat");
+  assert.ok(seatBlock.includes("createSeatService({"), "the seat is created over the kernel's own player/cabinets (1.6 pin move: the loop leg left with the drain)");
+  assert.ok(seatBlock.includes("busy: busyGate,"), "the seat sees the scheduler only through the injected busy gate (1.6)");
+  assert.ok(
+    seatBlock.includes("faultedFor: (gameId) => containment.faultedFor(gameId),"),
+    "1.7: the containment predicate reaches the seat as a deferred closure — the faulted E-law and same-tick release run in the SHIPPED entry, not only in the unit rigs",
+  );
   assert.ok(MAIN.includes("seat.track({"), "game-wired placements track with instance, kernel input object, controls, and the authored legend keys");
   assert.ok(MAIN.includes("seatTrackVolumeIds.has(p.volumeId)"), "the seat E-routing gate IS the track gate (an entry without controls or legend keys keeps the plain 1.4 law, never an untracked-seat fault)");
   assert.ok(MAIN.includes("player.registerInteractable(p.volumeId, (id) => seat.handleInteract(id));"), "a tracked game cabinet routes E through the seat (the plain 1.4 toggle stays for the rest)");
   assert.ok(MAIN.includes("player.step(1, seat.playerView(input.takeView()));"), "the player system consumes the seat's view (seated -> zeroed axes/aim, E kept)");
   assert.ok(MAIN.includes('loop.addSystem("seat", () => seat.step(input.takeCodeView(), patronsRecords));'), "the seat maps raw codes onto declared slots inside the tick, AFTER the patrons dispatch, on the records the patrons system drained (1.6 pin move: the seat no longer drains — AD-23)");
   assert.ok(MAIN.includes("seat.setEventSink((rec) => presentations.get(rec.gameId)?.onEvent?.(rec.event));"), "the seat's drained records ride to the presentation half (sole M0 consumer)");
-  assert.ok(MAIN.includes("entry.createPresentation({ makeCanvas:"), "the kernel hands the presentation its canvas through the injected factory (the adapter never touches DOM)");
+  assert.match(
+    MAIN,
+    /attachGameEntries\(\s*gameRegistry,\s*loop,\s*supervisor,\s*makeCanvas,\s*\)/,
+    "1.7 pin move: the instances + presentations now come from the containment seam — exactly ONE boot call site, every factory under the guard (DW-2)",
+  );
+  assert.ok(!MAIN.includes("createGameInstance("), "1.7: main.ts builds no instance directly — a second unguarded boot call is exactly the AC3 crash this pin catches");
   const body = frameBody(MAIN);
   assert.ok(body.includes("pres.drawFrame(instance.snapshot());"), "the game half paints from the instance snapshot every frame");
   assert.ok(body.includes("compositeScreen("), "the Core composites the game canvas under the Core-painted NEXT row");
-  assert.ok(body.includes("presentations.has(placement.gameId)) continue;"), "a game-driven face skips the paint-step fallback (the gate governs the fallback path only)");
+  assert.ok(body.includes("!containment.faultedFor(placement.gameId) &&"), "1.7: a quarantined sim half takes the fallback painter (the face gate widens past 'has a presentation')");
+  assert.ok(body.includes("if (faceComposites) continue;"), "a compositing face still skips the paint-step fallback (the 1.5 gate law survives under the wider gate)");
 });
 
 test("1.5 render-chain re-arm: frame() arms requestAnimationFrame BEFORE its draw legs (a throwing game draw must not strand the chain; AD-15 posture, DW-2/DW-6 fault family)", () => {
@@ -165,7 +194,12 @@ test("1.6 patrons wiring: one drain per tick in a patrons system registered BETW
   assert.ok(MAIN.includes("const presenter = createFigurePresenter();"), "the kernel owns the reaction library + figure state");
   assert.ok(MAIN.includes("busyFor: (volumeId) => scheduler.busyFor(volumeId),"), "the seat's busy leg defers to the scheduler");
   assert.ok(MAIN.includes("toggleWait: (volumeId) => scheduler.toggleWait(volumeId),"), "and the wait toggle");
-  assert.ok(MAIN.includes("const scheduler = createPatronScheduler({ seat, player, presenter });"), "the scheduler gets the seat through the SeatHandover interface (one direction, scheduler -> seat)");
+  const schedBlock = creationBlock(MAIN, "scheduler");
+  assert.ok(schedBlock.includes("createPatronScheduler({"), "the scheduler gets the seat through the SeatHandover interface (one direction, scheduler -> seat)");
+  assert.ok(
+    schedBlock.includes("faultedFor: (gameId) => containment.faultedFor(gameId),"),
+    "1.7: the same containment predicate reaches the scheduler (dwell re-arm + break relaunch gated in the SHIPPED entry)",
+  );
 
   // Busy is room data: run states are tracked per busy placement record —
   // no hand-typed id list anywhere in the glue.
@@ -193,6 +227,22 @@ test("1.6 patrons wiring: one drain per tick in a patrons system registered BETW
     drainAt >= 0 && stepAt > drainAt && dispatchAt > stepAt,
     "inside the patrons body the order is drain -> figure step -> dispatch on this tick's records (AD-23 same-tick phase order in the shipped entry)",
   );
+  // 1.7 (DW-3 drain half): the drain is the body's FIRST statement — a
+  // dispatch that throws must never cost this tick's queue (the queue is
+  // already handed to the consumers before anything can fault).
+  assert.ok(
+    pBody.trimStart().startsWith("patronsRecords = loop.drainEvents();"),
+    "the drain leads the patrons body (mutation: moving it below the dispatch silently loses records on a throwing tick — AC6's drain regression)",
+  );
+  // 1.7 draw-stamp leg: frame() stamps its draw-fault records from this
+  // tick-state variable, which is why the frame's "tickCount" ban above
+  // stays byte-unchanged (AD-3 — sim time comes from the tick, not a clock).
+  assert.ok(pBody.includes("drawTick = loop.tickCount;"), "the patrons body stamps the draw-record tick (the frame reads drawTick, never the loop's clock)");
+  assert.ok(
+    drainAt >= 0 && drainAt < pBody.indexOf("drawTick = loop.tickCount;") && pBody.indexOf("drawTick = loop.tickCount;") < stepAt,
+    "1.7: the stamp rides right behind the drain, ahead of the legs a fault can cost — a throwing presenter/dispatch never leaves it a tick stale (mutation: moving the stamp below the dispatch reds this pin)",
+  );
+  assert.ok(frameBody(MAIN).includes("tick: drawTick,"), "the draw legs' fault records stamp the tick-stamped variable");
   // AD-23's fixed phase order realized as registration order: cabinets,
   // then patrons, then seat (seat's controls apply to the NEXT tick).
   const cabinetsAt = MAIN.indexOf('loop.addSystem("cabinets"');
@@ -213,4 +263,52 @@ test("1.6 patrons wiring: one drain per tick in a patrons system registered BETW
   assert.ok(body.includes("const off = presenter.figureOffset();"), "the pose delta is a pure read of presenter tick state (no wall-clock, no recomputation in render)");
   assert.ok(body.includes("f.torso.position.set(f.base.x + leanX, FIGURE_PARTS.torso.centerY + off.torsoY, f.base.z + leanZ)"), "the torso re-poses from the reaction offset + the lean along the placement facing");
   assert.ok(body.includes("f.head.position.set(f.base.x + leanX, FIGURE_PARTS.head.centerY + off.headY, f.base.z + leanZ)"), "and the head rides the torso");
+});
+
+// Story 1.7: the containment seam in the shipped entry. The boot body
+// MOVED to core/containment.ts (one guarded call site remains), the frame
+// decides every face through the widened gate, and each draw leg is
+// supervisor-wrapped with a persistent per-face flip. The executed tiers
+// cover the laws themselves (containment/seat/scheduler suites); these
+// pins prove the SHIPPED entry routes through them.
+test("1.7 containment wiring: the boot body lives behind attachGameEntries with every factory under hook \"boot\", the loop is handed the GUARDED instance, the face gate reads faultedFor + drawFaulted, draw legs are supervisor-wrapped with a forever-flip on fault, and main.ts keeps no unguarded factory call", () => {
+  assert.ok(
+    MAIN.includes('import { attachGameEntries, type Containment } from "./containment.ts";'),
+    "the containment seam is a core module (AD-1: core owns it; the seam imports no games)",
+  );
+  assert.ok(!MAIN.includes("createGameInstance("), "main.ts creates no sim directly (mutation: a direct unguarded boot here is the AC3 crash — one throwing factory kills the page)");
+  assert.ok(!MAIN.includes("createPresentation("), "nor a presentation directly — the moved boot body must not leave a second unguarded copy behind");
+
+  // The seam itself (source tier): factories under the boot guard, the
+  // guarded instance reaching the loop, and the 1.5 canvas-factory law at
+  // its new home.
+  assert.ok(CONTAINMENT.includes('hook: "boot",'), "every factory runs under the supervisor's boot hook (DW-2: a throwing factory is one fault record, not a dead page)");
+  assert.ok(CONTAINMENT.includes("createGameInstance(entry.createSim, entry.seed ?? 0)"), "the sim half is built THROUGH the wrapper inside the guard (the AD-8 contract seeding law intact)");
+  assert.ok(CONTAINMENT.includes("entry.createPresentation!({ makeCanvas })"), "the kernel hands the presentation its canvas through the injected factory (the 1.5 pin travels with the moved body)");
+  assert.ok(CONTAINMENT.includes("loop.addInstance(entry.id, guard.instance, tickInput);"), "the loop is handed the GUARDED instance — the quarantine is on the shipped surface, not a test-only decorator");
+
+  // AC3's consequence half: a boot-faulted entry leaves the instances/
+  // instanceInputs maps without that entry, and the track gates' null
+  // checks are the shipped bridge from that state to the plain 1.4 law
+  // (fallback face, coin-door E) for its Cabinet.
+  assert.ok(
+    MAIN.includes("instance == null || tickInput == null"),
+    "the seat-track gate drops a boot-faulted entry (no instance/TickInput) — never a track on missing parts (mutation: dropping the instance null-check reds this pin)",
+  );
+  assert.ok(
+    MAIN.includes("entry == null || instance == null || entry.seed == null"),
+    "the scheduler-track gate degrades the same way — a boot-faulted game gets no Patron run state (AC3, matrix row 1)",
+  );
+
+  // The frame's face gate and draw legs.
+  const body = frameBody(MAIN);
+  assert.ok(body.includes("const faceComposites ="), "the frame decides the face path through ONE gate variable");
+  assert.ok(body.includes("presentations.has(placement.gameId) &&"), "a face with no live presentation falls back (boot-half fault or never-wired cabinet)");
+  assert.ok(body.includes("!drawFaulted.has(placement.gameId);"), "a face whose draw leg faulted once falls back FOREVER (bounded logging — the Never against silent per-frame retry, DW-3)");
+  assert.ok(body.includes("if (faceComposites) continue;"), "and the fallback body runs for exactly the gated faces");
+  assert.ok(MAIN.includes("const drawFaulted = new Set<string>();"), "the draw-fault flip is persistent state, not a frame-local");
+  assert.ok(body.includes('containment.faultedFor(placement.gameId) || drawFaulted.has(placement.gameId)) continue;'), "the draw loop skips faulted faces BEFORE invoking (one fault per face, forever — not one per frame)");
+  assert.ok(body.includes("supervisor.invoke({"), "each draw+composite leg goes through the supervisor (AD-15), not a bare try/catch");
+  assert.ok(body.includes('hook: "draw",'), "draw faults are attributed under hook \"draw\" with the gameId (AD-26 shape: <gameId>.draw#N)");
+  assert.ok(body.includes("if (!draw.ok) drawFaulted.add(placement.gameId);"), "a draw fault flips ONLY that face — neighbours and the sim half keep performing (halves fault independently)");
 });

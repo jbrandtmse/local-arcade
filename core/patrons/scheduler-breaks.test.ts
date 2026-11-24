@@ -14,7 +14,9 @@
 // real sit/stand law is pinned in seat.test.ts, and the real-rig legs of
 // both laws run the gameEnded kind in scheduler.test.ts). Real scheduler,
 // real presenter, real placements (busy B0), real player, real wrapper
-// instance.
+// instance. Story 1.7 adds the launch-gate pair at the same seam (the
+// faultedFor predicate is arbRig's optional third input; the real-rig
+// fault-during-autoplay leg runs in scheduler.test.ts).
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { EventRecord } from "../loop.ts";
@@ -42,7 +44,7 @@ function breakRec(tick: number, type: "roundBreak"): EventRecord {
 // The seat's one-chair contract, mirrored at the injected seam: a taken
 // chair blocks a second takeOver, and seatedAt reports exactly the volume
 // handed over (what the real seat does after its sit law ran).
-function arbRig() {
+function arbRig(faultedFor?: (gameId: string) => boolean) {
   const player = createPlayerController(collisionVolumes, ENTRY_SPAWN);
   const presenter: FigurePresenter = createFigurePresenter();
   const taken: string[] = [];
@@ -59,7 +61,7 @@ function arbRig() {
     },
   };
   const instance = createGameInstance(ENTRY.createSim, ENTRY.seed ?? 0);
-  const sched: PatronScheduler = createPatronScheduler({ seat, player, presenter });
+  const sched: PatronScheduler = createPatronScheduler({ seat, player, presenter, faultedFor });
   sched.track({
     volumeId: "cabinet-B0",
     gameId: ENTRY.id,
@@ -118,4 +120,33 @@ test("roundBreak re-offer: with the claimant absent the machine restarts autopla
   assert.notEqual(r.b0().lastSeed, seed0, "and it differs from run N");
   assert.equal(r.b0().queue.length, 1, "the absent claim persists (until un-waited or honored)");
   assert.equal(r.sched.figureActive("cabinet-B0"), true, "the Patron (run 2) stands again");
+});
+
+// --- Story 1.7 (AC5): the launch gate while faulted, at the seam -------------------------
+
+test("1.7 the launch gate while faulted: a faulted Cabinet never fires the dwell launch (no autoplay hook call, no derived seed consumed, occupancy stays attract, figure off), and at a roundBreak under fault the Patron flips to attract with the queue VOIDED instead of consuming a relaunch — an arbitration never relaunches into a dead sim", () => {
+  // (a) dwell-launch half: the fault already stands when the dwell closes.
+  const r = arbRig(() => true);
+  r.sched.dispatch([], ATTRACT_DWELL_TICKS);
+  assert.equal(r.b0().occupancy, "attract", "the dwell launch is gated while faulted (busy-never-withholds becomes fallback PERFORMANCE for a faulted cabinet, not a relaunch)");
+  assert.equal(r.b0().runCount, 0, "no autoplay run consumed while faulted");
+  assert.equal(r.b0().lastSeed, -1, "no derived seed spent at all — the gate precedes the seed arithmetic");
+  assert.equal(r.instance.mode(), "attract", "the autoplay hook was never called at a faulted Cabinet");
+  assert.equal(r.sched.figureActive("cabinet-B0"), false, "the figure never appears at a faulted Cabinet");
+
+  // (b) break-relaunch half: healthy launch first, the fault lands while a
+  // claim sits in the queue, and the break arrives with the claimant absent.
+  let broken = false;
+  const r2 = arbRig((gameId) => broken && gameId === "moon-patrol");
+  r2.sched.dispatch([], ATTRACT_DWELL_TICKS);
+  assert.equal(r2.b0().occupancy, "patron-autoplay", "healthy launch first: the Patron holds the machine");
+  r2.sched.toggleWait("cabinet-B0"); // claim; the player stays at ENTRY_SPAWN (absent at the break)
+  broken = true;
+  r2.sched.dispatch([breakRec(ATTRACT_DWELL_TICKS + 1, "roundBreak")], ATTRACT_DWELL_TICKS + 1);
+  assert.deepEqual(r2.taken, [], "no handover (the claimant is absent) — and no relaunch either");
+  assert.equal(r2.b0().occupancy, "attract", "the fault lifts the Patron this same dispatch: the break never relaunches a dead sim");
+  assert.deepEqual(r2.b0().queue, [], "the queue is voided with the fault (no pending claim on a dead machine)");
+  assert.equal(r2.b0().runCount, 1, "no second run consumed — the 1.6 re-offer law does not fire while faulted");
+  assert.equal(r2.b0().lastSeed, derivedSeed(ENTRY.seed!, 0), "run 1's derived seed is still the last seed spent");
+  assert.equal(r2.instance.mode(), "autoplay", "the raw instance stays where the fault froze it — a relaunch would flip it to attract, corroborating the runCount/lastSeed pins above (quarantine itself is the guard's law, pinned in containment.test.ts)");
 });

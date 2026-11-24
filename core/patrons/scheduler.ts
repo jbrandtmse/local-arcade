@@ -130,6 +130,15 @@ export function createPatronScheduler(opts: {
   seat: SeatHandover;
   player: PlayerController;
   presenter: FigurePresenter;
+  /** Story 1.7 (AC5): the containment predicate — the gameId's sim is
+   * quarantined (BusyGate injection idiom; absent = every 1.6 law byte-
+   * unchanged). Laws it changes: faulted + patron-autoplay -> occupancy
+   * "attract" with the queue voided (the figure lifts off via figureActive
+   * — no separate figure change), and NO autoplay launch ever fires while
+   * faulted (the dwell re-arm AND the break-time relaunch: an arbitration
+   * never relaunches into a dead sim — busy-never-withholds extends to
+   * faulted cabinets as fallback performance, not a relaunch). */
+  faultedFor?: (gameId: string) => boolean;
 }): PatronScheduler {
   const placements = opts.placements ?? cabinetPlacements;
   const states = new Map<string, CabinetRunState>();
@@ -137,6 +146,10 @@ export function createPatronScheduler(opts: {
   let tickSeen = 0;
 
   function launch(st: CabinetRunState): void {
+    // Story 1.7 (AC5): the one launch gate — dwell re-arm AND break-time
+    // relaunch both route through here, so a faulted cabinet never
+    // relaunches autoplay while faulted.
+    if (opts.faultedFor?.(st.gameId) === true) return;
     st.lastSeed = derivedSeed(st.seed, st.runCount);
     st.runCount += 1;
     st.instance.autoplay(st.lastSeed);
@@ -234,6 +247,15 @@ export function createPatronScheduler(opts: {
 
       // --- occupancy tick law: dwell launches + the stand observation ----
       for (const st of states.values()) {
+        if (opts.faultedFor?.(st.gameId) === true && st.occupancy === "patron-autoplay") {
+          // Story 1.7 (AC5): the fault lifts the Patron off the machine
+          // this same tick — occupancy returns to attract, the queue is
+          // voided, and the figure follows via figureActive (the frame
+          // reads it; no separate figure change needed). The launch gate
+          // keeps it attract for as long as the fault stands.
+          st.occupancy = "attract";
+          st.queue.length = 0;
+        }
         if (st.occupancy === "attract") {
           if (tick >= st.rearmTick && !opts.seat.seatedAt(st.volumeId)) launch(st);
         } else if (st.occupancy === "visitor-seated" && !opts.seat.seatedAt(st.volumeId)) {

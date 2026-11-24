@@ -54,7 +54,7 @@ interface Visit {
 // records) — the 1.5 exclusive-drain rig move), pointer-locked aim. The
 // scheduler tracks nothing here: this suite drives the tracked NOT-busy
 // machine (busy B0 is pinned in patrons/scheduler.test.ts).
-function rig(seedFn: () => number): Visit {
+function rig(seedFn: () => number, faultedFor?: (gameId: string) => boolean): Visit {
   const cabinets = createCabinetRuntime();
   const player = createPlayerController(collisionVolumes, ENTRY_SPAWN);
   const clock = { ms: 0 };
@@ -70,7 +70,7 @@ function rig(seedFn: () => number): Visit {
     busyFor: (volumeId) => scheduler.busyFor(volumeId),
     toggleWait: (volumeId) => scheduler.toggleWait(volumeId),
   };
-  const seat = createSeatService({ player, cabinets, busy: busyGate, seedFn });
+  const seat = createSeatService({ player, cabinets, busy: busyGate, faultedFor, seedFn });
   seat.track({
     volumeId: "cabinet-B0",
     gameId: entry.id,
@@ -111,8 +111,8 @@ function rig(seedFn: () => number): Visit {
 
 // Walk the visitor into center-of-view of B0 (real resolver, real
 // targeting), settle 30 idle ticks (bob eased out), return the rig.
-function walkToB0(seedFn: () => number = () => 4242): Visit {
-  const v = rig(seedFn);
+function walkToB0(seedFn: () => number = () => 4242, faultedFor?: (gameId: string) => boolean): Visit {
+  const v = rig(seedFn, faultedFor);
   const g = placementGeometry("B0");
   const want = Math.atan2(-(g.center.x - ENTRY_SPAWN.x), -(g.center.z - ENTRY_SPAWN.z));
   v.input.mouseMove((ENTRY_SPAWN.yaw - want) / MOUSE_SENSITIVITY, 0);
@@ -263,4 +263,28 @@ test("the on-screen legend, the authored kernel key map, and the keys these test
   const advertised = ["ArrowLeft", "ArrowRight", "Enter", "KeyA", "KeyD", "KeyJ", "KeyK", "KeyX", "KeyZ"];
   assert.deepEqual(codesOf(block), advertised, "SEAT_KEYS advertises exactly the nine keys the screen teaches (no dead key advertised, no working key hidden)");
   assert.deepEqual(codesOf(JSON.stringify(MOON_KEYS)), advertised, "and the key set the executed pins above drive is the same nine (authored and executed never drift apart)");
+});
+
+// Story 1.7 (AC5 x UX-DR24): the legend law and the fault law meet. The
+// nine keys keep their meaning at a healthy Cabinet; at a faulted one the
+// seat law reroutes E BEFORE any sit can happen, so no declared slot is
+// ever written and no legend key can pull a dead sim into play.
+test("1.7 legend keys cannot override the fault law at a faulted Cabinet: E twice toggles the coin door only, never sits, and Enter/jump/fire/arrows never start play — the machine stays an attract performer behind its fallback face", () => {
+  const v = walkToB0(() => 4242, () => true);
+  v.key("KeyE", true); v.tick(); v.key("KeyE", false);
+  assert.equal(v.cabinets.coinDoors["cabinet-B0"], true, "the first E still opens the door (the fallback face performs the 1.4 law)");
+  v.key("KeyE", true); v.tick(); v.key("KeyE", false);
+  assert.equal(v.cabinets.coinDoors["cabinet-B0"], false, "the second E closes instead of sitting");
+  assert.equal(v.instance.mode(), "attract", "the sit never happened, so the legend's START can never mean play here");
+  // Press every legend key anyway: with no chair taken the seat's mapping
+  // never runs — the fault law reroutes upstream of the declared slots.
+  for (const code of ["Enter", "KeyX", "KeyZ", "ArrowRight", "KeyA"]) {
+    v.key(code, true);
+    v.tick();
+    v.key(code, false);
+  }
+  assert.equal(v.instance.mode(), "attract", "no legend key at an empty chair at a faulted Cabinet starts play");
+  const h0 = v.instance.stateHash();
+  for (let i = 0; i < 30; i++) v.tick();
+  assert.notEqual(v.instance.stateHash(), h0, "the attract performance behind the fallback face stays alive (hash advances)");
 });

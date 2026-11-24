@@ -9,13 +9,8 @@
 
 import * as THREE from "three";
 import { createKernelLoop, type EventRecord, type KernelLoop } from "./loop.ts";
-import {
-  createGameInstance,
-  math,
-  type GameInstance,
-  type PresentationHooks,
-  type TickInput,
-} from "./contract/index.ts";
+import { math } from "./contract/index.ts";
+import { attachGameEntries, type Containment } from "./containment.ts";
 import { createInputService } from "./input/index.ts";
 import { createPlayerController, EYE_HEIGHT, type PlayerController } from "./player.ts";
 import { createSeatService, type BusyGate, type SeatKeyMap, type SeatService } from "./seat.ts";
@@ -48,7 +43,10 @@ declare global {
      * smoke (Design Notes item 6) — nothing is rendered or announced.
      * 1.4 adds the cabinet runtime (phase + coin doors) for the console
      * liveness/targeting smoke; 1.6 adds the Patron scheduler (occupancy
-     * per busy cabinet + queue) and the figure presenter (reaction). */
+     * per busy cabinet + queue) and the figure presenter (reaction); 1.7
+     * adds the containment handle — faultedFor reads + injectFault, the
+     * console-only smoke trigger that drives the real fault chain
+     * (UX-DR18: zero UI announces a fault; the fallback IS the fiction). */
     arcadeDebug: {
       player: PlayerController;
       loop: KernelLoop;
@@ -56,6 +54,7 @@ declare global {
       seat: SeatService;
       scheduler: PatronScheduler;
       presenter: FigurePresenter;
+      containment: Containment;
     };
   }
 }
@@ -96,26 +95,22 @@ const loop = createKernelLoop({
   onFault: (entry) => console.error(`[supervisor fault] tick=${entry.tick} id=${entry.errorId}: ${entry.message}`),
 });
 
-// Story 1.5: each entry gets its own kernel-owned TickInput object (the seat
-// service writes the per-tick mapped controls into it) and — when the entry
-// ships a presentation half — its own presentation canvas the kernel hands
-// out through the injected makeCanvas (the adapter never reaches for DOM).
-const instances = new Map<string, GameInstance>();
-const instanceInputs = new Map<string, TickInput>();
-const presentations = new Map<string, PresentationHooks>();
-for (const entry of gameRegistry) {
-  const instance = createGameInstance(entry.createSim, entry.seed ?? 0);
-  const tickInput: TickInput = { controls: {} };
-  instances.set(entry.id, instance);
-  instanceInputs.set(entry.id, tickInput);
-  loop.addInstance(entry.id, instance, tickInput);
-  if (entry.createPresentation != null) {
-    presentations.set(
-      entry.id,
-      entry.createPresentation({ makeCanvas: (width, height) => new OffscreenCanvas(width, height) }),
-    );
-  }
-}
+// Story 1.5's boot body (kernel-owned TickInput per entry, presentation
+// canvases handed out through the injected makeCanvas) MOVED to the 1.7
+// containment seam: attachGameEntries runs every factory through the
+// supervisor under hook "boot" (DW-2 — a throwing factory logs one fault
+// and the entry stays unattached; the page still opens), registers each
+// surviving instance GUARDED (first sim fault quarantines it — AC1), and
+// hands back the same maps plus the containment handle. The loop's
+// supervisor is the one room record sink; its onFault prints the single
+// "[supervisor fault]" line the smoke watches.
+const supervisor = loop.supervisor;
+const { containment, instances, instanceInputs, presentations } = attachGameEntries(
+  gameRegistry,
+  loop,
+  supervisor,
+  makeCanvas,
+);
 
 // First-person shell: the authored Arcade Room AABB list (1.3) drives
 // blocking through the untouched 1.2 resolver, and the visitor spawns just
@@ -148,7 +143,15 @@ const busyGate: BusyGate = {
   busyFor: (volumeId) => scheduler.busyFor(volumeId),
   toggleWait: (volumeId) => scheduler.toggleWait(volumeId),
 };
-const seat = createSeatService({ player, cabinets, busy: busyGate });
+// 1.7: the containment predicate is injected deferred (BusyGate idiom) —
+// a faulted Cabinet falls back to the plain coin-door E law, and a seated
+// Visitor is released by the stand law the same tick the fault lands.
+const seat = createSeatService({
+  player,
+  cabinets,
+  busy: busyGate,
+  faultedFor: (gameId) => containment.faultedFor(gameId),
+});
 // One gate decides tracked-ness: a gameId-wired placement routes E through
 // the seat ONLY when it actually tracks (entry + declared controls + legend
 // keys present). An authoring gap (entry without controls, placement without
@@ -183,7 +186,15 @@ seat.setEventSink((rec) => presentations.get(rec.gameId)?.onEvent?.(rec.event));
 // come off it, never a fresh roll) and its embedded impulse mapping. An
 // authoring gap keeps the cabinet attract-idle instead of faulting every
 // tick (1.5 precedent: authoring gaps degrade, they do not crash).
-const scheduler = createPatronScheduler({ seat, player, presenter });
+// 1.7: the same containment predicate reaches the scheduler — faulted +
+// patron-autoplay lifts the figure (occupancy -> attract, queue voided),
+// and no autoplay launch fires while faulted.
+const scheduler = createPatronScheduler({
+  seat,
+  player,
+  presenter,
+  faultedFor: (gameId) => containment.faultedFor(gameId),
+});
 for (const p of cabinetPlacements) {
   if (p.busy !== true || p.gameId == null) continue;
   const entry = gameRegistry.find((e) => e.id === p.gameId);
@@ -267,9 +278,19 @@ for (const p of cabinetPlacements) {
 // sanctioned wiring change), advances the figure state, and runs the
 // scheduler's impulse stage + break arbitration. The seat system below
 // receives the same records forwarded — no second drain.
+let drawTick = 0; // tick-stamped sim time for draw-fault records (set by the patrons system)
 let patronsRecords: EventRecord[] = [];
 loop.addSystem("patrons", () => {
   patronsRecords = loop.drainEvents();
+  // 1.7 (AC6/DW-3 drain half + draw records): the drain is the FIRST
+  // statement of the body, before anything that can throw — every tick's
+  // queue reaches the consumers (pinned as a regression). The draw-stamp
+  // rides right behind it, ahead of the legs a fault can cost, so the
+  // stamp never goes stale past a dispatch throw: fault records stamp
+  // this tick's loop.tickCount (AD-3), and frame() reads this tick-state
+  // variable instead of touching the loop's clock (the 1.4 frame ban on
+  // tickCount reads stays byte-unchanged).
+  drawTick = loop.tickCount;
   presenter.step(loop.tickCount);
   scheduler.dispatch(patronsRecords, loop.tickCount);
 });
@@ -310,11 +331,17 @@ loop.start();
 // runtime's paint STEP changed — equal ticks paint equal pixels, and a
 // still step costs no repaint at all.
 let lastScreenPaintStep = -1;
+// 1.7: faces whose draw leg faulted — persistent, logged ONCE (the Never
+// against silent per-frame try/catch: a draw fault flips that face to the
+// fallback painter forever, the sim half keeps ticking untouched).
+const drawFaulted = new Set<string>();
 function frame(): void {
   // Re-arm FIRST, before any draw: drawFrame runs game adapter code and the
   // composites read it — a throwing draw frame must strand the chain never.
-  // One bad frame costs at most itself; full fault containment is Story
-  // 1.7's tier (DW-2/DW-6).
+  // One bad frame costs at most itself; 1.7's containment tier now wraps
+  // the draw legs below (supervisor + the persistent drawFaulted flip),
+  // but this re-arm-first posture stands byte-unchanged (1.5's in-story
+  // patch, now backed by its tier).
   requestAnimationFrame(frame);
   const p = player.state;
   camera.position.set(p.x, EYE_HEIGHT + math.sin(p.bobPhase) * p.bobAmp, p.z);
@@ -342,14 +369,25 @@ function frame(): void {
     f.torso.position.set(f.base.x + leanX, FIGURE_PARTS.torso.centerY + off.torsoY, f.base.z + leanZ);
     f.head.position.set(f.base.x + leanX, FIGURE_PARTS.head.centerY + off.headY, f.base.z + leanZ);
   }
-  // 1.5 paint-step gate: the fallback painters cover only faces WITHOUT a
-  // presentation half (a game-driven face repaints every frame below).
+  // 1.5 paint-step gate: the fallback painters cover every face NOT
+  // actively compositing (a game-driven face repaints every frame below).
+  // 1.7: "actively compositing" is now the full face gate — a face takes
+  // the fallback (phase-driven repaint keeps the screen moving, the marquee
+  // stays lit — AD-15's fallback performance, no new animator) when its
+  // sim half is quarantined or its boot half failed (no live presentation
+  // anyway) or its draw leg faulted once. No fault UI: the fallback IS the
+  // fiction (AD-24).
   const paintStep = screenPaintStep(cabinets);
   if (paintStep !== lastScreenPaintStep) {
     lastScreenPaintStep = paintStep;
     for (const s of handles.screens) {
       const placement = placementByVolumeId(s.id);
-      if (placement.gameId != null && presentations.has(placement.gameId)) continue;
+      const faceComposites =
+        placement.gameId != null &&
+        presentations.has(placement.gameId) &&
+        !containment.faultedFor(placement.gameId) &&
+        !drawFaulted.has(placement.gameId);
+      if (faceComposites) continue;
       repaintScreen(
         s.canvas,
         placement.screenZones,
@@ -367,23 +405,37 @@ function frame(): void {
   // Story 1.5: the game half drives its own pixels per frame — drawFrame
   // gets the instance snapshot, and the Core composites the canvas into the
   // face under the still-Core-painted NEXT row (letterboxed, centered).
+  // 1.7: each face's draw+composite legs go through supervisor.invoke under
+  // hook "draw" — a fault is one record attributed to the gameId, flips
+  // that face into the fallback painter permanently (bounded logging: the
+  // face gate above skips it afterwards), and leaves the other faces and
+  // the sim half untouched (halves fault independently).
   for (const s of handles.screens) {
     const placement = placementByVolumeId(s.id);
     if (placement.gameId == null) continue;
+    if (containment.faultedFor(placement.gameId) || drawFaulted.has(placement.gameId)) continue;
     const pres = presentations.get(placement.gameId);
     const instance = instances.get(placement.gameId);
     if (pres == null || instance == null) continue;
-    pres.drawFrame(instance.snapshot());
-    compositeScreen(
-      s.canvas,
-      placement.screenZones,
-      pres.canvas,
-      toCss(ROOM_BLACK),
-      toCss(placement.marqueeHue),
-      MARQUEE_CAP_M,
-      SHELL.screen.height,
-    );
-    three.markTextureUpdated(s.texture);
+    const draw = supervisor.invoke({
+      tick: drawTick,
+      gameId: placement.gameId,
+      hook: "draw",
+      call: () => {
+        pres.drawFrame(instance.snapshot());
+        compositeScreen(
+          s.canvas,
+          placement.screenZones,
+          pres.canvas,
+          toCss(ROOM_BLACK),
+          toCss(placement.marqueeHue),
+          MARQUEE_CAP_M,
+          SHELL.screen.height,
+        );
+        three.markTextureUpdated(s.texture);
+      },
+    });
+    if (!draw.ok) drawFaulted.add(placement.gameId);
   }
   renderer.render(scene, camera);
 }
@@ -398,5 +450,8 @@ window.addEventListener("resize", () => {
 // Non-visual debug handle for QA/browser smoke — state only, zero UI.
 // 1.5 adds the seat service (E-law cycle + the forwarded-event record);
 // 1.6 adds the scheduler (occupancy/queue/derived seeds) and the figure
-// presenter (reaction state) for the busy-machine console smoke.
-window.arcadeDebug = { player, loop, cabinets, seat, scheduler, presenter };
+// presenter (reaction state) for the busy-machine console smoke; 1.7 adds
+// the containment handle (faultedFor + injectFault) so the lead's smoke
+// drives the real fault chain from the console — the fault law path, not
+// a scripted one, and still zero UI (UX-DR18/AD-24).
+window.arcadeDebug = { player, loop, cabinets, seat, scheduler, presenter, containment };

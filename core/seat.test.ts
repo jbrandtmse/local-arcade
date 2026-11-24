@@ -21,6 +21,15 @@
 // here), so every 1.5 law keeps its meaning — direct sit on E #2 and the
 // seat-side gameEnded flip. The real busy B0 (placement busy: true) and
 // the scheduler-owned flip are pinned in patrons/scheduler.test.ts.
+//
+// Story 1.7 tier (the sanctioned rig extension, existing calls byte-
+// identical): a rig may inject a faultedFor predicate; when given, the
+// loop/seat face the GUARDED instance (core/containment.ts) so a fault
+// injection runs through the real guard + supervisor chain. The pins this
+// adds: E at a faulted cabinet is the plain 1.4 coin-door law (never a sit,
+// never a wait), and a seated Visitor is released by the stand law the same
+// tick the fault lands — pose, door, neutralized input; the guarded faulted
+// instance's attract() is a safe no-op.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -30,6 +39,7 @@ import { createKernelLoop, MS_PER_TICK, type EventRecord } from "./loop.ts";
 import { createInputService, type InputService } from "./input/index.ts";
 import { createPlayerController, EYE_HEIGHT, MOUSE_SENSITIVITY, type PlayerController } from "./player.ts";
 import { createSeatService, PLAY_STANDOFF_M, SEAT_EVENT_WINDOW, playPoseFor, type BusyGate, type SeatKeyMap } from "./seat.ts";
+import { guardInstance, type GameGuard } from "./containment.ts";
 import { createPatronScheduler } from "./patrons/scheduler.ts";
 import { createFigurePresenter } from "./patrons/presenter.ts";
 import { createGameInstance, type GameInstance, type TickInput } from "./contract/index.ts";
@@ -55,6 +65,9 @@ interface Visit {
    * mapping target — exposed for the standing-neutralization pin). */
   tickInput: TickInput;
   clock: { ms: number };
+  /** Present only on the 1.7 rigs (faultedFor injected): the guard the
+   * loop/seat face — injectFault drives a real fault through the chain. */
+  guard?: GameGuard;
   tick(): void;
   key(code: string, down: boolean): void;
 }
@@ -62,13 +75,23 @@ interface Visit {
 // One full rig, wired exactly as core/main.ts wires it: the registry entry's
 // sim half through the wrapper, a kernel-owned TickInput the seat writes,
 // the player + seat systems on the loop, pointer-locked aim.
-function rig(seedFn: () => number): Visit {
+function rig(seedFn: () => number, faultedFor?: (gameId: string) => boolean): Visit {
   const cabinets = createCabinetRuntime();
   const player = createPlayerController(collisionVolumes, ENTRY_SPAWN);
   const clock = { ms: 0 };
   const loop = createKernelLoop({ now: () => clock.ms });
   const entry = gameRegistry.find((e) => e.id === "moon-patrol")!;
-  const instance = createGameInstance(entry.createSim, entry.seed ?? 0);
+  const raw = createGameInstance(entry.createSim, entry.seed ?? 0);
+  // 1.7 tier: a rig that injects the containment predicate faces the
+  // GUARDED instance (exactly what main.ts registers), so injectFault is a
+  // real fault through guard + supervisor. Without the predicate the rig
+  // wires the bare wrapper — every 1.5/1.6 pin below byte-unchanged.
+  let guard: GameGuard | undefined;
+  let instance = raw;
+  if (faultedFor != null) {
+    guard = guardInstance(raw, loop.supervisor, entry.id, { tickCount: () => loop.tickCount });
+    instance = guard.instance;
+  }
   const tickInput: TickInput = { controls: {} };
   loop.addInstance(entry.id, instance, tickInput);
   const input = createInputService({ requestPointerLock: () => {} });
@@ -83,7 +106,7 @@ function rig(seedFn: () => number): Visit {
     busyFor: (volumeId) => scheduler.busyFor(volumeId),
     toggleWait: (volumeId) => scheduler.toggleWait(volumeId),
   };
-  const seat = createSeatService({ player, cabinets, busy: busyGate, seedFn });
+  const seat = createSeatService({ player, cabinets, busy: busyGate, faultedFor, seedFn });
   seat.track({
     volumeId: "cabinet-B0",
     gameId: entry.id,
@@ -115,6 +138,7 @@ function rig(seedFn: () => number): Visit {
     cabinets,
     tickInput,
     clock,
+    guard,
     tick() {
       // A hair above the tick length: the accumulator residual never crosses
       // a second tick inside these run lengths (max ~2160 steps -> +0.36 ms),
@@ -132,8 +156,8 @@ function rig(seedFn: () => number): Visit {
 // Walk the visitor into center-of-view of B0 (the real resolver, real
 // targeting), then settle 30 idle ticks so the bob eases out (Design Notes:
 // the pose-identity law binds on a settled pose). Returns the visit rig.
-function walkToB0(seedFn: () => number = () => 4242): Visit {
-  const v = rig(seedFn);
+function walkToB0(seedFn: () => number = () => 4242, faultedFor?: (gameId: string) => boolean): Visit {
+  const v = rig(seedFn, faultedFor);
   const g = placementGeometry("B0");
   const want = Math.atan2(-(g.center.x - ENTRY_SPAWN.x), -(g.center.z - ENTRY_SPAWN.z));
   v.input.mouseMove((ENTRY_SPAWN.yaw - want) / MOUSE_SENSITIVITY, 0);
@@ -438,4 +462,75 @@ test("the seat's debug event record caps at SEAT_EVENT_WINDOW: past that many dr
   const shown = v.seat.state().events;
   assert.equal(shown.length, SEAT_EVENT_WINDOW, "the record is exactly the cap once the run exceeds it (the shift branch is exercised)");
   assert.deepEqual(shown, all.slice(-SEAT_EVENT_WINDOW), "the window holds the LAST 32 drained records, in drain order");
+});
+
+// --- Story 1.7: the seat-side containment laws (AC5) ----------------------
+
+test("1.7 faulted Cabinet: E falls back to the plain 1.4 coin-door law — every press toggles, never a sit, never a wait, the pose is never touched (AC5)", () => {
+  const v = walkToB0(() => 4242, () => true);
+  const preSit = v.player.snapshot();
+  // E #1 opens the door (the 1.4 law is intact on a faulted Cabinet too).
+  v.key("KeyE", true); v.tick(); v.key("KeyE", false);
+  assert.equal(v.cabinets.coinDoors["cabinet-B0"], true, "the first E opens the coin door");
+  // E #2 at a healthy cabinet would sit — here it CLOSES instead.
+  v.key("KeyE", true); v.tick(); v.key("KeyE", false);
+  assert.equal(v.cabinets.coinDoors["cabinet-B0"], false, "the second E closes — never a sit");
+  assert.equal(v.seat.state().seated, false, "the Visitor never sits at a faulted Cabinet");
+  assert.equal(v.instance.mode(), "attract", "no kernel seed is consumed at a faulted Cabinet");
+  // E #3: the fallback E-law is the plain toggle, not a one-shot.
+  v.key("KeyE", true); v.tick(); v.key("KeyE", false);
+  assert.equal(v.cabinets.coinDoors["cabinet-B0"], true, "the third E opens again (the toggle keeps toggling)");
+  assert.deepEqual(v.player.snapshot(), preSit, "the Visitor's pose is never touched at a faulted Cabinet");
+  // The predicate alone does not freeze the room — a QUARANTINE is the
+  // guard's job (pinned in containment.test.ts), the seat law only reroutes E.
+  const hash = v.instance.stateHash();
+  for (let i = 0; i < 20; i++) v.tick();
+  assert.notEqual(v.instance.stateHash(), hash, "attract keeps advancing behind the faultedFor predicate");
+});
+
+test("1.7 the fault lands mid-seat: the Visitor is released by the stand law in the SAME tick's routing phase (saved pose, closed door, neutralized kernel input), the guarded faulted instance's attract() is a safe no-op, and E after the release only toggles the coin door (AC5, Design Notes 3)", () => {
+  let broken = false;
+  const v = walkToB0(() => 4242, (gameId) => broken && gameId === "moon-patrol");
+  const preSit = v.player.snapshot();
+  v.key("KeyE", true); v.tick(); v.key("KeyE", false); // open
+  v.key("KeyE", true); v.tick(); v.key("KeyE", false); // sit (healthy)
+  assert.equal(v.instance.mode(), "play", "sits normally while healthy (through the guard: play is wrapped too)");
+  assert.ok(v.seat.state().seated, "the chair is taken before the fault");
+  v.key("KeyD", true);
+  v.tick();
+  const idleButtons = {
+    start: { down: false, pressed: false },
+    jump: { down: false, pressed: false },
+    fire: { down: false, pressed: false },
+  };
+  assert.deepEqual(
+    v.tickInput.controls,
+    { axes: { move: 1 }, buttons: idleButtons },
+    "the seated mapping is live on the kernel input before the fault",
+  );
+  // The fault lands through the REAL chain: guard.injectFault records one
+  // supervisor fault and quarantines; `broken` mirrors the guard's state,
+  // exactly as containment.faultedFor reads the guard in main.ts.
+  v.guard!.injectFault("mid-seat boom");
+  broken = true;
+  v.tick(); // systems run after the instance phase — the seat's release leg lands THIS tick
+  assert.equal(v.seat.state().seated, false, "the fault is that machine's last break: released without an E press");
+  assert.deepEqual(v.player.snapshot(), preSit, "the stand law restored the saved standing pose exactly");
+  assert.equal(v.cabinets.coinDoors["cabinet-B0"], false, "the stand law closed the coin door");
+  assert.deepEqual(
+    v.tickInput.controls,
+    { axes: { move: 0 }, buttons: idleButtons },
+    "the kernel input is neutralized — the 1.5 stand law skips nothing on a fault release",
+  );
+  assert.equal(
+    v.instance.mode(),
+    "play",
+    "the guarded faulted attract() is a SAFE NO-OP: the quarantined machine never relaunches — the fallback face carries the fiction (AD-24)",
+  );
+  // E after the release follows the faulted law: plain coin-door toggle.
+  v.key("KeyE", true); v.tick(); v.key("KeyE", false);
+  assert.equal(v.cabinets.coinDoors["cabinet-B0"], true, "E opens the door again (the fallback law)");
+  assert.equal(v.seat.state().seated, false, "E never re-sits while the fault stands");
+  assert.equal(v.loop.supervisor.faults.length, 1, "exactly one fault record for one injection");
+  assert.equal(v.loop.supervisor.faults[0]?.errorId, "moon-patrol.inject#1", "attributable under hook 'inject' (AD-26 shape)");
 });

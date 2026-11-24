@@ -54,7 +54,7 @@ interface Visit {
 // One full rig exactly as core/main.ts wires it (patrons system draining
 // once per tick BETWEEN cabinets and seat; the seat receives the forwarded
 // records; the scheduler tracks busy B0 off the REAL placements).
-function rig(seedFn: () => number): Visit {
+function rig(seedFn: () => number, faultedFor?: (gameId: string) => boolean): Visit {
   const cabinets = createCabinetRuntime();
   const player = createPlayerController(collisionVolumes, ENTRY_SPAWN);
   const clock = { ms: 0 };
@@ -79,7 +79,9 @@ function rig(seedFn: () => number): Visit {
     keys: MOON_KEYS,
   });
   player.registerInteractable("cabinet-B0", (id) => seat.handleInteract(id));
-  const scheduler = createPatronScheduler({ seat, player, presenter });
+  // 1.7 tier: the containment predicate is injected scheduler-side only —
+  // the seat's faulted law is pinned in seat/visit-arc suites.
+  const scheduler = createPatronScheduler({ seat, player, presenter, faultedFor });
   scheduler.track({
     volumeId: "cabinet-B0",
     gameId: ENTRY.id,
@@ -146,8 +148,8 @@ function creepToB0(v: Visit): void {
   for (let i = 0; i < 30; i++) v.tick();
 }
 
-function walkToB0(seedFn: () => number): Visit {
-  const v = rig(seedFn);
+function walkToB0(seedFn: () => number, faultedFor?: (gameId: string) => boolean): Visit {
+  const v = rig(seedFn, faultedFor);
   const g = placementGeometry("B0");
   const want = Math.atan2(-(g.center.x - ENTRY_SPAWN.x), -(g.center.z - ENTRY_SPAWN.z));
   v.input.mouseMove((ENTRY_SPAWN.yaw - want) / MOUSE_SENSITIVITY, 0);
@@ -596,4 +598,31 @@ test("AC3: on busy B0's composite the game frame blits under the Core NEXT row, 
   assert.equal(next[0]!.fontPx, Math.round(MARQUEE_CAP_M * pxPerM), "NEXT paints at the 0.18 m cap on the busy screen (the fit law untouched — mutation dropping the NEXT fillText is red here)");
   assert.equal(next[0]!.y, surface.height - Math.round(surface.height * SCREEN_EDGE_RATIO), "NEXT sits on the bottom-band baseline");
   assert.equal(next[0]!.style, "#ffc46b", "the injected marquee hue, as always");
+});
+
+// --- Story 1.7 (AC5): the faulted laws at the busy cabinet --------------------------------
+
+test("1.7 a fault lands during Patron autoplay: the figure lifts off the SAME dispatch that sees it (occupancy -> attract, queue voided, figure gone), and neither the dwell re-arm nor a break relaunch ever fires while faulted — busy-never-withholds becomes fallback performance, not a relaunch into a dead sim", () => {
+  let broken = false;
+  const v = walkToB0(() => 4242, (gameId) => broken && gameId === "moon-patrol");
+  waitPatron(v); // a real autoplay run is live (runCount 1, figure active)
+  pressE(v); // the door leg is intact at a busy cabinet
+  assert.equal(v.cabinets.coinDoors["cabinet-B0"], true, "the first E opens the door (busy law)");
+  pressE(v); // the second E joins the queue (never a sit at a busy cabinet)
+  assert.equal(v.b0().queue.length, 1, "the Visitor's claim sits in the queue before the fault");
+  assert.ok(v.sched.figureActive("cabinet-B0"), "the Patron holds the machine before the fault");
+  const seedsBefore = v.b0().lastSeed;
+  const runBefore = v.b0().runCount;
+
+  broken = true;
+  v.tick(); // one dispatch sees the fault (systems run after the instance phase)
+  assert.equal(v.b0().occupancy, "attract", "the fault is that machine's last break: the Patron is off the machine this same tick");
+  assert.deepEqual(v.b0().queue, [], "the queue is voided with the faulted game (no handover can ever be honoured on it)");
+  assert.equal(v.sched.figureActive("cabinet-B0"), false, "the figure follows occupancy — the frame reads figureActive, no separate figure change");
+  assert.equal(v.b0().runCount, runBefore, "no new autoplay run was consumed on the fault tick");
+
+  for (let i = 0; i < 720; i++) v.tick();
+  assert.equal(v.b0().runCount, runBefore, "720 more ticks and the dwell re-arm gate never fires while faulted — no relaunch");
+  assert.equal(v.b0().occupancy, "attract", "the Cabinet keeps its fallback face for as long as the fault stands");
+  assert.equal(v.b0().lastSeed, seedsBefore, "no new derived seed is consumed either (the launch gate precedes the seed arithmetic)");
 });

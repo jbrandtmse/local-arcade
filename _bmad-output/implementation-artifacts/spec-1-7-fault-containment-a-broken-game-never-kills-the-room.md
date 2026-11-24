@@ -2,10 +2,10 @@
 title: 'Story 1.7: Fault containment — a broken game never kills the room'
 type: 'feature'
 created: '2026-11-24'
-status: 'ready-for-dev'
-baseline_revision: ''
+status: 'done'
+baseline_revision: 'e1019f1b1345c8d4d04754f6409d05d6a8e5c3ee'
 review_loop_iteration: 0
-followup_review_recommended: false
+followup_review_recommended: true
 context:
   - _bmad-output/planning-artifacts/architecture/architecture-local-arcade-2026-11-19/ARCHITECTURE-SPINE.md
   - docs/game-authoring.md
@@ -122,20 +122,52 @@ deferred: []
 - `npm run build` -- (once per story) expected: Vite build succeeds (entry-chunk warning tier precedent)
 
 **Rule 19 — pinning tests + intended mutations (implement stage: apply, observe red, revert byte-identical, record the `mutation:` lines):**
-- AC1 pin: guard quarantine test (fault count 1, sim tick-call counter frozen, neighbours alive). `mutation: guard re-invokes sim hooks after a fault → the frozen-counter pin red; revert.`
+- AC1 pin: guard quarantine test (fault count 1, sim tick-call counter frozen, events-leg rawPulls frozen at the fault tick, neighbours alive). `mutation: guard re-invokes sim hooks after a fault → the frozen-counter pin red; revert. mutation: events() bypasses the quarantine short-circuit → the rawPulls pin red (40 not 3); revert.`
 - AC2 pin: composed gate-chain test (out-of-tick write → fault under gameId + quarantine). `mutation: wrapper opens the gate permanently (gate.open in kernelWindow's finally) → no out-of-tick fault record appears → red; revert.`
-- AC3 pin: attach-with-broken-factory test. `mutation: attachGameEntries calls createGameInstance unguarded → the test's step throws → red; revert.`
+- AC3 pin: attach-with-broken-factory test + unattached-entry degradation gates pinned in main-glue.test.ts. `mutation: attachGameEntries calls createGameInstance unguarded → the test's step throws → red; revert. mutation: drop the instance null-check from the main.ts track gate → the 1.7 containment-wiring source pin red; revert.`
 - AC4 pin: stall-fixture test faults exactly at the N-boundary; real attract instance never faults. `mutation: watcher skips the recordFault synthesis → the stall pin red; revert.`
 - AC5 pin: figure-lift/no-relaunch pins (scheduler) + same-tick release + coin-door-law pins (seat) + 720-tick fallback-motion advance. `mutation: scheduler dwell launch ignores faultedFor → the no-relaunch pin red; revert. mutation: seat.step drops the faulted release leg → the unseat pin red; revert.`
-- AC6 pin: supervisor cap test + drain regression pin. `mutation: supervisor drops the ring trim → the 64-cap pin red (200 records); revert.`
+- AC6 pin: supervisor cap test + drain regression pin + stamp-order pin in main-glue.test.ts. `mutation: supervisor drops the ring trim → the 64-cap pin red (200 records); revert. mutation: move the drawTick stamp below scheduler.dispatch in the patrons body → the 1.6 patrons-wiring order pin red; revert.`
 
 **Shared surfaces (Rule 19):** `HookName` union and `supervisor.faults` consumers (existing pins stay green — caps not hit by ≤64-fault rigs; `e2e-kernel`/`supervisor.test` raw-instance pins must NOT move), `window.arcadeDebug` shape (main-glue pin line), the frame face-gate condition (main-glue pin `presentations.has(placement.gameId)) continue;` changes), `no-ui-dom.test.ts` dev-serve module list (+`/core/containment.ts`), scheduler/seat constructor options (new OPTIONAL leg — existing rigs byte-unchanged), the recorded test-count baseline. Standing criterion: every test added or changed passes on a fresh environment, standalone and against its neighbours in either order.
 
 **Lead's manual smoke (DW-12 tier — Chrome AND Edge):** load the page, Patron runs at B0 (~10 s dwell); console: `arcadeDebug.containment.injectFault("moon-patrol")` → the figure lifts immediately, the screen flips to the 1.4 attract fallback (scan-band motion keeps moving — watch ~5 s), the marquee stays lit with its title, one `[supervisor fault]` line prints with a `moon-patrol.*` errorId, `arcadeDebug.containment.faultedFor("moon-patrol")` reads true; E at the cabinet opens/closes the coin door, never sits; a second `injectFault` adds no second fault (quarantine). Console: no DOM beyond the canvas; marquee/roadmap otherwise unchanged.
 
+## Review Triage Log
+
+### 2026-11-24 — Review pass (build-auto, single review layer, no rework iteration)
+
+- verdicts: 22 findings — high 0, medium 3, low 14, false 5
+- routes: patch 11 findings (8 entries), reject 6, false 5, defer 0, intent_gap 0, bad_spec 0
+
+| # | finding | verdict | route | evidence / action |
+|---|---------|---------|-------|-------------------|
+| BH1 | main.ts track/seed gates degrade unattached cabinets after a boot fault, but no pin holds those null-checks in place | medium | patch | added `MAIN.includes("instance == null \|\| tickInput == null")` and `MAIN.includes("entry == null \|\| instance == null \|\| entry.seed == null")` pins to the 1.7 containment-wiring test in main-glue.test.ts; mutation 1.7k: dropping the instance null-check from the track gate reds the pin; reverted |
+| BH2 | scheduler handover (`opts.seat.takeOver`) never consults `faultedFor` — a Patron could take over a quarantined cabinet | low | reject | unreachable in the shipped law: a handover needs break records, and a quarantined sim emits none (guard freezes the events leg — now falsifiably pinned via the rawPulls pin); the seat release leg is busy-agnostic (stands a quarantined figure whatever the occupancy) and the stand-observation flushes `st.queue` (scheduler.ts:261-268); the takeover-variant laws are already pinned at their seams |
+| BH3 | faulted game left in attract keeps an attract-mode cabinet that lures interaction | low | reject | inert: E at the cabinet is rerouted to the coin-door law before any wait path; handover needs break records a quarantined sim never emits; scheduler dwell launch is gated by `faultedFor` (the no-relaunch pin) |
+| BH4 | post-quarantine `events()` returning `[]` diverges from the loop's raw-instance tolerance | low | reject | the spec's AD-6 posture is explicit: "a quarantined game emits no events; consumers handle absence"; the loop keeps raw instances (the Never-list loop pins stay untouched); the guard holds the loop's registered instance, so the divergence is unreachable at the seam — the invariant is now pinned (rawPulls) |
+| BH5 | containment.ts header says it imports "contract + supervisor" per the spec's Code Map, yet it imports `CABINET_PHASE_CYCLE_TICKS` from core/room/cabinets.ts | low | reject | the code comment states the full truth ("core/contract, core/supervisor, and the room's attract-cycle constant"); depcheck is green (room→core direction allowed); the intent mandates reusing the one attract-cycle source rather than duplicating the number; the fix would rewrite this build's spec text — not a code defect |
+| BH6 | `attachGameEntries` carries a dead 5th `guardOpts` param absent from the spec's 4-arg Code Map signature | low | patch | param dropped; call sites and `{ tickCount: () => loop.tickCount }` inline the options; signature now matches the Code Map |
+| BH7 | `drawTick` is stamped after the legs a fault can cost, so a throwing presenter/dispatch leaves the draw stamp one tick stale | low | patch | stamp moved to right behind `patronsRecords = loop.drainEvents()` in the patrons system body, ahead of `presenter.step`/`scheduler.dispatch`; order pin added to the 1.6 patrons-wiring test; mutation 1.7l: moving the stamp below the dispatch reds the pin; reverted |
+| BH8 | the 720-tick fallback-motion test doesn't state which law it actually pins | low | patch | contract comment block added: it pins the REUSED 1.4 painter's liveness law (the shipped face gate is pinned in main-glue.test.ts; the painter is the shipped one, not a replica) — same entry as IA2 |
+| ECH1 | `cycleTicks: 0` would make the watcher's modulo NaN and never sample | low | reject | no caller passes `cycleTicks` (internal seam, default `CABINET_PHASE_CYCLE_TICKS`); guarding a nonexistent caller adds untested branches |
+| ECH2 | `stallCycles <= 0` would synthesize a stall on the first sample | low | reject | same: no caller passes `stallCycles` (default `MAX_STALL_CYCLES` placeholder); the threshold is a labelled placeholder by the AC's own terms |
+| ECH3 | a presenter throw before the stamp leaves it stale for the frame face gate | low | patch | same root as BH7 — same patch and order pin (see above) |
+| VG1 | quarantine test pins the tick counter but not that the events LEG also stops pulling | medium | patch | `assert.equal(flaky.rawPulls, 3, ...)` added (the throw lands inside guarded tick call #4, so pulls stop at 3); mutation 1.7i: `events()` calling through after the fault climbs rawPulls to 40 and reds the pin; reverted |
+| VG2 | injectFault test runs with the instance in attract, so a post-quarantine relaunch-to-attract would be invisible | medium | patch | `autoplay(7)` before the inject (pre-state asserted) and the final assertion now demands `mode() === "autoplay"`; mutation 1.7j: a guard that relaunches after quarantine flips it red; reverted |
+| VG-o1 | containment draw test message claims one record per faulted draw call as if the shipped per-face flip were pinned there | low | patch | message reworded: the shipped per-face flip that keeps it from recurring every frame is pinned in main-glue.test.ts |
+| VG-o2 | scheduler-breaks mode pin comment cites containment.test without saying what the mode read proves | low | patch | message reworded: a relaunch would flip the raw instance to attract, corroborating the runCount/lastSeed pins (quarantine itself stays pinned in containment.test.ts) |
+| IA1 | AC1's "room keeps running" intent never composed end-to-end in one test | false | — | composition IS covered across tiers: containment.test (guard law), main-glue.test (source-tier face/leg gates), visit-arc.test (arc unaffected); main.ts is browser glue never imported — the seam-decomposed tiering is the documented convention the spec's Code Map pre-adjudicates |
+| IA2 | 720-tick test's intent link (fallback keeps moving) asserted without stating the layer | low | patch | contract comment added (see BH8) |
+| IA3 | boot-fault entry never composed with the seat/scheduler in one executed test | false | — | boot faults register no instance, so seat/scheduler lookups hit their null gates — pinned at both seams (containment attach test + main-glue gate pins); the composed chain is source-tier by the same convention |
+| IA4 | stall watcher intent (dev dead-machine predicate) not tied to an FR in a test name | false | — | the test cites FR-17 L1 precursor / CAP-7 in the module header and the stall test asserts the synthesized record under hook "stall" — the tie exists at both code and test layers |
+| IA5 | injectFault smoke trigger has no browser-executed proof of intent | false | — | the browser tier is the lead's designated manual smoke (spec Verification, DW-12 tier) — its absence from this run's executed evidence is by plan, not a gap in intent coverage; the law path is composed in containment.test |
+| IA6 | face gate acting on a stale tick stamp drifts from the loop's own tick at the draw leg | low | patch | same root as BH7/ECH3 — stamp moved ahead of the faultable legs + order pin |
+| IA7 | fault-lift law (quarantine lifts the Patron) never observed in a full visit arc | false | — | scheduler-breaks.test composes dwell→fault→break-record→lift in one dispatch with runCount/lastSeed/queue pins; visit-arc.test keeps the clean arc green; the arc's fault variant is a documented tier split, not a gap |
+
 ## Auto Run Result
 
-Status: ready-for-dev
+Status: done
 Blocking condition: none
 
-Plan-stage result 2026-11-24 (build-auto, unattended, halt-after-planning): spec planned from epic-1-context + Story 1.7 block (epics.md:351-366) + spine AD map + direct investigation of main.ts/loop.ts/supervisor.ts/wrapper.ts/freeze.ts/cabinets.ts/seat.ts/scheduler.ts and the fault-family test pins. Ledger inbox DW-2/DW-3/DW-6 all addressed (none declined). No commits (plan stage; the untracked sprint-status.yaml stray untouched). No implementation performed.
+Implement+review result 2026-11-24 (build-auto, unattended, single pass): implemented the containment seam per spec — `core/containment.ts` (attachGameEntries boot guard + guardInstance quarantine decorator + stateHash-stall watcher + injectFault trigger), supervisor ring cap 64 + `droppedFaults` + widened HookName, optional `faultedFor` legs in seat/scheduler, main.ts face-gate/track/seed degradation gates + persistent `drawFaulted` + `window.arcadeDebug.containment`. Files: core/containment{.ts,.test.ts} (new) + main.ts, main-glue.test.ts, no-ui-dom.test.ts, supervisor{.ts,.test.ts}, seat{.ts,.test.ts}, seat-controls.test.ts, patrons/scheduler{.ts,.test.ts}, patrons/scheduler-breaks.test.ts, visit-arc.test.ts. Review: 22 findings (0 high / 3 medium / 14 low / 5 false) — 11 patched (8 entries), 6 rejected with refutations (BH2-BH5, ECH1-ECH2: unreachable at the seam or spec-mandated posture), 5 false (IA1/3/4/5/7: seam-decomposed tiering is the pre-adjudicated glue convention), 0 deferred. Verification: full suite 295/295 green (twice), typecheck / depcheck / lint-bans / registry-no-drift / build all green, no MUTATION-DEMO residue; 11 mutation demonstrations total (7 by the handoff implementation, 4 at stage layer: events-passthrough, inject relaunch, track-gate null-check, stamp order) — all reverted byte-identical. `followup_review_recommended: true` — first pass with 3 medium entries patched; named unverified risk: the lead-only Chrome+Edge browser tier (live fallback face, injectFault smoke, render chain) was never browser-executed in this run, only source-pinned. One local commit on ARC-1-epic1; never pushed; the untracked `_bmad-output/planning-artifacts/sprint-status.yaml` stray left untouched.

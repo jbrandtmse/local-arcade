@@ -143,6 +143,13 @@ export function createSeatService(opts: {
   /** Story 1.6: the scheduler's busy gate (absent = a 1.5 rig: every
    * tracked cabinet is seat-side, every law unchanged). */
   busy?: BusyGate;
+  /** Story 1.7 (AC5): the containment predicate — the gameId's sim is
+   * quarantined. Absent keeps every 1.5/1.6 law byte-unchanged (the
+   * BusyGate deferred-closure injection idiom). Laws it changes: E at a
+   * faulted cabinet falls back to the plain coin-door toggle (never sits,
+   * never waits), and a seated Visitor is released by the stand law the
+   * same tick the fault lands — the fault is that machine's last break. */
+  faultedFor?: (gameId: string) => boolean;
   seedFn?: () => number;
 }): SeatService {
   const seedFn = opts.seedFn ?? kernelSeed;
@@ -206,6 +213,14 @@ export function createSeatService(opts: {
         return;
       }
       if (seatedVolumeId !== null) return; // one visitor: a second cabinet's E is silent while seated
+      if (opts.faultedFor?.(entry.gameId) === true) {
+        // Story 1.7 (AC5): a faulted Cabinet performs by its fallback face,
+        // and E falls back to the plain 1.4 coin-door law — never a sit,
+        // never a wait (the scheduler's queue law below would be moot: the
+        // faulted game emits no breaks to hand over on).
+        toggleCoinDoor(opts.cabinets, volumeId);
+        return;
+      }
       if (!coinDoorOpen(opts.cabinets, volumeId)) {
         toggleCoinDoor(opts.cabinets, volumeId); // 1.4 law intact: the first press opens
         return;
@@ -249,6 +264,19 @@ export function createSeatService(opts: {
         // the scheduler (Story 1.6); this leg must not double-flip.
         if (entry != null && rec.event.type === "gameEnded" && opts.busy?.busyFor(entry.volumeId) !== true) {
           entry.instance.attract();
+        }
+      }
+      // Story 1.7 (AC5, Design Notes 3): a faulted sim emits no canonical
+      // break, so the fault IS that machine's last break — the release
+      // lands in this same tick's routing phase (systems run after the
+      // instance phase, fixed order). The stand law already skips nothing:
+      // saved pose, door close, input neutralization; the guarded faulted
+      // instance's attract() is a safe no-op.
+      if (seatedVolumeId !== null) {
+        const seated = entryFor(seatedVolumeId);
+        if (opts.faultedFor?.(seated.gameId) === true) {
+          standUp(seated);
+          return;
         }
       }
       if (seatedVolumeId === null) return;

@@ -153,6 +153,7 @@ test("dev serve (real HTTP): the served body is unchanged, the 1.2 shell modules
 
     for (const moduleUrl of [
       "/core/main.ts",
+      "/core/containment.ts",
       "/core/player.ts",
       "/core/input/index.ts",
       "/core/room/collision-volumes.ts",

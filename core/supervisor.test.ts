@@ -2,7 +2,7 @@
 // {tick, errorId}, and the loop keeps running (AD-15; I/O matrix rows 3,4).
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createSupervisor } from "./supervisor.ts";
+import { createSupervisor, MAX_FAULT_RECORDS } from "./supervisor.ts";
 import { createKernelLoop, type KernelLoop } from "./loop.ts";
 import type { GameInstance } from "./contract/index.ts";
 
@@ -110,4 +110,18 @@ test("events() call site is also wrapped: a fault there is logged, loop alive", 
   assert.equal(loop.tickCount, 3);
   assert.equal(loop.supervisor.faults.length, 3);
   assert.equal(loop.supervisor.faults[0]?.errorId, "bad-events.events#1");
+});
+
+// Story 1.7 (DW-3): the ring cap keeps the fault list honest across a long
+// broken run — bounded size, most-recent kept, overflow counted, counter
+// gap-free (the future fault-marker basis, AD-26).
+test("the fault ring caps at MAX_FAULT_RECORDS: 200 faults leave the newest 64 in the list, count the rest in droppedFaults, and the errorId counter keeps rising gap-free (DW-3)", () => {
+  const sup = createSupervisor();
+  for (let i = 1; i <= 200; i++) {
+    sup.invoke({ tick: i, gameId: "g1", hook: "tick", call: () => { throw new Error(`boom ${i}`); } });
+  }
+  assert.equal(sup.faults.length, MAX_FAULT_RECORDS, "the list never grows past the cap (mutation: dropping the ring trim leaves all 200 here)");
+  assert.equal(sup.faults[0]?.errorId, `g1.tick#${200 - MAX_FAULT_RECORDS + 1}`, "the ring keeps the MOST RECENT records (the SEAT_EVENT_WINDOW shift law)");
+  assert.equal(sup.faults[MAX_FAULT_RECORDS - 1]?.errorId, "g1.tick#200", "the newest fault is at the ring's tail");
+  assert.equal(sup.droppedFaults, 200 - MAX_FAULT_RECORDS, "the overflow is counted, never silently lost");
 });

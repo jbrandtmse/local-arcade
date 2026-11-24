@@ -10,6 +10,10 @@
 // cycle then RE-ARMS on the same visit — open, sit, play again, stand —
 // and only then do the room controls resume. Hermetic: every rig builds
 // its own world and consumes only its own state; run-order free.
+//
+// Story 1.7 tier: the rig takes an optional faultedFor predicate (seat
+// injection only here — the quarantine tier is pinned in containment.test.ts
+// and seat.test.ts); the arc pin below adds the mid-visit fault release.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -48,7 +52,7 @@ interface Visit {
 // tracks nothing in this suite — the 1.5 visit arc keeps running on the
 // tracked NOT-busy wiring (direct sit, seat-side flip); busy B0 is pinned
 // in patrons/scheduler.test.ts.
-function rig(seedFn: () => number): Visit {
+function rig(seedFn: () => number, faultedFor?: (gameId: string) => boolean): Visit {
   const cabinets = createCabinetRuntime();
   const player = createPlayerController(collisionVolumes, ENTRY_SPAWN);
   const clock = { ms: 0 };
@@ -64,7 +68,7 @@ function rig(seedFn: () => number): Visit {
     busyFor: (volumeId) => scheduler.busyFor(volumeId),
     toggleWait: (volumeId) => scheduler.toggleWait(volumeId),
   };
-  const seat = createSeatService({ player, cabinets, busy: busyGate, seedFn });
+  const seat = createSeatService({ player, cabinets, busy: busyGate, faultedFor, seedFn });
   seat.track({
     volumeId: "cabinet-B0",
     gameId: entry.id,
@@ -103,8 +107,8 @@ function rig(seedFn: () => number): Visit {
 
 // Walk into center-of-view of B0, settle 30 idle ticks (the sit/stand
 // pose-identity law binds on a settled pose).
-function walkToB0(seedFn: () => number): Visit {
-  const v = rig(seedFn);
+function walkToB0(seedFn: () => number, faultedFor?: (gameId: string) => boolean): Visit {
+  const v = rig(seedFn, faultedFor);
   const g = placementGeometry("B0");
   const want = Math.atan2(-(g.center.x - ENTRY_SPAWN.x), -(g.center.z - ENTRY_SPAWN.z));
   v.input.mouseMove((ENTRY_SPAWN.yaw - want) / MOUSE_SENSITIVITY, 0);
@@ -225,4 +229,29 @@ test("the whole visit arc in one run: walk in, open, sit, play, die seated, attr
 
   // 10) The debug event record stays bounded across the whole visit.
   assert.ok(v.seat.state().events.length <= SEAT_EVENT_WINDOW, "the exposed arcadeDebug.seat event record is bounded, not a leak");
+});
+
+test("1.7 a fault lands mid-visit: the seated Visitor is released by the stand law the same tick the faultedFor predicate flips (pose restored, door closed), and every later E at this Cabinet is the plain coin-door toggle — never a re-sit (AC5)", () => {
+  let broken = false;
+  const v = walkToB0(() => 4242, (gameId) => broken && gameId === "moon-patrol");
+  const preSit = v.player.snapshot();
+  pressE(v); // open
+  pressE(v); // sit (healthy)
+  assert.ok(v.seat.state().seated, "the fault lands mid-seat");
+  assert.equal(v.instance.mode(), "play", "the seated run is live before the fault");
+
+  broken = true;
+  v.tick(); // systems run after the instance phase — the release lands THIS tick
+  assert.equal(v.seat.state().seated, false, "the fault is that machine's last break: released without an E press");
+  assert.deepEqual(v.player.snapshot(), preSit, "the stand law restored the saved standing pose exactly");
+  assert.equal(v.cabinets.coinDoors["cabinet-B0"], false, "and closed the coin door");
+  assert.equal(v.instance.mode(), "attract", "the stand law returned the machine to attract (unguarded rig — the quarantine no-op is pinned in seat/containment tests)");
+
+  // The rest of the visit at this Cabinet is the fallback face's E-law:
+  // the plain 1.4 toggle, twice over, never a sit.
+  pressE(v);
+  assert.equal(v.cabinets.coinDoors["cabinet-B0"], true, "E opens the door (the fallback law is intact)");
+  pressE(v);
+  assert.equal(v.cabinets.coinDoors["cabinet-B0"], false, "E closes — a second press never sits at a faulted Cabinet");
+  assert.equal(v.seat.state().seated, false, "the Visitor stays out of the chair while the fault stands");
 });
