@@ -34,6 +34,11 @@ try {
 if (!Array.isArray(list)) fail("provisional list must be a JSON array");
 
 const KEBAB = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+// The kernel reaction library (Story 1.6, AD-23): authored impulse mappings
+// may only name these reactions. Mirrors the REACTIONS table in
+// core/patrons/presenter.ts — that suite source-pins the two lists together,
+// so this script stays dependency-free (it must run under bare node).
+const REACTIONS = ["flinch", "jump", "slam"];
 const entries = [];
 for (const [i, entry] of list.entries()) {
   if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
@@ -82,13 +87,48 @@ for (const [i, entry] of list.entries()) {
       }
     }
   }
+  // Story 1.6: the authored impulse mapping is validated HERE and embedded
+  // into the generated module as parsed data (AD-11/AD-18: the sealed build
+  // fetches nothing; a bad mapping fails the build, never runtime).
+  let impulses;
+  if (entry.impulsePath !== undefined) {
+    if (typeof entry.impulsePath !== "string" || entry.impulsePath === "") {
+      fail(`entry ${i} (${entry.id}): impulsePath must be a non-empty string relative to the repo root`);
+    }
+    const mapPath = path.resolve(cwd, entry.impulsePath);
+    if (!existsSync(mapPath)) {
+      fail(`entry ${i} (${entry.id}): impulse mapping source not found: ${entry.impulsePath}`);
+    }
+    let mapping;
+    try {
+      mapping = JSON.parse(readFileSync(mapPath, "utf8"));
+    } catch (err) {
+      fail(`entry ${i} (${entry.id}): impulse mapping is not valid JSON: ${String(err)}`);
+    }
+    if (typeof mapping !== "object" || mapping === null || Array.isArray(mapping)) {
+      fail(`entry ${i} (${entry.id}): impulse mapping must be an object of event name -> reaction name`);
+    }
+    for (const [event, reaction] of Object.entries(mapping)) {
+      if (typeof reaction !== "string" || !REACTIONS.includes(reaction)) {
+        fail(`entry ${i} (${entry.id}): impulse mapping value ${JSON.stringify(reaction)} for event ${JSON.stringify(event)} is not a kernel reaction (known: ${REACTIONS.join(", ")})`);
+      }
+    }
+    // Fixed key order (sorted): byte-identical re-emits must not depend on
+    // the asset file's key order — the same rule as the controls vocab legs.
+    impulses = Object.fromEntries(
+      Object.entries(mapping).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+    );
+  }
   // Strict schema: a typo like "seeds" would silently drop the seed and the
   // entry would still emit — fail loudly instead.
   for (const key of Object.keys(entry)) {
-    if (key !== "id" && key !== "simPath" && key !== "seed" && key !== "presPath" && key !== "controls") {
-      fail(`entry ${i} (${entry.id}): unknown field ${JSON.stringify(key)} (known: id, simPath, seed, presPath, controls)`);
+    if (key !== "id" && key !== "simPath" && key !== "seed" && key !== "presPath" && key !== "controls" && key !== "impulsePath") {
+      fail(`entry ${i} (${entry.id}): unknown field ${JSON.stringify(key)} (known: id, simPath, seed, presPath, controls, impulsePath)`);
     }
   }
+  // Attach the validated, sorted mapping only after the schema loop, so the
+  // generated data field never reads as an unknown list field.
+  if (impulses !== undefined) entry.impulses = impulses;
   entries.push(entry);
 }
 entries.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
@@ -150,6 +190,11 @@ for (const entry of entries) {
         aim: entry.controls.aim,
       })}`,
     );
+  }
+  if (entry.impulses !== undefined) {
+    // Parsed mapping data embedded in the module (already sorted at
+    // validation time — the asset's key order cannot leak into bytes).
+    fields.push(`impulses: ${JSON.stringify(entry.impulses)}`);
   }
   lines.push(`  { ${fields.join(", ")} },`);
 }

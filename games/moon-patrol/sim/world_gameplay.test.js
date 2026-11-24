@@ -45,6 +45,38 @@ test('mines cannot be shot and are fatal on the ground', () => {
   assert.equal(w.deathReason, 'mine');
 });
 
+// Story 1.6 (DW-25): the vendored respawn pad-clear predicate read
+// o.x + o.w for EVERY ground item; minefields (and craters-as-ground items)
+// carry x1/x2, so the expression was NaN and NaN never filters — a minefield
+// sitting on the landing pad survived respawn and killed the freshly
+// respawned buggy the moment its invulnerability lapsed. Fixed upstream
+// first (working tree), then re-vendored: the span idiom createCrater uses.
+test('DW-25: respawn clears a minefield on the landing pad; the old rock/crater legs still filter; off-pad fields survive', () => {
+  const w = sandboxWorld();
+  const x0 = w.buggy.x;
+  const onPad = { type: 'minefield', x1: x0 + 30, x2: x0 + 130, mines: [{ type: 'mine', x: x0 + 40, w: 15, h: 12 }] };
+  const far = { type: 'minefield', x1: x0 + 900, x2: x0 + 1000, mines: [{ type: 'mine', x: x0 + 950, w: 15, h: 12 }] };
+  w.ground.push(onPad, far, { type: 'rock', size: 0, x: x0 + 200, w: 16, h: 13, hp: 1 });
+  w.craters.push({ type: 'crater', x1: x0 + 60, x2: x0 + 90, width: 30, large: false, scored: false });
+  // die on the mine ahead of the buggy (rock/crater sit further along)
+  driveUntilNotRunning(w, 4, { right: true });
+  assert.equal(w.mode, 'dying');
+  assert.equal(w.deathReason, 'mine');
+  const xDeath = w.buggy.x; // the pad is computed from the death position
+  // drive one beat past the respawn delay: mode flips back to running
+  drive(w, CFG.buggy.respawnDelay + 0.05, {});
+  assert.equal(w.mode, 'running', 'respawn happened (the buggy is back on the pad)');
+  const padHit = (a, b) => b > xDeath - 80 && a < xDeath + 240;
+  assert.ok(
+    !w.ground.some(o => o.type === 'minefield' && padHit(o.x1, o.x2)),
+    'DW-25: no minefield remains anywhere on the respawn pad',
+  );
+  assert.ok(w.ground.includes(far), 'minefields clear of the pad are never filtered (no over-clear)');
+  assert.equal(w.ground.filter(o => o.type === 'rock').length, 0, 'the rock on the pad still filters (unchanged leg)');
+  assert.equal(w.craters.length, 0, 'the crater on the pad still filters (unchanged leg)');
+  assert.equal(w.buggy.y, CFG.view.GROUND_Y, 'the buggy stands on a cleared pad');
+});
+
 test('jump clears a minefield', () => {
   const w = sandboxWorld();
   // mines placed between bunny-hop landing spots (landings are deterministic: x0 + k*jump-reach)

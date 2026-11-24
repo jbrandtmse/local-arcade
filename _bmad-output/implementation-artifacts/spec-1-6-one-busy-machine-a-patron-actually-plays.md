@@ -2,7 +2,8 @@
 title: 'Story 1.6: One busy machine — a Patron actually plays'
 type: 'feature'
 created: '2026-11-23'
-status: 'ready-for-dev'
+status: 'done'
+baseline_revision: '4f334c1425a8a2b922feee961195334fcdf576da'
 review_loop_iteration: 0
 followup_review_recommended: false
 context:
@@ -104,8 +105,39 @@ deferred: []
 ## Spec Change Log
 
 - 2026-11-23: initial plan (plan stage, unattended; no prior spec for this key).
+- 2026-11-23: implement pass — Rule-19 tracking lines updated (AC2 adapter pin realized as the presentation purity scan; AC5 gained the headroom mutation line); review triage recorded; status done.
 
 ## Review Triage Log
+
+### 2026-11-23 — review pass (4 layers; 25 findings, 22 entries — 2 groups)
+
+Verdicts: 25 findings — high 0, medium 0, low 19, false 6, maybe-false 0. Patched: 5 (all low). Deferred: 0. Grouped roots: G1 = presenter-singleton trio (BH1/EC1/IA7), G2 = AC2-wording pair (VG2/IA1).
+
+- BH1 [low] [reject] G1: one presenter shared across placements — if a second busy cabinet ships, both figures react in lockstep. Everyday M0 reach is one busy placement (pinned "exactly one busy placement" in scheduler.test.ts); the fix is a per-volume presenter re-shape, more than a direct correction. Epic 3 lands the second cabinet.
+- BH2 [low] [reject] track() never validates impulse-map values against the library. Unreachable in the sealed bundle — gen-registry validates every mapping value at build (pinned in gen-registry.test.ts), and presenter.react throws loudly as the runtime backstop (pinned). Guarding an unreachable state.
+- BH3 [low] [reject] impulse stage not gated by occupancy (a visitor-seated run's mapped events still pose the absent figure). The figure renders only while figureActive (main.ts); zero user-visible effect. The new impulse-scope pin (BH5 fix) makes the stage's scope an explicit law instead.
+- BH4 [low] [reject] takeOver-refusal restart branch untested. Unreachable at M0: the seat refuses only when occupied elsewhere, and a single seat makes that exclusive with presence at B0 (verification-gap independently dropped it). The branch is a loud, correct failsafe for a state no M0 path reaches.
+- BH5 [low] [PATCH] the break-skip and untracked-game-record laws were code comments, unpinned. Fix: new "impulse scope" test in scheduler.test.ts (mapped breaks never fire the library; an untracked game's records are inert; the stage is proven alive via jump). Mutations: drop the break `continue;` → red; drop the `st == null` guard → red (TypeError); reverted byte-identical.
+- BH6 [low] [PATCH] autoplay.test.js bound to gameRegistry[0] positionally. Fix: find by id `moon-patrol` + presence assert — pins bind by id, never list position.
+- BH7 [low] [PATCH] queue comments overstated forward compatibility. Fix: the comment now says the container survives growth; per-claim Visitor identity is what the crowd will additionally need.
+- BH8 [low] [reject] spec Code Map drift (Core math for the parabola, 1.0001 rig value). The fix would edit this build's spec; both drifts are labelled in code (presenter.ts math note, scheduler.test.ts rig comment). No code defect.
+- BH9 [low] [PATCH] presenter.test title cited the spine for values that are Design Notes 8. Fix: retitled "the authored reaction library is exactly the Design-Notes-8 authored data…".
+- BH10 [low] [reject] toggleWait stamps the last dispatch's tick, not the interact's. Debug-view-only queue value; no consumer reads it (state() is the only reader); plumbing an interact-time tick through routing is new surface for a cosmetic stamp.
+- EC1 [low] [reject] G1 group member: figures animate in lockstep with multiple busy placements — same root as BH1.
+- EC2 [false] boot glue white-screens if track() ever throws. Disproved: the throw IS the pinned law ("one run state per cabinet", /already tracked/ pin); the missing-wiring path degrades with a guard before track (main.ts entry/instance/seed check) — the intended loud-fail-vs-degrade split, working as designed.
+- EC3 [low] [reject] a busy registry entry without an autoplay hook = zombie machine. The wrapper's hook-tolerance is the untouched 1.1 contract (wrapper.ts:199-206); the sole registry entry implements the hook; tightening the contract is out of footprint.
+- VG1 [low] [reject] reaction-list cross-pin regex is brittle to a gen-registry reformat. It fails LOUDLY on reformat (assert.ok names the requirement) — matching the repo's source-pin style; a parser is over-engineering a lint-tier risk.
+- VG2 [low] [reject] G2 member: AC2 Verification wording overstates the adapter pin. Same root as IA1.
+- IA1 [low] [reject] G2: the AC2 adapter pin is realized as a word-scan purity test, not a byte diff. The intent's own "(diff pin)" reading holds — this pass's diff has zero hunks under presentation/ (reviewer-verified), and the adapter structurally cannot reach the figure (createPresentation receives only the canvas factory). Verification tracking line updated per Rule 19.
+- IA2 [false] the spec was edited to fit the mechanism. Disproved: edits are only frontmatter + Rule-19-sanctioned tracking lines; <intent-contract> untouched (diff-verified).
+- IA3 [false] the DW-25 upstream half is invisible to the repo's gates. The intent prescribes exactly this arrangement (working-tree fix, handoff to the lead, nothing committed upstream); a repo gate cannot pin another repo's working tree. moonpatrol HEAD unchanged at 49c3519; the working-tree diff is reported to the lead.
+- IA4 [low] [PATCH] the ≥2× bound headroom was header prose only. Fix: headroom assert per seed in autoplay.test.js (`end.tick * 2 <= BOUND_TICKS`). Mutation: BOUND_TICKS 30000→20000 → red (seed 5 breaks at 12338); reverted. AC5 mutation line updated.
+- IA5 [low] [reject] "presence beats queue head" only bites at degenerate M0 (one claimant). The two-claimant contrast case doesn't exist until Epic 3; the ordering is structural (presence check before queue consumption) and pinned by the walk-away and present-beats-head rows (mutation d red).
+- IA6 [low] [reject] G1 group member: singleton presenter vs per-game impulse maps. Same root as BH1.
+- IA7 [false] figure meshes live in main.ts while the pose law lives in core/patrons. The intent names this exact coin-door idiom (glue builds meshes, kernel owns pose law) — it follows it.
+- IA8 [low] [reject] the impulse-mapping .json joins the provenance exclusion list only by absence from the scan. The scan pins the .js count (13→15) and the in-test comment states the .json law; a future all-files scan is speculative.
+- IA9 [false] a third E un-waits; the E-cycle past the third press is unbounded. The intent enumerates E2/E3 laws only; the toggle is the minimal consistent reading, and the handoff test runs the 4th press (sit) already.
+- IA10 [false] seat's optional busy leg + byGame-uniqueness law invented; a Node v24 note. Both are spec Design Notes consequences (absent-busy = 1.5 rigs; one run state per busy placement); the Node note is an environment fact, not a code finding.
 
 ## Design Notes
 
@@ -144,10 +176,10 @@ deferred: []
 
 **Rule 19 — pinning tests + intended mutations (implement stage: apply, observe red, revert byte-identical, record the `mutation:` lines):**
 - AC1 pin: busy-start integration test (mode "autoplay" after the dwell, hash advance, figure active). `mutation: scheduler skips the autoplay launch after the dwell → the busy-start pin red; revert.`
-- AC2 pin: causality test on a real run (mapped event → reaction kind + same tick; unmapped → nothing; duration ends state). `mutation: impulse stage ignores the mapping and reacts to every event → the unmapped-event pin red; revert.` Adapter diff-empty pin: `mutation: pose the figure from adapter.js → the presentation diff pin red; revert.`
+- AC2 pin: causality test on a real run (mapped event → reaction kind + same tick; unmapped → nothing; duration ends state). `mutation: impulse stage ignores the mapping and reacts to every event → the unmapped-event pin red; revert.` Adapter pin (realized as the presentation purity scan — the adapter's sources carry no figure/Patron/busy carrier; no byte-baseline fixture exists): `mutation: pose the figure from adapter.js (a figure/busy carrier appended to adapter.js) → the presenter purity scan red; revert via git checkout, presentation/ byte-identical.`
 - AC3 pin: composite-draw pin on busy B0 (NEXT leg of `compositeScreen` unchanged). `mutation: drop the NEXT fillText from compositeScreen → the NEXT pin red; revert.`
 - AC4 pin: wait/take-over/walk-away/present-beats-head matrix rows as executed tests + the standing chair law. `mutation: arbitration takes the queue head before checking presence → the walk-away pin red; revert.`
-- AC5 pin: same-break restart with a different derived seed + measured end-state bound. `mutation: derived seed ignores runCount → the run-N/N+1 differ pin red; revert.`
+- AC5 pin: same-break restart with a different derived seed + measured end-state bound. `mutation: derived seed ignores runCount → the run-N/N+1 differ pin red; revert.` `mutation: BOUND_TICKS 30000→20000 → the ≥2× headroom assert red (seed 5 breaks at 12338, 2×=24676>20000); revert.`
 - AC6 pin: DW-25 respawn test + gates. `mutation: revert the world.js predicate to x+w → the pad-clear test red (NaN never filters); revert.`
 
 **Shared surfaces (Rule 19):** `CabinetPlacement` record (+`busy`), `generated/game-registry.ts` entry shape (+`impulses`) and the gen-registry schema/fixtures, `tools/registry-list.json`, the seat's event-drain ownership (`seat.step(codes, records)` — rigs in `seat.test.ts`, `seat-controls.test.ts`, `visit-arc.test.ts`), the gameEnded→attract flip owner (scheduler for busy B0), `no-ui-dom.test.ts` dev-serve module list + provenance authored-exclusion, `window.arcadeDebug` shape (main-glue pin), the vendored respawn behavior (no existing test pins the minefield-on-pad miss — verified by grep), the recorded test-count baseline. Standing criterion: every test added or changed passes on a fresh environment standalone and against its neighbours in either order.
@@ -156,5 +188,17 @@ deferred: []
 
 ## Auto Run Result
 
-Status: ready-for-dev
+Status: done
 Blocking condition: none
+
+**Implement pass 2026-11-23 (build-auto, unattended; spec oversized → terse result).**
+
+Files changed (23): new `core/patrons/presenter.ts` + `.test.ts`, `core/patrons/scheduler.ts` + `.test.ts`, `games/moon-patrol/sim/autoplay.js` + `.test.js`, `games/moon-patrol/assets/impulse-mapping.json`; modified `core/main.ts` (patrons system between cabinets and seat, figure meshes, arcadeDebug scheduler/presenter), `core/seat.ts` (BusyGate/takeOver/seatedAt, `step(codes, records)`, busy-guarded gameEnded flip), `core/room/cabinets.ts` (+`busy`, B0 true), `core/contract/wrapper.ts` (+`impulses?`), `games/moon-patrol/sim/index.js` (autoplay hook + raw gameover prepended to the drain pair), `games/moon-patrol/sim/world.js` (DW-25 span predicate + deviation note) + `world_gameplay.test.js` (pad-clear pin), `tools/gen-registry.mjs`/`.test.ts`/`registry-list.json` (impulsePath validation, REACTIONS list), `generated/game-registry.ts` (entry `impulses`), pin moves in `seat.test.ts`/`seat-controls.test.ts`/`visit-arc.test.ts`/`cabinets.test.ts`/`main-glue.test.ts`/`no-ui-dom.test.ts` (walk 13→15).
+
+Review breakdown: 25 findings — 0 high, 0 medium, 19 low, 6 false (triage log above). Patched in-pass: 5 low entries (impulse-scope pins BH5, registry find-by-id BH6, queue comment BH7, test title BH9, headroom assert IA4). All other lows rejected per the reject rules (unreachable-at-M0, fix-would-edit-this-spec, more-than-direct-correction); no finding was deferred (frontmatter `deferred: []`).
+
+Follow-up review recommendation: false (no high, no medium; every patch was a pin/comment/test-shape correction verified red→green).
+
+Verification performed: `npm test` 272/272 pass (251 baseline + 21 new/moved); `npm run typecheck` clean; `node ci/depcheck.mjs` DEPCHECK-OK; `node ci/lint-bans.mjs` LINTBANS-OK (autoplay.js scanned, zero exemptions); registry regen idempotent (generated/game-registry.ts sha256 identical before/after regen — `git diff --exit-code -- generated/` is meaningless pre-commit, so equality-by-hash stands in for the drift gate); `npm run build` green (597 kB entry chunk, entry-chunk warning tier precedent). Rule 19: 9 mutations demonstrated red then reverted byte-identical — the six AC pins (AC1 launch skip, AC2 ignore-mapping, AC2 pose-from-adapter realization, AC3 drop-NEXT, AC4 queue-head-before-presence, AC5 runCount-ignoring seed, AC6 predicate revert) plus two impulse-scope demos (break-`continue`, untracked-guard) and the headroom demo (BOUND_TICKS→20000).
+
+Residual risks / lead follow-ups: the Chrome-AND-Edge smoke and the fresh-environment standing criterion remain lead tier (matrix rows labelled lead). The measured bound covers the five fixed stub seeds, not the seed space exhaustively — the ≥2× headroom assert is the guard. DW-25: the upstream half lives as an uncommitted working-tree edit in `C:/git/moonpatrol` (`src/world.js` respawn pad span predicate, 8 insertions / 1 deletion, index blob 35aa3bf→4e1038c; moonpatrol HEAD unchanged at 49c3519) — the commit there is the lead's call; this run committed nothing there. The untracked `_bmad-output/planning-artifacts/sprint-status.yaml` predates this run: not committed, not touched, per dispatch.

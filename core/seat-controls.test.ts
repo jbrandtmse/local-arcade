@@ -15,10 +15,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { createKernelLoop, MS_PER_TICK } from "./loop.ts";
+import { createKernelLoop, MS_PER_TICK, type EventRecord } from "./loop.ts";
 import { createInputService, type InputService } from "./input/index.ts";
 import { createPlayerController, MOUSE_SENSITIVITY, type PlayerController } from "./player.ts";
-import { createSeatService, type SeatKeyMap } from "./seat.ts";
+import { createSeatService, type BusyGate, type SeatKeyMap } from "./seat.ts";
+import { createPatronScheduler } from "./patrons/scheduler.ts";
+import { createFigurePresenter } from "./patrons/presenter.ts";
 import { createGameInstance, type GameInstance, type TickInput } from "./contract/index.ts";
 import { ENTRY_SPAWN, collisionVolumes } from "./room/collision-volumes.ts";
 import { createCabinetRuntime, placementGeometry, type CabinetRuntime } from "./room/cabinets.ts";
@@ -45,9 +47,13 @@ interface Visit {
   key(code: string, down: boolean): void;
 }
 
-// One full rig, wired as core/main.ts wires it: the registry entry's sim
-// half through the wrapper, a kernel-owned TickInput the seat writes, the
-// player + seat systems on the loop, pointer-locked aim.
+// One full rig, wired as core/main.ts wires it (Story 1.6 shape): the
+// registry entry's sim half through the wrapper, a kernel-owned TickInput
+// the seat writes, the player + patrons + seat systems on the loop (the
+// patrons system drains once per tick and forwards into seat.step(codes,
+// records) — the 1.5 exclusive-drain rig move), pointer-locked aim. The
+// scheduler tracks nothing here: this suite drives the tracked NOT-busy
+// machine (busy B0 is pinned in patrons/scheduler.test.ts).
 function rig(seedFn: () => number): Visit {
   const cabinets = createCabinetRuntime();
   const player = createPlayerController(collisionVolumes, ENTRY_SPAWN);
@@ -59,7 +65,12 @@ function rig(seedFn: () => number): Visit {
   loop.addInstance(entry.id, instance, tickInput);
   const input = createInputService({ requestPointerLock: () => {} });
   input.pointerLockChanged(true);
-  const seat = createSeatService({ player, cabinets, loop, seedFn });
+  const presenter = createFigurePresenter();
+  const busyGate: BusyGate = {
+    busyFor: (volumeId) => scheduler.busyFor(volumeId),
+    toggleWait: (volumeId) => scheduler.toggleWait(volumeId),
+  };
+  const seat = createSeatService({ player, cabinets, busy: busyGate, seedFn });
   seat.track({
     volumeId: "cabinet-B0",
     gameId: entry.id,
@@ -69,8 +80,15 @@ function rig(seedFn: () => number): Visit {
     keys: MOON_KEYS,
   });
   player.registerInteractable("cabinet-B0", (id) => seat.handleInteract(id));
+  const scheduler = createPatronScheduler({ seat, player, presenter });
   loop.addSystem("player", () => player.step(1, seat.playerView(input.takeView())));
-  loop.addSystem("seat", () => seat.step(input.takeCodeView()));
+  let patronsRecords: EventRecord[] = [];
+  loop.addSystem("patrons", () => {
+    patronsRecords = loop.drainEvents();
+    presenter.step(loop.tickCount);
+    scheduler.dispatch(patronsRecords, loop.tickCount);
+  });
+  loop.addSystem("seat", () => seat.step(input.takeCodeView(), patronsRecords));
   return {
     loop,
     player,

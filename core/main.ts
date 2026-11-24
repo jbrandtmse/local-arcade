@@ -8,7 +8,7 @@
 // denial falls back silently to drag-look inside the input service.
 
 import * as THREE from "three";
-import { createKernelLoop, type KernelLoop } from "./loop.ts";
+import { createKernelLoop, type EventRecord, type KernelLoop } from "./loop.ts";
 import {
   createGameInstance,
   math,
@@ -18,10 +18,12 @@ import {
 } from "./contract/index.ts";
 import { createInputService } from "./input/index.ts";
 import { createPlayerController, EYE_HEIGHT, type PlayerController } from "./player.ts";
-import { createSeatService, type SeatKeyMap, type SeatService } from "./seat.ts";
+import { createSeatService, type BusyGate, type SeatKeyMap, type SeatService } from "./seat.ts";
+import { createPatronScheduler, type PatronScheduler } from "./patrons/scheduler.ts";
+import { createFigurePresenter, type FigurePresenter } from "./patrons/presenter.ts";
 import { ENTRY_SPAWN, collisionVolumes } from "./room/collision-volumes.ts";
 import { buildRoomScene, type Three } from "./room/scene.ts";
-import { ROOM_BLACK, toCss } from "./room/tokens.ts";
+import { ROOM_BLACK, WALL_WARM, toCss } from "./room/tokens.ts";
 import { compositeScreen, repaintScreen, type CanvasFactory } from "./room/surfaces.ts";
 import {
   MARQUEE_CAP_M,
@@ -32,6 +34,7 @@ import {
   coinDoorPose,
   cabinetPlacements,
   placementByVolumeId,
+  placementGeometry,
   screenPaintStep,
   stepCabinetPhase,
   toggleCoinDoor,
@@ -44,8 +47,16 @@ declare global {
     /** Non-visual state handle for headless QA and the lead's console
      * smoke (Design Notes item 6) — nothing is rendered or announced.
      * 1.4 adds the cabinet runtime (phase + coin doors) for the console
-     * liveness/targeting smoke. */
-    arcadeDebug: { player: PlayerController; loop: KernelLoop; cabinets: CabinetRuntime; seat: SeatService };
+     * liveness/targeting smoke; 1.6 adds the Patron scheduler (occupancy
+     * per busy cabinet + queue) and the figure presenter (reaction). */
+    arcadeDebug: {
+      player: PlayerController;
+      loop: KernelLoop;
+      cabinets: CabinetRuntime;
+      seat: SeatService;
+      scheduler: PatronScheduler;
+      presenter: FigurePresenter;
+    };
   }
 }
 
@@ -127,7 +138,17 @@ const SEAT_KEYS: Record<string, SeatKeyMap> = {
     buttons: { start: ["Enter"], jump: ["KeyX", "KeyK"], fire: ["KeyZ", "KeyJ"] },
   },
 };
-const seat = createSeatService({ player, cabinets, loop });
+// Story 1.6: the figure presenter holds the reaction library + figure
+// state; the Patron scheduler owns occupancy per busy placement. The seat
+// and the scheduler see ONLY their injected slices of each other (BusyGate
+// below, SeatHandover inside the scheduler) — the mutual reference is
+// resolved by call-time deferral, never by mutating a finished object.
+const presenter = createFigurePresenter();
+const busyGate: BusyGate = {
+  busyFor: (volumeId) => scheduler.busyFor(volumeId),
+  toggleWait: (volumeId) => scheduler.toggleWait(volumeId),
+};
+const seat = createSeatService({ player, cabinets, busy: busyGate });
 // One gate decides tracked-ness: a gameId-wired placement routes E through
 // the seat ONLY when it actually tracks (entry + declared controls + legend
 // keys present). An authoring gap (entry without controls, placement without
@@ -151,9 +172,75 @@ for (const p of cabinetPlacements) {
   });
   seatTrackVolumeIds.add(p.volumeId);
 }
-// The seat is the sole consumer of the loop's event queue; each drained
-// record rides to that game's presentation half (AD-6 -> AD-11 seam).
+// Records reach the presentation sink through the seat's forwarded drain
+// (AD-6 -> AD-11 seam); Story 1.6 moved the DRAIN itself to the patrons
+// system below, the sink stays here.
 seat.setEventSink((rec) => presentations.get(rec.gameId)?.onEvent?.(rec.event));
+
+// Story 1.6 (AD-23): one run state per busy, gameId-wired placement — busy
+// is room data read off the placement record, never a hand-typed id list.
+// Each is fed the registry entry's AUTHORED seed (derived autoplay runs
+// come off it, never a fresh roll) and its embedded impulse mapping. An
+// authoring gap keeps the cabinet attract-idle instead of faulting every
+// tick (1.5 precedent: authoring gaps degrade, they do not crash).
+const scheduler = createPatronScheduler({ seat, player, presenter });
+for (const p of cabinetPlacements) {
+  if (p.busy !== true || p.gameId == null) continue;
+  const entry = gameRegistry.find((e) => e.id === p.gameId);
+  const instance = instances.get(p.gameId);
+  if (entry == null || instance == null || entry.seed == null) continue;
+  scheduler.track({
+    volumeId: p.volumeId,
+    gameId: p.gameId,
+    instance,
+    seed: entry.seed,
+    impulses: entry.impulses ?? {},
+  });
+}
+
+// Story 1.6 (AC2): the Patron figure — three hard-cornered boxes (legs,
+// torso, head) in the Wall Warm token, built ONCE like every other scene
+// part and standing at the cabinet's authored play pose (the seat law,
+// reused through presenter.figurePose). The frame only RE-POSES them from
+// kernel state (the coin-door-pose idiom); no Patron shows while the
+// chair is attract-idle or Visitor-seated.
+const FIGURE_PARTS = {
+  legs: { w: 0.3, h: 0.6, d: 0.26, centerY: 0.3 },
+  torso: { w: 0.44, h: 0.56, d: 0.3, centerY: 0.88 },
+  head: { w: 0.24, h: 0.24, d: 0.24, centerY: 1.28 },
+} as const;
+interface PatronFigure {
+  volumeId: string;
+  base: { x: number; z: number };
+  toward: { x: number; z: number };
+  legs: THREE.Mesh;
+  torso: THREE.Mesh;
+  head: THREE.Mesh;
+}
+const figures: PatronFigure[] = [];
+for (const p of cabinetPlacements) {
+  if (p.busy !== true) continue;
+  const pose = presenter.figurePose(p.volumeId);
+  const geom = placementGeometry(p.slotId);
+  const material = three.standardMaterial({ color: WALL_WARM });
+  const build = (spec: { w: number; h: number; d: number; centerY: number }): THREE.Mesh => {
+    const partMesh = three.mesh(three.boxGeometry(spec.w, spec.h, spec.d), material) as THREE.Mesh;
+    partMesh.position.set(pose.x, spec.centerY, pose.z);
+    partMesh.visible = false; // attract at boot: no Patron stands yet
+    scene.add(partMesh);
+    return partMesh;
+  };
+  figures.push({
+    volumeId: p.volumeId,
+    base: { x: pose.x, z: pose.z },
+    // The figure faces the cabinet like the seated visitor: from the play
+    // pose back toward the body front plane = -slot facing.
+    toward: { x: -geom.facing.x, z: -geom.facing.z },
+    legs: build(FIGURE_PARTS.legs),
+    torso: build(FIGURE_PARTS.torso),
+    head: build(FIGURE_PARTS.head),
+  });
+}
 
 loop.addSystem("player", () => {
   // Seated -> zeroed axes/aim, E kept (the seat's view IS the DeviceView
@@ -174,9 +261,22 @@ for (const p of cabinetPlacements) {
     player.registerInteractable(p.volumeId, (id) => toggleCoinDoor(cabinets, id));
   }
 }
+// Story 1.6 (AD-23 phase order realized as registration order): the
+// patrons system sits BETWEEN "cabinets" and "seat". It drains this tick's
+// events ONCE (the seat's exclusive drain from 1.5 moves — the one
+// sanctioned wiring change), advances the figure state, and runs the
+// scheduler's impulse stage + break arbitration. The seat system below
+// receives the same records forwarded — no second drain.
+let patronsRecords: EventRecord[] = [];
+loop.addSystem("patrons", () => {
+  patronsRecords = loop.drainEvents();
+  presenter.step(loop.tickCount);
+  scheduler.dispatch(patronsRecords, loop.tickCount);
+});
 // The seat system runs after the sim ticks and event dispatch (AD-23): it
-// drains this tick's events, then maps the raw codes for the NEXT tick.
-loop.addSystem("seat", () => seat.step(input.takeCodeView()));
+// maps the raw codes for the NEXT tick (Story 1.6: records arrive
+// forwarded; the seat no longer drains the queue itself).
+loop.addSystem("seat", () => seat.step(input.takeCodeView(), patronsRecords));
 
 // Thin browser glue -> device service (AD-7: Core owns capture; the glue
 // only forwards events and (re)arms pointer lock). Silent by construction:
@@ -225,6 +325,22 @@ function frame(): void {
     d.mesh.rotation.set(0, pose.panel.yaw, 0);
     d.slot.position.set(pose.slot.x, pose.slot.y, pose.slot.z);
     d.slot.rotation.set(0, pose.slot.yaw, 0);
+  }
+  // 1.6: Patron figures re-pose from kernel state every frame — the exact
+  // coin-door idiom (render READS figureActive + figureOffset; the pose
+  // law lives in the tick, and the adapter never touches these meshes).
+  for (const f of figures) {
+    const active = scheduler.figureActive(f.volumeId);
+    f.legs.visible = active;
+    f.torso.visible = active;
+    f.head.visible = active;
+    if (!active) continue;
+    const off = presenter.figureOffset();
+    const leanX = f.toward.x * off.torsoLean;
+    const leanZ = f.toward.z * off.torsoLean;
+    f.legs.position.set(f.base.x, FIGURE_PARTS.legs.centerY + off.legsY, f.base.z);
+    f.torso.position.set(f.base.x + leanX, FIGURE_PARTS.torso.centerY + off.torsoY, f.base.z + leanZ);
+    f.head.position.set(f.base.x + leanX, FIGURE_PARTS.head.centerY + off.headY, f.base.z + leanZ);
   }
   // 1.5 paint-step gate: the fallback painters cover only faces WITHOUT a
   // presentation half (a game-driven face repaints every frame below).
@@ -280,5 +396,7 @@ window.addEventListener("resize", () => {
 });
 
 // Non-visual debug handle for QA/browser smoke — state only, zero UI.
-// 1.5 adds the seat service (E-law cycle + the drained-event record).
-window.arcadeDebug = { player, loop, cabinets, seat };
+// 1.5 adds the seat service (E-law cycle + the forwarded-event record);
+// 1.6 adds the scheduler (occupancy/queue/derived seeds) and the figure
+// presenter (reaction state) for the busy-machine console smoke.
+window.arcadeDebug = { player, loop, cabinets, seat, scheduler, presenter };

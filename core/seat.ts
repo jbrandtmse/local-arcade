@@ -1,17 +1,26 @@
-// Story 1.5 (AC2/AC4/AC5): the seat service — the kernel half of "walk up,
-// sit down, play in place". It owns the E-law cycle for game-wired cabinets
-// (standing + closed coin door -> open; standing + open -> sit down, which
-// teleports the visitor to the cabinet's authored play pose and hands the
-// instance a kernel seed through instance.play(seed); seated -> stand up,
-// restoring the saved standing pose, closing the door, and returning the
-// machine to attract with the visitor still seated). Raw device codes reach
-// the game ONLY through this module's per-tick mapping onto the registry
-// entry's declared control slots (AD-7/AD-16); the game never sees codes.
-// The seat is also the sole consumer of the loop's event queue (M0): it
-// forwards every drained record to the presentation sink and flips a game
-// that emitted gameEnded back to attract on the spot — the Enter edge
-// restarts a seated visitor at attract with a fresh seed (Design Notes:
-// no auto-eject; the chair is yours until you press E).
+// Story 1.5 (AC2/AC4/AC5) extended by Story 1.6: the seat service — the
+// kernel half of "walk up, sit down, play in place". It owns the E-law
+// cycle for game-wired cabinets (standing + closed coin door -> open;
+// standing + open -> sit down, which teleports the visitor to the
+// cabinet's authored play pose and hands the instance a kernel seed
+// through instance.play(seed); seated -> stand up, restoring the saved
+// standing pose, closing the door, and returning the machine to attract
+// with the visitor still seated). Raw device codes reach the game ONLY
+// through this module's per-tick mapping onto the registry entry's
+// declared control slots (AD-7/AD-16); the game never sees codes.
+//
+// Story 1.6 made the seat arbitration-aware (busy is the placement's flag,
+// read through the injected busy gate — never a hand-typed id): at a BUSY
+// cabinet the second E joins the scheduler's queue (pose untouched, the
+// Patron keeps playing), a third E un-waits, and the scheduler hands the
+// chair over at a canonical break through takeOver() (the sit law below,
+// reused). The seat also stops being the loop's event drainer: the patrons
+// system drains once per tick (AD-23 phase order) and forwards the records
+// into step(codes, records); the sink and the rolling debug window still
+// live here, and the gameEnded->attract flip stays seat-side for tracked
+// NOT-busy cabinets only — busy cabinets' flip belongs to the scheduler
+// (chair law). The Enter edge still restarts a seated visitor at attract
+// with a fresh seed (no auto-eject; the chair is yours until you press E).
 //
 // Seated law (Design Notes): the visitor's own view is zeroed — look and
 // walk are dead while seated, E still routes (targeting keeps resolving
@@ -31,7 +40,7 @@ import {
   toggleCoinDoor,
   type CabinetRuntime,
 } from "./room/cabinets.ts";
-import type { EventRecord, KernelLoop } from "./loop.ts";
+import type { EventRecord } from "./loop.ts";
 
 /** How far in front of the body front plane the seated visitor stands,
  * metres (inference — Design Notes item 2: 0.80m puts the eyes on the
@@ -64,6 +73,14 @@ export interface SeatTrackEntry {
   keys: SeatKeyMap;
 }
 
+/** The scheduler legs the seat is allowed to see (Story 1.6): whether a
+ * volume is a tracked busy cabinet, and the wait/un-wait toggle. main.ts
+ * wires them as deferred closures over the scheduler. */
+export interface BusyGate {
+  busyFor(volumeId: string): boolean;
+  toggleWait(volumeId: string): void;
+}
+
 /** Plain-data debug view (the arcadeDebug.seat record). */
 export interface SeatState {
   seated: boolean;
@@ -82,9 +99,16 @@ export interface SeatService {
   /** What the player system sees: seated -> zeroed axes/aim, interact kept
    * (E must still route, and targeting still resolves from the play pose). */
   playerView(view: DeviceView): DeviceView;
-  /** The seat kernel system: drain the loop's events (sole consumer), then
-   * map this tick's raw codes onto the seated game's declared slots. */
-  step(codes: CodeView): void;
+  /** The seat kernel system: consume the records the patrons system drained
+   * this tick (window + sink + the not-busy gameEnded flip), then map this
+   * tick's raw codes onto the seated game's declared slots. */
+  step(codes: CodeView, records: readonly EventRecord[]): void;
+  /** Scheduler handover (Story 1.6): sit the standing Visitor down at this
+   * cabinet at a canonical break — the sit law (save pose, play-pose
+   * teleport, kernel-fresh play). False when a chair is already taken. */
+  takeOver(volumeId: string): boolean;
+  /** Scheduler observation: is the chair at this volume occupied? */
+  seatedAt(volumeId: string): boolean;
   state(): SeatState;
   /** Presentation sink the browser glue installs (Story 1.5 main.ts). */
   setEventSink(sink: (rec: EventRecord) => void): void;
@@ -116,7 +140,9 @@ export function playPoseFor(volumeId: string): { x: number; z: number; yaw: numb
 export function createSeatService(opts: {
   player: PlayerController;
   cabinets: CabinetRuntime;
-  loop: KernelLoop;
+  /** Story 1.6: the scheduler's busy gate (absent = a 1.5 rig: every
+   * tracked cabinet is seat-side, every law unchanged). */
+  busy?: BusyGate;
   seedFn?: () => number;
 }): SeatService {
   const seedFn = opts.seedFn ?? kernelSeed;
@@ -154,6 +180,18 @@ export function createSeatService(opts: {
     entry.input.controls = { axes, buttons };
   }
 
+  // The sit law (Story 1.5), shared by the direct E-sit of a not-busy
+  // cabinet and the scheduler's break-time handover (Story 1.6): save the
+  // standing pose, move to the play pose, hand the seed over through the
+  // wrapper (AD-23: the kernel resolves the seed).
+  function sitDown(entry: SeatTrackEntry): void {
+    const p = opts.player.state;
+    savedPose = { x: p.x, z: p.z, yaw: p.yaw, pitch: p.pitch };
+    opts.player.teleport(playPoseFor(entry.volumeId));
+    seatedVolumeId = entry.volumeId;
+    entry.instance.play(seedFn());
+  }
+
   return {
     track(entry) {
       if (tracked.some((t) => t.volumeId === entry.volumeId || t.gameId === entry.gameId)) {
@@ -172,13 +210,15 @@ export function createSeatService(opts: {
         toggleCoinDoor(opts.cabinets, volumeId); // 1.4 law intact: the first press opens
         return;
       }
-      // Sit: save the standing pose, move to the play pose, hand the seed
-      // over through the wrapper (AD-23: the kernel resolves the seed).
-      const p = opts.player.state;
-      savedPose = { x: p.x, z: p.z, yaw: p.yaw, pitch: p.pitch };
-      opts.player.teleport(playPoseFor(volumeId));
-      seatedVolumeId = volumeId;
-      entry.instance.play(seedFn());
+      if (opts.busy?.busyFor(volumeId) === true) {
+        // Story 1.6: at a busy cabinet the second E WAITS (joins the
+        // scheduler's queue — pose untouched, the Patron keeps playing),
+        // and a third E un-waits. Sitting happens only through the
+        // scheduler's break-time handover.
+        opts.busy.toggleWait(volumeId);
+        return;
+      }
+      sitDown(entry);
     },
     playerView(view) {
       if (seatedVolumeId === null) return view;
@@ -188,16 +228,28 @@ export function createSeatService(opts: {
         interact: view.interact, // E still routes from the chair (AC4)
       };
     },
-    step(codes) {
-      for (const rec of opts.loop.drainEvents()) {
+    takeOver(volumeId) {
+      const entry = entryFor(volumeId);
+      if (seatedVolumeId !== null) return false; // one visitor; the chair is taken
+      sitDown(entry);
+      return true;
+    },
+    seatedAt(volumeId) {
+      return seatedVolumeId === volumeId;
+    },
+    step(codes, records) {
+      for (const rec of records) {
         recent.push(rec);
         if (recent.length > SEAT_EVENT_WINDOW) recent.shift();
         if (sink != null) sink(rec);
         const entry = tracked.find((t) => t.gameId === rec.gameId);
-        // Canonical game over (Design Notes): the sim drained scoreSubmitted
-        // + gameEnded this tick; the machine returns to attract in place —
-        // the visitor stays seated, and Enter (below) restarts.
-        if (entry != null && rec.event.type === "gameEnded") entry.instance.attract();
+        // Canonical game over on a tracked NOT-busy cabinet (1.5 law): the
+        // machine returns to attract in place — the visitor stays seated,
+        // and Enter (below) restarts. A busy cabinet's flip is owned by
+        // the scheduler (Story 1.6); this leg must not double-flip.
+        if (entry != null && rec.event.type === "gameEnded" && opts.busy?.busyFor(entry.volumeId) !== true) {
+          entry.instance.attract();
+        }
       }
       if (seatedVolumeId === null) return;
       const entry = entryFor(seatedVolumeId);

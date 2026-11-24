@@ -1,12 +1,15 @@
 // Moon Patrol sim half — Story 1.5 (PROVISIONAL play surface): contract
 // hooks over the vendored world (see world.js header for provenance). The
 // kernel drives tick/events/snapshot/attract; play(seed) (AD-23, opened this
-// story) rebuilds the play world from the kernel's seed. The vendored world
+// story) rebuilds the play world from the kernel's seed, and autoplay(seed)
+// (Story 1.6) opens the same world to the authored AI in autoplay.js. The
+// vendored world
 // physics steps at dt/2 twice per kernel tick — the vendored tests tune and
 // pin the physics at 1/120, and 1/60 halved is exactly representable, so the
 // kernel's fixed step lands on the tuned substep without a rate change.
 
 import { createWorld, step as worldStep, drainFx } from './world.js';
+import { autoplayInput } from './autoplay.js';
 
 export function createSim(ctx) {
   const math = ctx.math;
@@ -29,6 +32,11 @@ export function createSim(ctx) {
         continue;
       }
       if (f === 'gameover') {
+        // Story 1.6: the raw 'gameover' cue rides the drain too — the
+        // authored impulse mapping binds the slam reaction to it (Design
+        // Notes 7). The AD-23 pair keeps its order: scoreSubmitted FIRST,
+        // then gameEnded.
+        out.push({ type: 'gameover', payload: {} });
         out.push({ type: 'scoreSubmitted', payload: { score: world.score } });
         out.push({ type: 'gameEnded', payload: { score: world.score } });
         continue;
@@ -51,16 +59,24 @@ export function createSim(ctx) {
         attractT += dt;
         return;
       }
-      const c = input.controls;
-      const move = typeof c.axes.move === 'number' ? c.axes.move : 0;
-      const inp = {
-        left: move < 0,
-        right: move > 0,
-        jump: !!c.buttons.jump?.down,
-        fire: !!c.buttons.fire?.down,
-      };
-      worldStep(world, dt / 2, inp);
-      worldStep(world, dt / 2, inp);
+      if (mode === 'autoplay') {
+        // Story 1.6 (AD-23): a busy cabinet has no seated player — the
+        // kernel input object is ignored, and the authored AI synthesizes
+        // step()'s boolean inputs from the live world, once per substep.
+        worldStep(world, dt / 2, autoplayInput(world));
+        worldStep(world, dt / 2, autoplayInput(world));
+      } else {
+        const c = input.controls;
+        const move = typeof c.axes.move === 'number' ? c.axes.move : 0;
+        const inp = {
+          left: move < 0,
+          right: move > 0,
+          jump: !!c.buttons.jump?.down,
+          fire: !!c.buttons.fire?.down,
+        };
+        worldStep(world, dt / 2, inp);
+        worldStep(world, dt / 2, inp);
+      }
       queued.push(...drainedEvents());
       if (world.done) {
         // Champion law (vendored src/main.js:67-76 — that glue layer is not
@@ -107,6 +123,17 @@ export function createSim(ctx) {
       // state debt, not history — the next attract cycle starts fresh.
       attractT = 0;
       mode = 'play';
+    },
+
+    // Story 1.6 (AD-23, hook shape fixed by the contract): identical world
+    // rebuild to play(), but the sim drives itself through autoplayInput.
+    // The wrapper re-seeds the kernel rng before calling this (AD-4).
+    autoplay(seed) {
+      runSeed = seed;
+      world = createWorld({ seed, math });
+      queued = [];
+      attractT = 0;
+      mode = 'autoplay';
     },
   };
 }

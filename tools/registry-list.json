@@ -4,6 +4,7 @@
     "simPath": "games/moon-patrol/sim/index.js",
     "seed": 1982,
     "presPath": "games/moon-patrol/presentation/adapter.js",
+    "impulsePath": "games/moon-patrol/assets/impulse-mapping.json",
     "controls": {
       "vocab": 1,
       "axes": ["move"],

@@ -108,6 +108,43 @@ test("presPath + controls emit; the vocab keys are fixed-order regardless of lis
   expectFailure(dir, "unknown controls field"); // a "butons" typo must not silently drop the buttons leg
 });
 
+// Story 1.6 (AC3): the authored impulse mapping is validated at BUILD time
+// (never fetched at runtime — the bundle stays sealed, AD-11) and embedded
+// into the entry as parsed data in fixed (sorted) key order.
+test("impulsePath: parsed mapping embedded sorted; a bad reaction name, a missing file, and a non-object mapping die loudly", () => {
+  const dir = fixtureRoot();
+  writeFileSync(path.join(dir, "impulses.json"), JSON.stringify({ gameover: "slam", jump: "jump", hit: "flinch", explode: "flinch" }));
+  writeFileSync(
+    path.join(dir, "list.json"),
+    JSON.stringify([{ id: "alpha", simPath: "sims/alpha/sim.js", impulsePath: "impulses.json" }]),
+  );
+  runGenerator(dir);
+  const first = readFileSync(path.join(dir, "out", "game-registry.ts"), "utf8");
+  assert.ok(
+    first.includes('{ id: "alpha", createSim: gAlpha, impulses: {"explode":"flinch","gameover":"slam","hit":"flinch","jump":"jump"} },'),
+    "the entry embeds the parsed mapping, keys sorted (the asset's key order never leaks into bytes)",
+  );
+  runGenerator(dir);
+  assert.equal(readFileSync(path.join(dir, "out", "game-registry.ts"), "utf8"), first, "byte-identical re-emit with a mapping present");
+
+  writeFileSync(path.join(dir, "impulses.json"), JSON.stringify({ jump: "shrug" }));
+  expectFailure(dir, "is not a kernel reaction"); // a name outside the reaction library is a build error
+
+  writeFileSync(path.join(dir, "impulses.json"), JSON.stringify({ jump: "jump" }));
+  writeFileSync(
+    path.join(dir, "list.json"),
+    JSON.stringify([{ id: "alpha", simPath: "sims/alpha/sim.js", impulsePath: "gone.json" }]),
+  );
+  expectFailure(dir, "impulse mapping source not found");
+
+  writeFileSync(path.join(dir, "impulses.json"), "[]");
+  writeFileSync(
+    path.join(dir, "list.json"),
+    JSON.stringify([{ id: "alpha", simPath: "sims/alpha/sim.js", impulsePath: "impulses.json" }]),
+  );
+  expectFailure(dir, "impulse mapping must be an object");
+});
+
 test("empty provisional list emits an empty registry", () => {
   const dir = fixtureRoot();
   writeFileSync(path.join(dir, "list.json"), "[]");

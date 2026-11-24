@@ -461,14 +461,17 @@ function visitSession(): {
   const rt: CabinetRuntime = createCabinetRuntime();
   const player = createPlayerController(collisionVolumes, ENTRY_SPAWN);
   // the REAL registry entry + wrapper instance, wired exactly as main.ts:
-  // kernel-owned TickInput, seat service over (player, runtime, loop).
+  // kernel-owned TickInput, seat service over (player, runtime). Story
+  // 1.6: the seat no longer takes the loop (the patrons system drains and
+  // forwards); this session never steps the loop's systems, so no patrons
+  // rig is needed — the E-law and the stand-restore pins are synchronous.
   const entry = gameRegistry.find((e) => e.id === "moon-patrol")!;
   assert.ok(entry.controls, "the registry entry declares its control vocab (the seat mapping needs it)");
   const instance = createGameInstance(entry.createSim, entry.seed ?? 0);
   const tickInput: TickInput = { controls: {} };
   const loop = createKernelLoop({ now: () => 0 });
   loop.addInstance(entry.id, instance, tickInput);
-  const seat = createSeatService({ player, cabinets: rt, loop, seedFn: () => 4242 });
+  const seat = createSeatService({ player, cabinets: rt, seedFn: () => 4242 });
   seat.track({ volumeId: "cabinet-B0", gameId: entry.id, instance, input: tickInput, controls: entry.controls, keys: MOON_KEYS });
   player.registerInteractable("cabinet-B0", (id) => seat.handleInteract(id));
   // aim at the shell's body centre through the MOUSE channel (no state pokes):

@@ -105,12 +105,17 @@ test("vendored files carry the provenance sha; the provisional seams carry PROVI
     return files;
   };
   const all = walk(gamesDir);
-  assert.equal(all.length, 13, "the games tree is exactly the 10 vendored files + the 3 authored files");
+  // Story 1.6: sim/autoplay.js (the autoplay AI) and its test join the
+  // authored set — the impulse-mapping asset is .json and never enters the
+  // .js walk at all (its provenance is the authored act itself).
+  assert.equal(all.length, 15, "the games tree is exactly the 10 vendored files + the 5 authored files");
   // The authored files (no vendored code inside) are exempt from the sha leg;
   // everything else in the tree is vendored and MUST carry provenance.
   const authored = new Set([
     path.join("moon-patrol", "sim", "index.js"), // authored sim adapter, cites provenance via the wrapped files
     path.join("moon-patrol", "sim", "index.test.js"), // authored test of that adapter
+    path.join("moon-patrol", "sim", "autoplay.js"), // 1.6: authored autoplay AI (lint-bans scans it, zero exemptions)
+    path.join("moon-patrol", "sim", "autoplay.test.js"), // authored test of the autoplay path
     path.join("moon-patrol", "presentation", "adapter.test.js"), // authored test of the presentation half
   ]);
   let provenanced = 0;
@@ -159,6 +164,8 @@ test("dev serve (real HTTP): the served body is unchanged, the 1.2 shell modules
       "/core/room/scene.ts",
       "/core/room/surfaces.ts",
       "/core/seat.ts",
+      "/core/patrons/scheduler.ts",
+      "/core/patrons/presenter.ts",
       "/generated/game-registry.ts",
       "/games/moon-patrol/presentation/adapter.js",
     ]) {

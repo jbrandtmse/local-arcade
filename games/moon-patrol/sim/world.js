@@ -10,6 +10,7 @@
 //  - up.hits Set-of-object-refs -> numeric oid array (oid stamped at spawn),
 //    so the live shape AND the snapshot are plain (Design Notes 7).
 //  - The world rng cursor is exposed via rng.js's added getState/setState.
+//  - DW-25 (Story 1.6): respawn()'s ground pad filter spans minefield/crater via x1/x2 (the same fix lands upstream in the working tree; the sha line above still names the vendor base).
 // dt-agnostic step() is otherwise unchanged.
 
 // Pure simulation: no DOM / Canvas / Audio imports (unit-testable in Node).
@@ -103,7 +104,14 @@ function respawn(w) {
   const b = w.buggy;
   // clear a landing pad around the respawn point (no score for cleared items)
   const padL = b.x - 80, padR = b.x + 240;
-  w.ground = w.ground.filter(o => !(o.x + o.w > padL && o.x < padR));
+  // span predicate (DW-25): minefields and craters carry x1/x2, not x/w —
+  // the old o.x + o.w reads NaN for them, and NaN never filters, so a
+  // minefield could sit on the respawn pad. Same idiom as createCrater.
+  w.ground = w.ground.filter(o => {
+    const s = o.type === 'crater' || o.type === 'minefield' ? o.x1 : o.x;
+    const e = o.type === 'crater' || o.type === 'minefield' ? o.x2 : o.x + o.w;
+    return !(e > padL && s < padR);
+  });
   w.craters = w.craters.filter(c => !(c.x2 > padL && c.x1 < padR));
   b.y = GY; b.vy = 0; b.onGround = true;
   b.speed = B.slow; b.target = B.slow;

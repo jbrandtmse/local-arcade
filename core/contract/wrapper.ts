@@ -92,6 +92,11 @@ export interface GameRegistryEntry {
   /** Control vocabulary this game accepts; presence is what makes the seat
    * service route raw keys to this instance (Story 1.5). */
   controls?: GameControls;
+  /** Authored event->reaction map (AD-23, Story 1.6): sim event types to
+   * kernel reaction-library names. The generator embeds the parsed asset
+   * (sealed build data — the mapping is never fetched at runtime), and
+   * validates every value against the library (tools/gen-registry.mjs). */
+  impulses?: Record<string, string>;
 }
 
 /** Kernel-owned instance modes; "play" (visitor-seated, AD-23) is set by the

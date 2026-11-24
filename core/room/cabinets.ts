@@ -86,6 +86,11 @@ export interface CabinetPlacement {
    * link, authored — no manifest, no ledger). Absent means a plain 1.4
    * cabinet: E toggles the coin door and nothing is seated. */
   gameId?: string;
+  /** Story 1.6 (AD-23): a busy machine runs autoplay when nobody claims
+   * it — the second E joins the queue instead of sitting. Room data, not
+   * hand-typed scheduler ids: the scheduler reads THIS flag off the
+   * placement (the occupancy law keys on placements, never on game ids). */
+  busy?: boolean;
 }
 
 export const cabinetPlacements: readonly CabinetPlacement[] = [
@@ -97,6 +102,7 @@ export const cabinetPlacements: readonly CabinetPlacement[] = [
     hue: GLOW_CYAN,
     marqueeHue: GLOW_MARQUEE,
     gameId: "moon-patrol",
+    busy: true, // Story 1.6: the one busy machine — a Patron actually plays
   },
 ];
 

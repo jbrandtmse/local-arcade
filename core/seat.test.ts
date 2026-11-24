@@ -1,15 +1,26 @@
-// Story 1.5 pins for the seat service, run through the REAL kernel loop,
-// input service, player controller, cabinet runtime, registry entry, and
-// wrapper (the I/O matrix's Rule-1 rows): the E-law cycle (open -> sit ->
-// stand) on the scripted walk from ENTRY_SPAWN; the KeyA/KeyD speed law
-// reaching the sim through the seat's slot mapping; seated look/walk zeroed
-// while E still routes (targeting holds B0 from the play pose); the stand
-// pose identity and the never-sat transcript identity; the seed roles
-// (kernel seedFn reaches the wrapper play path; the attract seed is the
-// registry entry's number); game over while seated flips the machine to
-// attract in place and Enter restarts on a fresh seed; the seat drains the
-// loop's event queue exclusively and exposes the record; standing neutralizes the kernel TickInput's
-// declared slots; past SEAT_EVENT_WINDOW drains the exposed record holds exactly the last 32, in order.
+// Story 1.5 pins for the seat service (kept honest through Story 1.6 —
+// see "Shared surfaces" in the 1.6 spec), run through the REAL kernel
+// loop, input service, player controller, cabinet runtime, registry
+// entry, and wrapper (the I/O matrix's Rule-1 rows): the E-law cycle
+// (open -> sit -> stand) on the scripted walk from ENTRY_SPAWN; the
+// KeyA/KeyD speed law reaching the sim through the seat's slot mapping;
+// seated look/walk zeroed while E still routes (targeting holds B0 from
+// the play pose); the stand pose identity and the never-sat transcript
+// identity; the seed roles (kernel seedFn reaches the wrapper play path;
+// the attract seed is the registry entry's number); game over while
+// seated flips the machine to attract in place and Enter restarts on a
+// fresh seed; standing neutralizes the kernel TickInput's declared slots;
+// past SEAT_EVENT_WINDOW the exposed record holds exactly the last 32,
+// in order.
+//
+// Story 1.6 rig move (the sanctioned one): the rigs now wire a patrons
+// system that drains the loop's queue ONCE per tick and forwards the
+// records into seat.step(codes, records) — the seat's exclusive drain
+// from 1.5 moved. These rigs carry the tracked NOT-BUSY wiring: the
+// scheduler is created but tracks nothing (no busy placement is tracked
+// here), so every 1.5 law keeps its meaning — direct sit on E #2 and the
+// seat-side gameEnded flip. The real busy B0 (placement busy: true) and
+// the scheduler-owned flip are pinned in patrons/scheduler.test.ts.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -18,7 +29,9 @@ import path from "node:path";
 import { createKernelLoop, MS_PER_TICK, type EventRecord } from "./loop.ts";
 import { createInputService, type InputService } from "./input/index.ts";
 import { createPlayerController, EYE_HEIGHT, MOUSE_SENSITIVITY, type PlayerController } from "./player.ts";
-import { createSeatService, PLAY_STANDOFF_M, SEAT_EVENT_WINDOW, playPoseFor, type SeatKeyMap } from "./seat.ts";
+import { createSeatService, PLAY_STANDOFF_M, SEAT_EVENT_WINDOW, playPoseFor, type BusyGate, type SeatKeyMap } from "./seat.ts";
+import { createPatronScheduler } from "./patrons/scheduler.ts";
+import { createFigurePresenter } from "./patrons/presenter.ts";
 import { createGameInstance, type GameInstance, type TickInput } from "./contract/index.ts";
 import { ENTRY_SPAWN, collisionVolumes } from "./room/collision-volumes.ts";
 import { createCabinetRuntime, placementGeometry, SHELL, type CabinetRuntime } from "./room/cabinets.ts";
@@ -60,7 +73,17 @@ function rig(seedFn: () => number): Visit {
   loop.addInstance(entry.id, instance, tickInput);
   const input = createInputService({ requestPointerLock: () => {} });
   input.pointerLockChanged(true);
-  const seat = createSeatService({ player, cabinets, loop, seedFn });
+  // 1.6 rig wiring mirrors main.ts: presenter + scheduler beside the seat,
+  // each side seeing only its injected slice (BusyGate closures resolve the
+  // mutual reference at call time). The scheduler tracks NOTHING here —
+  // this suite is the tracked-not-busy machine; busy B0 lives in
+  // patrons/scheduler.test.ts.
+  const presenter = createFigurePresenter();
+  const busyGate: BusyGate = {
+    busyFor: (volumeId) => scheduler.busyFor(volumeId),
+    toggleWait: (volumeId) => scheduler.toggleWait(volumeId),
+  };
+  const seat = createSeatService({ player, cabinets, busy: busyGate, seedFn });
   seat.track({
     volumeId: "cabinet-B0",
     gameId: entry.id,
@@ -70,8 +93,19 @@ function rig(seedFn: () => number): Visit {
     keys: MOON_KEYS,
   });
   player.registerInteractable("cabinet-B0", (id) => seat.handleInteract(id));
+  const scheduler = createPatronScheduler({ seat, player, presenter });
   loop.addSystem("player", () => player.step(1, seat.playerView(input.takeView())));
-  loop.addSystem("seat", () => seat.step(input.takeCodeView()));
+  // Story 1.6 wiring (registration order = AD-23 phase order): the patrons
+  // system drains ONCE per tick and forwards; the scheduler tracks nothing
+  // in this suite (not-busy wiring), so dispatch is inert and every 1.5
+  // law below keeps its meaning.
+  let patronsRecords: EventRecord[] = [];
+  loop.addSystem("patrons", () => {
+    patronsRecords = loop.drainEvents();
+    presenter.step(loop.tickCount);
+    scheduler.dispatch(patronsRecords, loop.tickCount);
+  });
+  loop.addSystem("seat", () => seat.step(input.takeCodeView(), patronsRecords));
   return {
     loop,
     player,

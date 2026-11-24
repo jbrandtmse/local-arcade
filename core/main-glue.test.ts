@@ -11,7 +11,11 @@
 // room wiring: the authored room is built into the page scene exactly once
 // through the real Three adapter with injected OffscreenCanvas painters, and
 // the player starts on the authored volumes at ENTRY_SPAWN. Pins the source
-// contract; the lead's Chrome+Edge smoke covers in-browser behaviour.
+// contract; the lead's Chrome+Edge smoke covers in-browser behaviour. Story
+// 1.6 moved two 1.5 pins (the seat creation no longer takes the loop; the
+// seat system takes forwarded records) and adds the patrons-wiring pins:
+// one drain per tick in a cabinets->patrons->seat registered order, and the
+// figure re-pose legs in frame() (banned wall-clock still banned).
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -120,19 +124,22 @@ test("1.4 cabinet wiring: the phase advances as a kernel system, coin doors togg
   assert.ok(body.includes("placement.screenZones,"), "the repaint re-reads the placement's authored zone records");
   assert.ok(body.includes("paintStep,"), "the repaint receives the tick-derived paint step (liveness source)");
   assert.ok(body.includes("three.markTextureUpdated(s.texture)"), "a repaint marks the SAME texture dirty (no second canvas)");
-  assert.ok(MAIN.includes("window.arcadeDebug = { player, loop, cabinets, seat };"), "the console smoke can read the cabinet runtime and the seat cycle (1.5)");
+  assert.ok(
+    MAIN.includes("window.arcadeDebug = { player, loop, cabinets, seat, scheduler, presenter };"),
+    "the console smoke can read the cabinet runtime, the seat cycle (1.5), and the Patron scheduler + figure presenter (1.6) — console-only, zero UI (AD-24)",
+  );
   for (const banned of ["performance.now", "Date.now", "Math.random", "tickCount"]) {
     assert.ok(!body.includes(banned), `the 1.4 frame legs must not read ${banned} either (liveness derives from tick state)`);
   }
 });
 
-test("1.5 seat wiring: the seat service owns the game-cabinet E-law, the seated view law, the raw-code slot mapping in-tick, and the event sink to the presentation half (AC4/AC5 wiring)", () => {
-  assert.ok(MAIN.includes("const seat = createSeatService({ player, cabinets, loop });"), "the seat is created over the kernel's own player/cabinets/loop");
+test("1.5 seat wiring (1.6-moved pins): the seat service owns the game-cabinet E-law, the seated view law, the raw-code slot mapping in-tick, and the event sink to the presentation half (AC4/AC5 wiring)", () => {
+  assert.ok(MAIN.includes("const seat = createSeatService({ player, cabinets, busy: busyGate });"), "the seat is created over the kernel's own player/cabinets plus the scheduler's busy gate (1.6 pin move: the loop leg left with the drain)");
   assert.ok(MAIN.includes("seat.track({"), "game-wired placements track with instance, kernel input object, controls, and the authored legend keys");
   assert.ok(MAIN.includes("seatTrackVolumeIds.has(p.volumeId)"), "the seat E-routing gate IS the track gate (an entry without controls or legend keys keeps the plain 1.4 law, never an untracked-seat fault)");
   assert.ok(MAIN.includes("player.registerInteractable(p.volumeId, (id) => seat.handleInteract(id));"), "a tracked game cabinet routes E through the seat (the plain 1.4 toggle stays for the rest)");
   assert.ok(MAIN.includes("player.step(1, seat.playerView(input.takeView()));"), "the player system consumes the seat's view (seated -> zeroed axes/aim, E kept)");
-  assert.ok(MAIN.includes('loop.addSystem("seat", () => seat.step(input.takeCodeView()));'), "the seat maps raw codes onto declared slots inside the tick, after sim ticks + event dispatch (AD-23)");
+  assert.ok(MAIN.includes('loop.addSystem("seat", () => seat.step(input.takeCodeView(), patronsRecords));'), "the seat maps raw codes onto declared slots inside the tick, AFTER the patrons dispatch, on the records the patrons system drained (1.6 pin move: the seat no longer drains — AD-23)");
   assert.ok(MAIN.includes("seat.setEventSink((rec) => presentations.get(rec.gameId)?.onEvent?.(rec.event));"), "the seat's drained records ride to the presentation half (sole M0 consumer)");
   assert.ok(MAIN.includes("entry.createPresentation({ makeCanvas:"), "the kernel hands the presentation its canvas through the injected factory (the adapter never touches DOM)");
   const body = frameBody(MAIN);
@@ -149,4 +156,47 @@ test("1.5 render-chain re-arm: frame() arms requestAnimationFrame BEFORE its dra
   assert.ok(rearm < body.indexOf("pres.drawFrame(instance.snapshot());"), "the re-arm precedes the game half's drawFrame (game adapter code may throw)");
   assert.ok(rearm < body.indexOf("compositeScreen("), "and the Core composite");
   assert.ok(rearm < body.indexOf("renderer.render("), "and the room render");
+});
+
+test("1.6 patrons wiring: one drain per tick in a patrons system registered BETWEEN cabinets and seat, the seat<->scheduler mutual reference deferred through injected closures, run states tracked off the placement busy flag, and the figure re-posed from kernel state only (AD-23/AD-3 wiring)", () => {
+  // Seat and scheduler see only their injected slices of each other; the
+  // mutual reference resolves at CALL time (deferred closures), never by
+  // mutating a finished object.
+  assert.ok(MAIN.includes("const presenter = createFigurePresenter();"), "the kernel owns the reaction library + figure state");
+  assert.ok(MAIN.includes("busyFor: (volumeId) => scheduler.busyFor(volumeId),"), "the seat's busy leg defers to the scheduler");
+  assert.ok(MAIN.includes("toggleWait: (volumeId) => scheduler.toggleWait(volumeId),"), "and the wait toggle");
+  assert.ok(MAIN.includes("const scheduler = createPatronScheduler({ seat, player, presenter });"), "the scheduler gets the seat through the SeatHandover interface (one direction, scheduler -> seat)");
+
+  // Busy is room data: run states are tracked per busy placement record —
+  // no hand-typed id list anywhere in the glue.
+  assert.ok(MAIN.includes("if (p.busy !== true || p.gameId == null) continue;"), "the track gate reads the placement's busy flag (AD-12 provisional carrier)");
+  assert.ok(MAIN.includes("impulses: entry.impulses ?? {},"), "the mapping reaches the scheduler only through the generated registry (AD-1)");
+
+  // Exactly ONE consumer of the event queue per tick — the patrons system
+  // — with the seat on forwarded records (the "no second drain" Never).
+  assert.equal((MAIN.match(/drainEvents\(/g) ?? []).length, 1, "the entry drains the event queue exactly once per tick");
+  assert.ok(MAIN.includes('loop.addSystem("patrons", () => {'), "the patrons system is a registered kernel system (supervisor-wrapped, AD-15)");
+  assert.ok(MAIN.includes("patronsRecords = loop.drainEvents();"), "it drains once per tick");
+  assert.ok(MAIN.includes("presenter.step(loop.tickCount);"), "it advances the figure reaction in-tick (AD-3)");
+  assert.ok(MAIN.includes("scheduler.dispatch(patronsRecords, loop.tickCount);"), "it runs the impulse stage + break arbitration in-tick");
+  // AD-23's fixed phase order realized as registration order: cabinets,
+  // then patrons, then seat (seat's controls apply to the NEXT tick).
+  const cabinetsAt = MAIN.indexOf('loop.addSystem("cabinets"');
+  const patronsAt = MAIN.indexOf('loop.addSystem("patrons"');
+  const seatAt = MAIN.indexOf('loop.addSystem("seat"');
+  assert.ok(cabinetsAt >= 0 && patronsAt > cabinetsAt && seatAt > patronsAt, "registration order IS cabinets -> patrons -> seat");
+
+  // The figure: three boxes at the Wall Warm token, built once per BUSY
+  // placement at the seat's play pose, invisible at boot — and the frame
+  // RE-POSES from kernel state (the coin-door idiom; render never decides).
+  assert.ok(MAIN.includes("if (p.busy !== true) continue;"), "figures are built per busy placement record, never per hand-typed id");
+  assert.ok(MAIN.includes("const pose = presenter.figurePose(p.volumeId);"), "the figure stands at the seat's authored play pose (reused law)");
+  assert.ok(MAIN.includes("three.standardMaterial({ color: WALL_WARM })"), "hard-cornered box stack in the Wall Warm token (inference-authored look)");
+  assert.ok(MAIN.includes("partMesh.visible = false;"), "no Patron stands at boot attract");
+  const body = frameBody(MAIN);
+  assert.ok(body.includes("const active = scheduler.figureActive(f.volumeId);"), "the frame READS whether the Patron drives — the figure appears/disappears with occupancy");
+  assert.ok(body.includes("f.legs.visible = active;") && body.includes("f.torso.visible = active;") && body.includes("f.head.visible = active;"), "all three parts follow the occupancy read");
+  assert.ok(body.includes("const off = presenter.figureOffset();"), "the pose delta is a pure read of presenter tick state (no wall-clock, no recomputation in render)");
+  assert.ok(body.includes("f.torso.position.set(f.base.x + leanX, FIGURE_PARTS.torso.centerY + off.torsoY, f.base.z + leanZ)"), "the torso re-poses from the reaction offset + the lean along the placement facing");
+  assert.ok(body.includes("f.head.position.set(f.base.x + leanX, FIGURE_PARTS.head.centerY + off.headY, f.base.z + leanZ)"), "and the head rides the torso");
 });

@@ -7,5 +7,5 @@ import { createSim as gMoonPatrol } from "../games/moon-patrol/sim/index.js";
 import { createPresentation as pMoonPatrol } from "../games/moon-patrol/presentation/adapter.js";
 
 export const gameRegistry: GameRegistryEntry[] = [
-  { id: "moon-patrol", seed: 1982, createSim: gMoonPatrol, createPresentation: pMoonPatrol, controls: {"vocab":1,"axes":["move"],"buttons":["start","jump","fire"],"aim":[]} },
+  { id: "moon-patrol", seed: 1982, createSim: gMoonPatrol, createPresentation: pMoonPatrol, controls: {"vocab":1,"axes":["move"],"buttons":["start","jump","fire"],"aim":[]}, impulses: {"explode":"flinch","gameover":"slam","hit":"flinch","jump":"jump"} },
 ];
