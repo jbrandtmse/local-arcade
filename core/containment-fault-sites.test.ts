@@ -186,12 +186,12 @@ test("composed integration (Rule 1, AC5): the scheduler's dwell launch through t
   step1(); // the next dispatch lifts the Patron off the dead machine
   assert.equal(b0().occupancy, "attract", "faulted + patron-autoplay -> attract on the next dispatch (AC5)");
   assert.equal(scheduler.figureActive("cabinet-B0"), false, "the figure follows via figureActive");
-  assert.deepEqual(b0().queue, []);
+  assert.deepEqual(b0().queue, [], "the queue stays empty — this rig never queues a claim (the chair is never taken); the queue-void-with-a-real-claim law is pinned in scheduler-breaks.test.ts");
 
   for (let i = 0; i < 480; i++) step1();
   assert.equal(loop.tickCount, ATTRACT_DWELL_TICKS + 1 + 480, "the room keeps ticking with the cabinet quarantined");
   assert.equal(loop.supervisor.faults.length, 1, "no relaunch, no repeated autoplay faults over the whole run (DW-3)");
-  assert.equal(autoplayCalls.length, 1, "the raw autoplay hook was never called again (the guard short-circuits re-launches - the scheduler-side bookkeeping below is what the missing gate would expose)");
+  assert.equal(autoplayCalls.length, 1, "the raw autoplay hook was never called again (the scheduler launch gate blocks the dwell relaunch here - runCount/lastSeed below pin the same law from the bookkeeping side; the guard's own no-op autoplay/play legs are pinned in containment.test.ts)");
   assert.equal(b0().occupancy, "attract", "the Cabinet keeps its attract posture for as long as the fault stands (mutation: deleting the launch gate in scheduler.ts re-launches every dwell dispatch - this and the runCount/lastSeed pins below go red)");
   assert.equal(b0().runCount, 1, "no further autoplay run is consumed");
   assert.equal(b0().lastSeed, derivedSeed(entry.seed!, 0), "no further derived seed is spent");

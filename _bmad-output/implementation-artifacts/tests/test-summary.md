@@ -25,7 +25,7 @@ Every other matrix row and AC pin was already executed by the implement suite wi
 - Rule 19: 3 QA mutation demonstrations (1.7m watcher direct-sample — pre-QA suite blind, QA pin red; 1.7n launch-gate delete — composed pin red; 1.7o snapshot-leg bypass — QA pin red + two corroborating containment pins). Each red observed, reverted, `git status`/`git diff --stat` byte-identical, suite re-green 298/298. Recorded in the spec's `## Verification` QA block.
 
 ## Next Steps
-- Lead commits the QA test file + the spec Verification block (this stage forbids committing), then runs the fresh-environment check and the Chrome+Edge injectFault smoke.
+- Committed by the lead already (`bdac3a5` QA test file; Verification/tracker bookkeeping through `a4ae068`) — this CR pass corrected the stale "Lead commits" instruction. Remaining lead-tier work: the fresh-environment forward/reverse check and the Chrome+Edge injectFault smoke.
 
 ---
 

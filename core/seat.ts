@@ -273,9 +273,9 @@ export function createSeatService(opts: {
       // saved pose, door close, input neutralization; the guarded faulted
       // instance's attract() is a safe no-op.
       if (seatedVolumeId !== null) {
-        const seated = entryFor(seatedVolumeId);
-        if (opts.faultedFor?.(seated.gameId) === true) {
-          standUp(seated);
+        const entry = entryFor(seatedVolumeId);
+        if (opts.faultedFor?.(entry.gameId) === true) {
+          standUp(entry);
           return;
         }
       }

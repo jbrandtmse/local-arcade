@@ -13,12 +13,14 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - evidence: review G12/blind-2,edge-16; needs supervisor-wrapped per-instance boot
 - 2026-11-21T12:01:42Z status=routed owner=1-7-fault-containment-a-broken-game-never-kills-the-room by=harvest note=containment seam belongs to 1.7
 - 2026-11-23T23:39:01Z occurrence=1-5-moon-patrol-plays-in-place-vendored-wrapped-alive by=cr note=frame() re-armed rAF only after renderer.render, so a throwing game draw (pres.drawFrame/compositeScreen) killed the render chain permanently; instance patched in-story (rAF re-armed first, main-glue order pin, probe M-cr3 red then reverted); fault-containment root cause stays routed to 1-7
+- 2026-11-24T14:51:16Z status=resolved-by:1-7-fault-containment-a-broken-game-never-kills-the-room by=lead note=boot guard shipped in 1-7 attachGameEntries (hook boot): broken sim factory registers NOTHING, broken presentation keeps the sim ticking AND marks faultedFor (CR HIGH patch; mutation 1.7p is the discriminator); lead L1 leg D executed on real stack
 
 ### DW-3: unbounded growth in long-lived processes: supervisor.faults uncapped (60/s from a broken sim); loop.eventQueue never drained once games register
 - source: _bmad-output/implementation-artifacts/spec-1-1-project-bootstrap-and-the-deterministic-kernel-core.md | severity: med | fix-risk: low | footprint: core/
 - evidence: review G13/blind-5; drains exist once 1.5 registers a game
 - 2026-11-21T12:01:43Z status=routed owner=1-7-fault-containment-a-broken-game-never-kills-the-room by=harvest note=cap/dedup is containment policy
 - 2026-11-21T23:06:38Z occurrence=1-1-project-bootstrap-and-the-deterministic-kernel-core by=cr note=supervisor.faults cap and per-tick eventQueue drain re-sighted by CR layers
+- 2026-11-24T14:51:17Z status=resolved-by:1-7-fault-containment-a-broken-game-never-kills-the-room by=lead note=ring cap 64 + droppedFaults counted + gap-free deterministic errorIds pinned; quarantine short-circuits the guard tick so a broken sim stops being hammered 60x/s; lead L1 leg E (70 faults -> 64 kept, 6 dropped); AD-26 sealing stays Epic-3
 
 ### DW-4: AGENTS.md Running-and-verifying section ("No commands exist yet") is stale once story 1.1 lands; agent instruction files are owner-only unattended
 - source: _bmad-output/implementation-artifacts/spec-1-1-project-bootstrap-and-the-deterministic-kernel-core.md | severity: med | fix-risk: low | footprint: docs/
@@ -35,6 +37,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: _bmad-output/implementation-artifacts/spec-1-1-project-bootstrap-and-the-deterministic-kernel-core.md | severity: med | fix-risk: med | footprint: core/contract/
 - evidence: review G27/edge-21,edge-23,intent-1; composition deferred with 1.7
 - 2026-11-21T12:01:43Z status=routed owner=1-7-fault-containment-a-broken-game-never-kills-the-room by=harvest note=
+- 2026-11-24T14:51:17Z status=resolved-by:1-7-fault-containment-a-broken-game-never-kills-the-room by=lead note=composable fault-chain surface now exists: QA composed scheduler dwell-launch through boot-seam guard into throwing autoplay (one record, lift next dispatch, no relaunch 480 ticks) + writeInEvents fixture drives the gate TypeError inside the real chain
 
 ### DW-7: cross-engine determinism (browser kernel === Node CI stateHashes) never exercised on two engines; construction property only
 - source: _bmad-output/implementation-artifacts/spec-1-1-project-bootstrap-and-the-deterministic-kernel-core.md | severity: med | fix-risk: med | footprint: epics-3-replay/
@@ -69,6 +72,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - 2026-11-23T11:12:59Z occurrence=1-4-the-standard-stand-up-cabinet-shell-marquee-live-screen
 - 2026-11-23T23:39:02Z occurrence=1-5-moon-patrol-plays-in-place-vendored-wrapped-alive by=cr note=seat/wrapper and the new draw-chain legs stay pinned by source-text asserts + dev-serve text only (acceptance-auditor A3/A1); executed-host tier still open
 - 2026-11-24T06:44:33Z occurrence=1-6-one-busy-machine-a-patron-actually-plays
+- 2026-11-24T14:40:31Z occurrence=1-7-fault-containment-a-broken-game-never-kills-the-room
 
 ### DW-13: requestPointerLock synchronous throw escapes the promise catch, logging to console and breaking AC3 silent denial; no target engine throws synchronously
 - source: _bmad-output/implementation-artifacts/spec-1-2-first-person-walk-look-and-move-no-prompts.md | severity: low | fix-risk: low | footprint: in-story

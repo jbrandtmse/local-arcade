@@ -166,11 +166,13 @@ test("boot guard: [good, broken, good] entries attach the survivors, the broken 
   // The containment posture the room consumes: faultedFor true only for the
   // dead entry (face gate -> fallback painter; seat law -> coin-door only).
   assert.equal(attached.containment.faultedFor("broken"), true);
+  attached.containment.injectFault("broken", "smoke on a boot-dead entry");
+  assert.equal(loop.supervisor.faults.length, 1, "injectFault on a sim-side boot-faulted id is a no-op — no guard exists for the unattached entry, so it adds no second record (an injectFault that synthesized around the missing guard would climb this to 2)");
   assert.equal(attached.containment.faultedFor("good-a"), false);
   assert.equal(attached.containment.faultedFor("good-b"), false);
 });
 
-test("throwing presentation factory: the sim half keeps ticking, the face registers no presentation, and boot survives with one fault under hook \"boot\" (matrix row 2)", () => {
+test("throwing presentation factory: the sim half keeps ticking, the face registers no presentation, the Cabinet reads faultedFor for the room-side laws, and boot survives with one fault under hook \"boot\" (matrix row 2, AC3)", () => {
   const clock = { ms: 0 };
   const loop = createKernelLoop({ now: () => clock.ms });
   const fx = fxSim();
@@ -197,7 +199,7 @@ test("throwing presentation factory: the sim half keeps ticking, the face regist
     loop.drainEvents();
   }
   assert.equal(fx.rawTicks, 10, "the sim half keeps ticking untouched by the presentation fault");
-  assert.equal(attached.containment.faultedFor("bad-pres"), false, "a presentation-side boot fault never quarantines the sim half (the halves fault independently)");
+  assert.equal(attached.containment.faultedFor("bad-pres"), true, "the presentation-boot fault marks the Cabinet faulted for the room-side laws too — AC3 gives every boot-faulted Cabinet the fallback face + coin-door E law even though the sim half keeps ticking above (mutation 1.7p: dropping the pres-half bootFaulted mark reddens this; the halves stay independent everywhere else — no guard, and no guard quarantine, exists for the presentation half)");
   assert.equal(loop.supervisor.faults.length, 1, "and it adds nothing past the boot record");
 });
 
@@ -236,8 +238,11 @@ test("guard quarantines at the first sim-side fault: exactly one record under th
   const quarantined = attached.instances.get("flaky")!;
   assert.deepEqual(quarantined.snapshot(), {}, "post-quarantine snapshot is the safe total value");
   assert.equal(quarantined.stateHash(), stateHashOf({}), "post-quarantine stateHash is the wrapper hash of {} (computed once, Design Notes 8)");
-  assert.deepEqual(quarantined.events(), [], "post-quarantine events is empty — the loop's queue stays clean");
+  assert.deepEqual(quarantined.events(), [], "post-quarantine events() reads total (this fixture emits no events, so the frozen raw pulls below are the discriminating pin here)");
   assert.equal(flaky.rawPulls, 3, "the events LEG is frozen too — raw pulls stop at the faulting tick (3 pulls land before it; a guard that kept pulling through would climb to 40)");
+  quarantined.autoplay(999);
+  quarantined.play(42);
+  assert.equal(quarantined.mode(), "attract", "autoplay()/play() no-op on the quarantined instance — the wrapper state machine is never asked to relaunch a dead sim (mutation 1.7q: an autoplay leg that calls the raw wrapper through flips this to autoplay)");
 });
 
 // --- DW-6: out-of-tick write through the REAL gate (matrix row 4) ------------

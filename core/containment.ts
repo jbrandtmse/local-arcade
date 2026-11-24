@@ -127,7 +127,7 @@ export function guardInstance(
       // AC4: the dev dead-machine predicate — an attract cycle whose
       // wrapper stateHash equals the previous cycle's is one stall sample.
       const hash = live<string>("stateHash", () => instance.stateHash(), emptyHash);
-      if (faulted) return; // a throwing snapshot quarantines; the watcher stops
+      if (faulted) return; // a throwing stateHash sample quarantines; the watcher stops
       equalSamples = lastHash !== null && hash === lastHash ? equalSamples + 1 : 1;
       lastHash = hash;
       if (equalSamples < stallCycles) return;
@@ -171,8 +171,9 @@ export function guardInstance(
 }
 
 /** The per-room containment handle (main.ts's arcadeDebug.containment):
- * reads the per-game quarantine for the scheduler/seat laws and the frame
- * face gate, and carries the injectFault smoke trigger. */
+ * reads the per-game fault posture — the guard's quarantine or a boot fault
+ * on either half — for the scheduler/seat laws and the frame face gate, and
+ * carries the injectFault smoke trigger. */
 export interface Containment {
   faultedFor(gameId: string): boolean;
   injectFault(gameId: string, message?: string): void;
@@ -195,8 +196,9 @@ export interface AttachResult {
  * faultedFor keeps the face on the 1.4 fallback painter + coin-door law.
  * A throwing sim factory means the presentation half is not created either
  * (the entry registers no instance/presentation); a throwing presentation
- * factory keeps the sim ticking with the fallback face (matrix rows 1-2).
- * attach never rethrows (AC3). */
+ * factory keeps the sim ticking with the fallback face but marks the Cabinet
+ * faultedFor as well — AC3 gives every boot-faulted Cabinet the fallback
+ * face + coin-door E law (matrix rows 1-2). attach never rethrows (AC3). */
 export function attachGameEntries(
   entries: readonly GameRegistryEntry[],
   loop: ContainmentLoopSink,
@@ -231,7 +233,7 @@ export function attachGameEntries(
     instanceInputs.set(entry.id, tickInput);
     loop.addInstance(entry.id, guard.instance, tickInput);
     if (entry.createPresentation != null) {
-      supervisor.invoke({
+      const presResult = supervisor.invoke({
         tick: loop.tickCount,
         gameId: entry.id,
         hook: "boot",
@@ -239,6 +241,14 @@ export function attachGameEntries(
           presentations.set(entry.id, entry.createPresentation!({ makeCanvas }));
         },
       });
+      if (!presResult.ok) {
+        // AC3: EVERY boot-faulted Cabinet takes the fallback face + coin-door
+        // E law, so the presentation half marks the Cabinet faultedFor too.
+        // The sim half keeps ticking (matrix row 2) — this mark is faultedFor's
+        // law flag, not the guard's quarantine (no guard exists for the
+        // presentation half; a guard-side fault stays independently pinned).
+        bootFaulted.add(entry.id);
+      }
     }
   }
 

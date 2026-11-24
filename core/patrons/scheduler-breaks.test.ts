@@ -148,5 +148,5 @@ test("1.7 the launch gate while faulted: a faulted Cabinet never fires the dwell
   assert.deepEqual(r2.b0().queue, [], "the queue is voided with the fault (no pending claim on a dead machine)");
   assert.equal(r2.b0().runCount, 1, "no second run consumed — the 1.6 re-offer law does not fire while faulted");
   assert.equal(r2.b0().lastSeed, derivedSeed(ENTRY.seed!, 0), "run 1's derived seed is still the last seed spent");
-  assert.equal(r2.instance.mode(), "autoplay", "the raw instance stays where the fault froze it — a relaunch would flip it to attract, corroborating the runCount/lastSeed pins above (quarantine itself is the guard's law, pinned in containment.test.ts)");
+  assert.equal(r2.instance.mode(), "autoplay", "the raw instance stays where the fault froze it — mode() is corroborative only (an autoplay relaunch would KEEP it \"autoplay\"; only an attract path could flip it): the runCount/lastSeed pins above carry the discrimination (quarantine itself is the guard's law, pinned in containment.test.ts)");
 });
