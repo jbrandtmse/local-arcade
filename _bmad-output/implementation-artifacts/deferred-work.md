@@ -170,3 +170,23 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: 1-8-the-room-knows-you-without-an-account | severity: medium | fix-risk: low | footprint: core
 - evidence: core/main.ts boot storage.visitorId() -> default uuidFn crypto.randomUUID; missing API throws before loop.start; spec DN9 verified-present for Node 26 + evergreen Chrome/Edge only; storage port degrade law does NOT cover this (the throw is at key generation, not storage access)
 - 2026-11-24T19:59:30Z status=routed owner=3-15-the-public-posture-one-sealed-bundle-to-one-droplet by=lead note=harvested from spec 1-8 frontmatter deferred; fix-risk low = one-line fallback uuid generator or https-only settle; footprint core (boot wiring)
+
+### DW-31: storage service conflates a port read/write failure with absence: a flaky or mid-session-changing port could clobber a higher PB or orphan a PB under a visitor id never persisted
+- source: spec-1-8-the-room-knows-you-without-an-account.md | severity: med | fix-risk: med | footprint: in-story
+- evidence: read() catch returns null (storage.ts:287-290) so readPb/recordScoreSubmitted treat a failed read as no-PB and write unconditionally (:370-377); write() swallows setItem failure with no visitor-key retry (:293-300)
+- 2026-11-24T21:57:44Z status=wontfix-theoretical owner=1-8-the-room-knows-you-without-an-account by=cr note=would be real if a port's getItem/setItem availability diverged mid-session; browser storage gates are session-stable
+
+### DW-32: rowsFor cap-2 branch cannot fire (the view has at most two sources), so the unit cap pin never exercises truncation; the live guard is the painter collision throw
+- source: spec-1-8-the-room-knows-you-without-an-account.md | severity: low | fix-risk: med | footprint: in-story
+- evidence: rowsFor pushes at most PB then best Patron (storage.ts:385-396); the rows.length guard is always true before the second push, so removing SCORE_ROW_CAP keeps the unit pin green; AD-28 names the collision law as the guard
+- 2026-11-24T21:57:54Z status=wontfix-theoretical owner=1-8-the-room-knows-you-without-an-account by=cr note=would be real if a third row source (Epic-3 ledger/leaderboard machinery) landed without the view law being updated
+
+### DW-33: banned-token scan posture is duplicated across three test files: comment-strip can mask tokens inside string literals, and the games-source token bans match prose in literals (false red risk)
+- source: spec-1-8-the-room-knows-you-without-an-account.md | severity: low | fix-risk: med | footprint: in-story
+- evidence: no-ui-dom.test.ts, main-glue.test.ts and storage.test.ts each inline the same replace-based comment strip; the games scan tokens (storage. / visitorId / rowsFor / arcade.pb) match string contents; masking path acknowledged theoretical in-story triage
+- 2026-11-24T21:58:03Z status=wontfix-accepted owner=1-8-the-room-knows-you-without-an-account by=cr note=reopen_if=a core or vendored source trips or masks a ban scan through string content, or a fourth scan site lands (unify the scanner then)
+
+### DW-34: Rule 3: the rendered score rows (user-facing surface) have no browser-tier test in the QA suite; rendering is proven at source-pin tier plus an executed real-painter chain
+- source: spec-1-8-the-room-knows-you-without-an-account.md | severity: high | fix-risk: high | footprint: in-story
+- evidence: QA suite is node --test headless; the intent fixes the verification tiers itself (main-glue source pins, real-painter chain test) and the Chrome/Edge matrix row assigns browser evidence to the lead's post-review smoke gate; a browser harness would need tooling the Never-list bars
+- 2026-11-24T21:58:14Z status=by-design owner=1-8-the-room-knows-you-without-an-account by=cr note=spec-bound (Rule 15): intent-pinned tier + lead smoke gate; closes by-design at emission, smoke gate lands the browser evidence
