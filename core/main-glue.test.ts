@@ -179,6 +179,20 @@ test("1.6 patrons wiring: one drain per tick in a patrons system registered BETW
   assert.ok(MAIN.includes("patronsRecords = loop.drainEvents();"), "it drains once per tick");
   assert.ok(MAIN.includes("presenter.step(loop.tickCount);"), "it advances the figure reaction in-tick (AD-3)");
   assert.ok(MAIN.includes("scheduler.dispatch(patronsRecords, loop.tickCount);"), "it runs the impulse stage + break arbitration in-tick");
+  // Order INSIDE the patrons body: dispatch must run on THIS tick's drained
+  // records (a reorder keeps every substring above and still feeds the
+  // scheduler the previous tick's records — AC2's same-tick reaction law and
+  // break-tick arbitration would ship broken through the shipped entry).
+  const pm = MAIN.match(/loop\.addSystem\("patrons", \(\) => \{([\s\S]*?)\n\}\);/);
+  assert.ok(pm, "the patrons system is one registered block");
+  const pBody = pm![1];
+  const drainAt = pBody.indexOf("patronsRecords = loop.drainEvents();");
+  const stepAt = pBody.indexOf("presenter.step(loop.tickCount);");
+  const dispatchAt = pBody.indexOf("scheduler.dispatch(patronsRecords, loop.tickCount);");
+  assert.ok(
+    drainAt >= 0 && stepAt > drainAt && dispatchAt > stepAt,
+    "inside the patrons body the order is drain -> figure step -> dispatch on this tick's records (AD-23 same-tick phase order in the shipped entry)",
+  );
   // AD-23's fixed phase order realized as registration order: cabinets,
   // then patrons, then seat (seat's controls apply to the NEXT tick).
   const cabinetsAt = MAIN.indexOf('loop.addSystem("cabinets"');

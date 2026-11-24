@@ -21,7 +21,7 @@ import { createPlayerController, MOUSE_SENSITIVITY, TARGET_REACH, type PlayerCon
 import { createSeatService, playPoseFor, type BusyGate, type SeatKeyMap } from "../seat.ts";
 import { ATTRACT_DWELL_TICKS, createPatronScheduler, derivedSeed, type PatronScheduler } from "./scheduler.ts";
 import { REACTIONS, createFigurePresenter, type FigurePresenter, type ReactionKind } from "./presenter.ts";
-import { createGameInstance, type GameInstance, type TickInput } from "../contract/index.ts";
+import { createGameInstance, math, type GameInstance, type TickInput } from "../contract/index.ts";
 import { ENTRY_SPAWN, collisionVolumes } from "../room/collision-volumes.ts";
 import { MARQUEE_CAP_M, SHELL, cabinetPlacements, createCabinetRuntime, placementGeometry, type CabinetRuntime } from "../room/cabinets.ts";
 import { SCREEN_EDGE_RATIO, SURFACE_PX_PER_M, compositeScreen, type PaintContext, type PaintSurface } from "../room/surfaces.ts";
@@ -129,10 +129,8 @@ function rig(seedFn: () => number): Visit {
 }
 
 // Walk into center-of-view of B0, then CREEP in to a metre inside the
-// presence radius before settling: targeting fires along the sight-ray at
-// exactly TARGET_REACH, while the scheduler's presence law measures to the
-// front POINT — stopping the instant the target appears can park the
-// visitor a hair outside. The collision body stops the creep short of the
+// presence radius before settling: the creep parks the stance well inside
+// the body-box reach law, and the collision body stops it short of the
 // face; 30 settle ticks then zero the bob (the pose-identity law binds on
 // a settled pose).
 function creepToB0(v: Visit): void {
@@ -390,6 +388,50 @@ test("walk away: presence fails at the break, autoplay re-offers THAT same break
   assert.equal(v.b0().runCount, 2, "the handover consumed no extra autoplay run");
   assert.deepEqual(v.b0().queue, [], "queue cleaned on handover");
   assert.equal(visitorSeeds, 1, "exactly one fresh seed across the whole wait-then-honor path");
+});
+
+test("presence reaches the targeting law: a Visitor claiming from an off-axis stance inside TARGET_REACH of the body box but outside the front-point radius is honored at the break (no creep)", () => {
+  let visitorSeeds = 0;
+  const v = walkToB0(() => {
+    visitorSeeds += 1;
+    return 77;
+  });
+  waitPatron(v);
+
+  // Off-axis stance: 1.5 m out along the facing and 1.5 m along the
+  // slot's right — inside TARGET_REACH of the body box (the AABB the
+  // center-of-view targeting ray tests), strictly OUTSIDE TARGET_REACH of
+  // the front point. yaw faces the box centre, pitch level: the sight-ray
+  // must target B0 from the stance (the E the Visitor presses there is
+  // exactly the E the real player can press).
+  const g = placementGeometry("B0");
+  const box = collisionVolumes.find((c) => c.id === "cabinet-B0")!;
+  const px = g.front.x + g.facing.x * 1.5 + g.right.x * 1.5;
+  const pz = g.front.z + g.facing.z * 1.5 + g.right.z * 1.5;
+  const dx = (box.min.x + box.max.x) / 2 - px;
+  const dz = (box.min.z + box.max.z) / 2 - pz;
+  v.player.teleport({ x: px, z: pz, yaw: math.atan2(-dx, -dz), pitch: 0 });
+  assert.ok(distToFront(v) > TARGET_REACH, `the stance is outside the front-point radius (dist=${distToFront(v).toFixed(2)} > ${TARGET_REACH}) — the old point-distance reading fails here`);
+  const nx = Math.min(Math.max(px, box.min.x), box.max.x);
+  const nz = Math.min(Math.max(pz, box.min.z), box.max.z);
+  assert.ok(Math.sqrt((px - nx) * (px - nx) + (pz - nz) * (pz - nz)) <= TARGET_REACH, "the stance is inside TARGET_REACH of the body box (the targeting geometry)");
+
+  v.tick();
+  assert.equal(v.player.state.targetId, "cabinet-B0", "E reaches from this stance: B0 is the center-of-view target");
+  pressE(v); // door opens
+  pressE(v); // wait: the claim comes from the uncrept, off-axis stance
+  assert.equal(v.b0().queue.length, 1, "the claim is in the queue");
+
+  let guard = 0;
+  while (v.b0().occupancy === "patron-autoplay" && guard < 30000) {
+    v.tick();
+    guard += 1;
+  }
+  assert.equal(v.b0().occupancy, "visitor-seated", "the break honours the claim: presence covers every stance E itself reaches");
+  assert.equal(v.seat.state().seated, true, "the Visitor is seated");
+  assert.equal(v.instance.mode(), "play", "the run continues through the seat");
+  assert.equal(v.b0().queue.length, 0, "queue cleaned on handover");
+  assert.equal(visitorSeeds, 1, "exactly one fresh seed consumed");
 });
 
 // --- AC4: the chair law for busy cabinets (scheduler-owned flip) --------------

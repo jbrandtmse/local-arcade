@@ -276,7 +276,7 @@ test("AC4 E-law cycle on the real rig: open, sit (play mode, play pose, targetin
   assert.deepEqual(afterStand, neverSat, "post-stand the player replays bit-identically to the never-sat run");
 });
 
-test("the seat is the sole event consumer: the drained record shows the canonical pair order (scoreSubmitted before gameEnded) (AC5)", async () => {
+test("the seat consumes the patrons system's forwarded drain: the record keeps the canonical pair order (scoreSubmitted before gameEnded) (AC5)", async () => {
   // seed 8 full throttle dies inside the cap (the index.test gameover run);
   // stub seed 8 sits, KeyD full throttle, watch the machine flip to attract
   // in place, the visitor stays seated, and Enter restarts on a NEW seed.

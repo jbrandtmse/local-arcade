@@ -108,9 +108,10 @@ test("presPath + controls emit; the vocab keys are fixed-order regardless of lis
   expectFailure(dir, "unknown controls field"); // a "butons" typo must not silently drop the buttons leg
 });
 
-// Story 1.6 (AC3): the authored impulse mapping is validated at BUILD time
-// (never fetched at runtime — the bundle stays sealed, AD-11) and embedded
-// into the entry as parsed data in fixed (sorted) key order.
+// Story 1.6 (AC6 gate; AD-11/AD-18 data side): the authored impulse mapping
+// is validated at BUILD time (never fetched at runtime — the bundle stays
+// sealed) and embedded into the entry as parsed data in fixed (sorted) key
+// order. (AC3 is this story's NEXT-lettering pin, not this carrier.)
 test("impulsePath: parsed mapping embedded sorted; a bad reaction name, a missing file, and a non-object mapping die loudly", () => {
   const dir = fixtureRoot();
   writeFileSync(path.join(dir, "impulses.json"), JSON.stringify({ gameover: "slam", jump: "jump", hit: "flinch", explode: "flinch" }));
@@ -188,6 +189,12 @@ test("invalid entries fail nonzero with a message", () => {
     JSON.stringify([{ id: "alpha", simPath: "sims/alpha/sim.js", seeds: 7 }]),
   );
   expectFailure(dir, "unknown field"); // a "seeds" typo must not silently drop the seed
+
+  writeFileSync(
+    path.join(dir, "list.json"),
+    JSON.stringify([{ id: "alpha", simPath: "sims/alpha/sim.js", seed: 2.5 }]),
+  );
+  expectFailure(dir, "seed must be an integer"); // the kernel track() gate rejects non-integer seeds; the build gate must not emit one
 });
 
 test("the repo's own list regenerates the committed registry byte-identically", () => {

@@ -68,6 +68,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - 2026-11-22T06:53:54Z status=routed owner=burndown by=cr note=browser harness = new dep, Epic 3 scope; lead Chrome+Edge smoke is the Epic 1 gate; distinct from DW-11 in-view half
 - 2026-11-23T11:12:59Z occurrence=1-4-the-standard-stand-up-cabinet-shell-marquee-live-screen
 - 2026-11-23T23:39:02Z occurrence=1-5-moon-patrol-plays-in-place-vendored-wrapped-alive by=cr note=seat/wrapper and the new draw-chain legs stay pinned by source-text asserts + dev-serve text only (acceptance-auditor A3/A1); executed-host tier still open
+- 2026-11-24T06:44:33Z occurrence=1-6-one-busy-machine-a-patron-actually-plays
 
 ### DW-13: requestPointerLock synchronous throw escapes the promise catch, logging to console and breaking AC3 silent denial; no target engine throws synchronously
 - source: _bmad-output/implementation-artifacts/spec-1-2-first-person-walk-look-and-move-no-prompts.md | severity: low | fix-risk: low | footprint: in-story
@@ -84,6 +85,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - evidence: spec-1-3 frontmatter deferred: + core/main-glue.test.ts source-pin tier added in review pass 1
 - 2026-11-22T11:32:43Z status=routed owner=burndown by=harvest note=DW-12 tier; Epic 3 browser harness (3.2/3.15) closes it
 - 2026-11-23T23:39:02Z occurrence=1-5-moon-patrol-plays-in-place-vendored-wrapped-alive by=cr note=the 1.5 drawFrame/compositeScreen chain adds real-THREE legs with no executed browser coverage; source-pin tier until the Epic-3 browser harness
+- 2026-11-24T06:44:33Z occurrence=1-6-one-busy-machine-a-patron-actually-plays
 
 ### DW-16: Front wall open above the door head: no lintel volume over the door gap (visible see-through band y 2.1-3.0 when looking up at the door; 13cm recess behind the panel)
 - source: spec-1-3-the-arcade-room-slots-pillars-zones-and-the-roadmap-wall.md | severity: med | fix-risk: med | footprint: in-story
@@ -138,6 +140,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: story 1.5 implement review B3+E4 (shared root cause); spec-1-5 frontmatter deferred | severity: medium | fix-risk: small | footprint: games/moon-patrol/sim/world.js:106 respawn predicate; data shape sim/course.js:100; vendored law kept world.js unmodified below seam edits (AC1)
 - evidence: Spec 1.5 Review Triage Log B3/E4: respawn() filters with (o.x + o.w > padL && o.x < padR); minefields carry x1/x2 -> NaN -> never filtered. Present in vendored source C:/git/moonpatrol@49c3519... Settle: fix predicate for x1/x2 kinds (upstream first, then re-vendor) + sim test that respawns a run with a minefield on the pad.
 - 2026-11-23T20:25:26Z status=routed owner=1-6-one-busy-machine-a-patron-actually-plays by=dev note=1.6 drives the sim to a real end state via autoplay (AD-8 L1) — the respawn unfairness lands squarely in that path; fix upstream at C:/git/moonpatrol then re-vendor
+- 2026-11-24T07:01:45Z status=routed owner=1-6-one-busy-machine-a-patron-actually-plays by=lead note=bundle_half_resolved_in_1-6_(x1/x2_predicate_re-vendored + pad-clear pin world_gameplay.test.js);upstream C:/git/moonpatrol commit is owner call — routed to epic-1 decision sheet;entry stays open pending upstream commit
 
 ### DW-26: the PROVISIONAL play(seed) seam flips the wrapper to mode play even for a sim that ships no play hook (kernel-side restart owns the start verb)
 - source: spec-1-5-moon-patrol-plays-in-place-vendored-wrapped-alive.md | severity: low | fix-risk: low | footprint: in-story

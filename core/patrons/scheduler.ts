@@ -25,8 +25,8 @@ import type { EventRecord } from "../loop.ts";
 import type { GameInstance } from "../contract/index.ts";
 import { TARGET_REACH, type PlayerController } from "../player.ts";
 import {
+  cabinetAABB,
   cabinetPlacements,
-  placementGeometry,
   type CabinetPlacement,
 } from "../room/cabinets.ts";
 import type { FigurePresenter, ReactionKind } from "./presenter.ts";
@@ -103,7 +103,6 @@ export interface PatronScheduler {
 interface CabinetRunState {
   volumeId: string;
   gameId: string;
-  slotId: string;
   instance: GameInstance;
   seed: number;
   impulses: Readonly<Record<string, string>>;
@@ -118,6 +117,10 @@ interface CabinetRunState {
    * list container survives growth; per-claim Visitor identity is what
    * the multi-claimant crowd will additionally need, not the container. */
   queue: number[];
+  /** The body-box footprint (x/z only) presence measures against — the
+   * same AABB the targeting ray tests, so the two "at the machine" laws
+   * share one geometry source (the cabinetAABB one-geometry law). */
+  reach: { minX: number; maxX: number; minZ: number; maxZ: number };
 }
 
 export function createPatronScheduler(opts: {
@@ -141,12 +144,17 @@ export function createPatronScheduler(opts: {
   }
 
   // Presence law (Design Notes 5, TARGET_REACH reused not copied): the
-  // waiting Visitor must stand within TARGET_REACH of the placement front.
+  // waiting Visitor must stand within TARGET_REACH of the cabinet's body
+  // box — the same AABB the center-of-view targeting ray measures against.
+  // One geometry source for both "at the machine" readings: any stance
+  // that could press E at all is present without moving, and walking away
+  // past TARGET_REACH fails presence at the break (the walk-away law).
   function present(st: CabinetRunState): boolean {
     const p = opts.player.state;
-    const g = placementGeometry(st.slotId);
-    const dx = p.x - g.front.x;
-    const dz = p.z - g.front.z;
+    const nx = Math.min(Math.max(p.x, st.reach.minX), st.reach.maxX);
+    const nz = Math.min(Math.max(p.z, st.reach.minZ), st.reach.maxZ);
+    const dx = p.x - nx;
+    const dz = p.z - nz;
     return Math.sqrt(dx * dx + dz * dz) <= TARGET_REACH;
   }
 
@@ -168,10 +176,10 @@ export function createPatronScheduler(opts: {
       if (!Number.isInteger(entry.seed)) {
         throw new Error(`scheduler: busy cabinet "${entry.volumeId}" needs the registry entry's authored seed (derived runs come off it)`);
       }
+      const box = cabinetAABB(placement);
       const st: CabinetRunState = {
         volumeId: entry.volumeId,
         gameId: entry.gameId,
-        slotId: placement.slotId,
         instance: entry.instance,
         seed: entry.seed,
         impulses: entry.impulses,
@@ -180,6 +188,7 @@ export function createPatronScheduler(opts: {
         lastSeed: -1,
         rearmTick: ATTRACT_DWELL_TICKS,
         queue: [],
+        reach: { minX: box.min.x, maxX: box.max.x, minZ: box.min.z, maxZ: box.max.z },
       };
       states.set(st.volumeId, st);
       byGame.set(st.gameId, st);

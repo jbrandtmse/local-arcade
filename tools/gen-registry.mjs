@@ -53,8 +53,11 @@ for (const [i, entry] of list.entries()) {
   if (!existsSync(path.resolve(cwd, entry.simPath))) {
     fail(`entry ${i} (${entry.id}): sim source not found: ${entry.simPath}`);
   }
-  if (entry.seed !== undefined && !Number.isFinite(entry.seed)) {
-    fail(`entry ${i} (${entry.id}): seed must be a finite number when present`);
+  // Integer, not merely finite: the kernel scheduler validates integer
+  // authored seeds at track() (32-bit derived-seed arithmetic), so the
+  // build gate must not emit a seed the boot site would reject.
+  if (entry.seed !== undefined && !Number.isInteger(entry.seed)) {
+    fail(`entry ${i} (${entry.id}): seed must be an integer number when present`);
   }
   if (entry.presPath !== undefined) {
     if (typeof entry.presPath !== "string" || entry.presPath === "") {
