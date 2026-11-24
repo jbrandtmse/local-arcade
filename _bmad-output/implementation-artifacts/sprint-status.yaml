@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 11-20-2026 20:55
-last_updated: 11-24-2026 15:57
+last_updated: 11-24-2026 15:58
 project: local-arcade
 project_key: NOKEY
 tracking_system: file-system
@@ -43,7 +43,7 @@ development_status:
   1-5-moon-patrol-plays-in-place-vendored-wrapped-alive: done
   1-6-one-busy-machine-a-patron-actually-plays: done
   1-7-fault-containment-a-broken-game-never-kills-the-room: done
-  1-8-the-room-knows-you-without-an-account: ready-for-dev
+  1-8-the-room-knows-you-without-an-account: in-progress
   1-9-the-street-door-beat-loading-as-fiction-s-first-shot: backlog
   epic-1-retrospective: optional
 
