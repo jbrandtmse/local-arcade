@@ -4,7 +4,7 @@
 
 ## Goal
 
-A visitor loads the page and is inside the Arcade Room in first-person control within a minute — no auth, no UI, no onboarding — seeing glowing cabinets whose empty wall slots read as roadmap, watching a Patron actually play Moon Patrol, sitting down, and playing the real game; their personal best survives the next visit. This epic lays the whole technical foundation: deterministic kernel, room geometry, the standard cabinet shell, the first vendored game, and Patron presence. The acceptance laws — no Dead Machines, fiction-pure room — bind from the first story even before their lints exist.
+A visitor loads the page and is inside the Arcade Room in first-person control within a minute — no auth, no UI, no onboarding — seeing glowing cabinets whose empty wall slots read as roadmap, watching a Patron actually play Moon Patrol, sitting down, and playing the real game; their personal best survives the next visit. This epic lays the whole technical foundation: deterministic kernel, room geometry, the standard cabinet shell, the first vendored game, and Patron presence. The acceptance laws — no Dead Machines, fiction-pure room — bind from the first story even before their lints exist. The epic closes with a bounded burn-down pass (Story 1.10) clearing deferred work that sits inside Epic 1's own footprint, so the epic merges with no burndown debt.
 
 ## Stories
 
@@ -17,6 +17,7 @@ A visitor loads the page and is inside the Arcade Room in first-person control w
 - Story 1.7: Fault containment — a broken game never kills the room
 - Story 1.8: The room knows you without an account
 - Story 1.9: The street-door beat — loading as fiction's first shot
+- Story 1.10: Epic 1 burn-down
 
 ## Requirements & Constraints
 
@@ -46,10 +47,11 @@ A visitor loads the page and is inside the Arcade Room in first-person control w
 
 - Loading is fiction: the page opens on the closed front door seen from the street; light-bleed widens under the door, glass brightens, handle turns at ready — no progress bar. Asset timeout ~90s shows a plain outside-fiction panel ("The arcade didn't open. Reload."); detected unsupported/underpowered browsers get a workbench panel before any 3D canvas. (The sound twin of this beat rides Epic 2.)
 - Controls are learned only from the Welcome Flyer (Paper Card stock by the door: "MOVE: W A S D · LOOK: MOUSE · DO: E") or by trying — never from prompts. Looking IS targeting (center-of-view + E); no hover states, no click-raycast. Pointer-lock denial falls back silently to drag-look, device-layer only and replay-safe.
-- Cabinet furniture: marquee lit with Chakra Petch title lettering at 0.18m cap height, legible ~15m; the Core-owned screen surface renders attract / score table / NEXT in an era-CRT voice, glowing in the cabinet's own hue family; the coin door opens/closes with E. NEXT renders at the authored minimum, legible from across the room — the visual rung of the discovery ladder works with audio absent (spatial sound is Epic 2).
+- Cabinet furniture: marquee lit with Chakra Petch title lettering at 0.18m cap height, legible ~15m; the Core-owned screen surface renders attract / score table / NEXT in an era-CRT voice, glowing in the cabinet's own hue family; the coin door opens/closes with E. NEXT renders at the authored minimum, legible from across the room — the visual rung of the discovery ladder works with audio absent (spatial sound is Epic 2). The shell must read as a real upright arcade cabinet — a real marquee box on top, shaped side panels, screen bezel/hood, control-deck silhouette — never a vending-machine slab (burn-down realism pass).
 - Tokens: Room Black / Wall Warm envelope, low-contrast carpet pattern; the eight glow hues are light/material identity only — cabinets are the light sources, nothing is painted-glow on walls. Zone hues (violet / steel / orange / green, amber at the roadmap stretch) must read at 6m from geometry alone.
 
 ## Cross-Story Dependencies
 
 - 1.1 (kernel, clock, contract harness) precedes all gameplay stories. 1.2's collision resolver runs against placeholder room volumes, which 1.3 replaces in place with the authored walls/pillars/slot config — the resolver code is not rewritten between them; 1.4's shell needs 1.3's slots; 1.5 needs 1.2's seat/interaction plus 1.4's screen; 1.6 needs 1.5's sim plus 1.4's NEXT surface; 1.7 rides 1.1's supervisor and deep-freeze; 1.8 rides 1.5's `scoreSubmitted` path; 1.9 wraps 1.2 + 1.3 readiness into the load beat.
 - Deferred outward by design: spatial audio, the full pull ladder, Settings and site pages (Epic 2); lints and verification gates, ledger, Layout System, Instruction Cards, banter and Patron handoff, recordings/replay/reporting, and the Moon Patrol contract reimplementation (Epic 3). The numeric thresholds (occlusion hysteresis, fault-stall N, framerate floor, liveness radii) stay unset until Epic 3 — so in M0 the acceptance laws bind at review, not in CI.
+- Story 1.10 runs last, after 1.1–1.9, as the burn-down pass closing Epic-1-footprint deferred work in one bounded cycle: sim-path lint-ban depth evasion, registry build-step path validation, the untested in-view half of the no-UI law, and the owner-priority cabinet-shell realism pass. Gaps beyond this footprint (cross-engine determinism proof, main.ts executed-test coverage, post-first-frame render containment) are routed to Epic 3 stories instead.
