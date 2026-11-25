@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 11-20-2026 20:55
-last_updated: 11-25-2026 11:40
+last_updated: 11-25-2026 11:41
 project: local-arcade
 project_key: NOKEY
 tracking_system: file-system
@@ -45,7 +45,7 @@ development_status:
   1-7-fault-containment-a-broken-game-never-kills-the-room: done
   1-8-the-room-knows-you-without-an-account: done
   1-9-the-street-door-beat-loading-as-fiction-s-first-shot: done
-  1-10-epic-1-burn-down: ready-for-dev
+  1-10-epic-1-burn-down: in-progress
   epic-1-retrospective: optional
 
   epic-2: backlog
