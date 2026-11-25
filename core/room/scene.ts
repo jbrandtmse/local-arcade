@@ -26,6 +26,9 @@ import {
   CARPET_BASE,
   CARPET_PATTERN,
   FACE_TINT,
+  GLASS_DARK,
+  GLASS_DIM,
+  GLOW_MARQUEE,
   GLOW_RED,
   PAPER_CARD,
   ROOM_BLACK,
@@ -53,6 +56,17 @@ import {
   coinDoorPose,
   placementGeometry,
 } from "./cabinets.ts";
+// Story 1.9: the street-side front-door furniture + swing law (door.ts).
+import {
+  FRONT_DOOR_AWNING,
+  FRONT_DOOR_BLEED_REACH_MIN,
+  FRONT_DOOR_GLASS,
+  FRONT_DOOR_GLASS_REACH_MIN,
+  FRONT_DOOR_HANDLE,
+  FRONT_DOOR_LIGHT_SPOTS,
+  frontDoorOpenPose,
+  paintStreetGlass,
+} from "./door.ts";
 
 // Painted faces (marquee + screen) are thin as paper — the FLYER_T
 // sibling; exported so the test pins derive from it, never retype (the
@@ -69,6 +83,12 @@ export const FACE_T = 0.005;
 export interface Placed {
   position: { set(x: number, y: number, z: number): void };
   rotation: { set(x: number, y: number, z: number): void };
+  /** Story 1.9 (inference): point lights carry animatable intensity/reach
+   * (the frame ramps the door bleed + glass from entry state). Optional —
+   * meshes never set it; the seam's light factories return objects that
+   * do. */
+  intensity?: number;
+  distance?: number;
 }
 
 export interface Three {
@@ -177,9 +197,23 @@ export interface DoorHandle {
   slot: Placed;
 }
 
+/** Story 1.9: the front door's handle-tracked assembly. The panel is the
+ * door-front volume's own extrusion (one mesh per volume preserved — the
+ * beat makes it handle-tracked, never duplicated); glass + handle ride it
+ * under the same hinge law (door.ts), and the two street lights start dark
+ * for the frame side to ramp. */
+export interface FrontDoorHandle {
+  panel: Placed;
+  glass: Placed;
+  handle: Placed;
+  bleedLight: Placed;
+  glassLight: Placed;
+}
+
 export interface RoomHandles {
   screens: ScreenHandle[];
   doors: DoorHandle[];
+  frontDoor: FrontDoorHandle;
 }
 
 /**
@@ -187,8 +221,10 @@ export interface RoomHandles {
  * straight from its bounds, walls wainscotted, ceiling/floor/pillars/door/
  * street in token colours, empty-slot baseplates, the Welcome Flyer painted
  * onto an injected canvas, the authored stand-up shells' parts + glow
- * lights, and the provisional zone/roadmap/door glow lighting. Returns the
- * coin-door and screen handles the frame side animates.
+ * lights, the provisional zone/roadmap/door glow lighting, and the 1.9
+ * street-side front-door furniture (awning, glazing, handle) with its two
+ * dark street lights. Returns the coin-door, screen, and front-door
+ * handles the frame side animates.
  */
 export function buildRoomScene(
   THREE: Three,
@@ -208,14 +244,17 @@ export function buildRoomScene(
   });
 
   // One box mesh per volume, dims straight from the authored bounds — the
-  // single-geometry-source law in render form.
+  // single-geometry-source law in render form. Story 1.9: the door-front
+  // extrusion is captured (not duplicated) so the beat can pose it.
+  let frontDoorPanel: Placed | null = null;
   for (const v of collisionVolumes) {
     const c = volumeCenter(v);
     const w = v.max.x - v.min.x;
     const h = v.max.y - v.min.y;
     const d = v.max.z - v.min.z;
     const mat = v.kind === "wall" ? wallMat : v.kind === "street" ? streetMat : panelMat;
-    addBox(THREE, scene, mat, w, h, d, c.x, c.y, c.z);
+    const box = addBox(THREE, scene, mat, w, h, d, c.x, c.y, c.z);
+    if (v.kind === "door") frontDoorPanel = box; // exactly one door volume in the list
 
     if (v.kind === "wall") {
       // Wainscot: a Wall Panel band 0..1.0m inset 0.01 from the room face.
@@ -439,6 +478,66 @@ export function buildRoomScene(
     scene.add(halo);
   }
 
+  // Story 1.9: the street-side front-door furniture. The awning (Wall
+  // Panel, mockup .awning) sits proud of the front wall's EXTERIOR above
+  // the door head; the glazing sheet and handle sit proud of the panel's
+  // street face (+Z) and start at their CLOSED pose — the frame side
+  // re-poses them with the panel every frame from entry state (door.ts
+  // hinge law). The glazing is a painted two-tone sheet in the mockup's
+  // glass tokens (never emissive — the street view obeys 1.3's identity
+  // law). The two street lights — the GLOW_MARQUEE bleed pool at the door
+  // base plus a glass sheen light — are BUILT DARK; the entry's
+  // bleedFraction ramps them as the page settles (AC5).
+  if (frontDoorPanel == null) throw new Error("buildRoomScene: the volume list has no door to pose");
+  const place = (placed: Placed, one: { x: number; y: number; z: number; yaw: number }): void => {
+    placed.position.set(one.x, one.y, one.z);
+    placed.rotation.set(0, one.yaw, 0);
+  };
+  const closed = frontDoorOpenPose(0);
+  addBox(
+    THREE,
+    scene,
+    panelMat,
+    FRONT_DOOR_AWNING.width,
+    FRONT_DOOR_AWNING.height,
+    FRONT_DOOR_AWNING.depth,
+    0,
+    FRONT_DOOR_AWNING.centerY,
+    FRONT_DOOR_AWNING.centerZ,
+  );
+  const glassMat = THREE.standardMaterial({
+    color: FACE_TINT,
+    map: THREE.canvasTexture(paintStreetGlass(makeCanvas, toCss(GLASS_DARK), toCss(GLASS_DIM))),
+    roughness: 1,
+  });
+  const glass = THREE.mesh(
+    THREE.boxGeometry(FRONT_DOOR_GLASS.width, FRONT_DOOR_GLASS.height, FRONT_DOOR_GLASS.thickness),
+    glassMat,
+  );
+  place(glass, closed.glass);
+  scene.add(glass);
+  const handleMat = THREE.standardMaterial({ color: SIGN_CHALK, roughness: 0.6 }); // mockup .handle
+  const handle = THREE.mesh(
+    THREE.boxGeometry(FRONT_DOOR_HANDLE.width, FRONT_DOOR_HANDLE.height, FRONT_DOOR_HANDLE.thickness),
+    handleMat,
+  );
+  place(handle, closed.handle);
+  scene.add(handle);
+  const bleedLight = THREE.pointLight(GLOW_MARQUEE, 0, FRONT_DOOR_BLEED_REACH_MIN); // starts dark
+  bleedLight.position.set(
+    FRONT_DOOR_LIGHT_SPOTS.bleed.x,
+    FRONT_DOOR_LIGHT_SPOTS.bleed.y,
+    FRONT_DOOR_LIGHT_SPOTS.bleed.z,
+  );
+  scene.add(bleedLight);
+  const glassLight = THREE.pointLight(GLOW_MARQUEE, 0, FRONT_DOOR_GLASS_REACH_MIN); // starts dark
+  glassLight.position.set(
+    FRONT_DOOR_LIGHT_SPOTS.glass.x,
+    FRONT_DOOR_LIGHT_SPOTS.glass.y,
+    FRONT_DOOR_LIGHT_SPOTS.glass.z,
+  );
+  scene.add(glassLight);
+
   // Provisional identity lighting: hues from lights, never painted glow
   // (spec Design Notes item 7 — "readable at 6m" is the lead's smoke check).
   for (const zone of zones) addLight(THREE, scene, zone.light);
@@ -448,5 +547,5 @@ export function buildRoomScene(
   scene.add(doorGlow);
   scene.add(THREE.ambientLight(ROOM_BLACK, AMBIENT_INTENSITY));
 
-  return { screens, doors };
+  return { screens, doors, frontDoor: { panel: frontDoorPanel, glass, handle, bleedLight, glassLight } };
 }

@@ -69,6 +69,33 @@ test("core/room modules are DOM-free: room data, scene builder, and painters nev
   }
 });
 
+// Story 1.9: the entry sequence is kernel law — DOM-free exactly like the
+// input service (it poses and gates; the CALLER renders). The workbench is
+// the ONE core module allowed to touch an element (AD-24's sanctioned
+// outside-fiction panel), and its allowance is pinned NARROWLY: exactly one
+// createElement (only ever a "canvas"), one append, one remove, one
+// listener — the whole mount law — and nothing markup-shaped beyond that.
+// (Behavioural halves — remove-first, reload wiring, painted copy — live in
+// core/workbench.test.ts; the core/room scan covers room/door.ts via the
+// existing room-module loop automatically.)
+test("1.9 entry.ts is DOM-free; workbench.ts's DOM surface is exactly the narrow mount law (AD-24)", () => {
+  const entry = readFileSync(path.join(REPO, "core", "entry.ts"), "utf8");
+  for (const banned of ["document.", "window.", "localStorage", "navigator.", "createElement", "style."]) {
+    assert.ok(!entry.includes(banned), `core/entry.ts must not touch ${banned}`);
+  }
+  const wb = readFileSync(path.join(REPO, "core", "workbench.ts"), "utf8");
+  // Call sites are pinned by their dotted call form (the injected-doc
+  // interface declarations name the methods without a receiver dot).
+  assert.equal((wb.match(/\.createElement\(/g) ?? []).length, 1, "exactly one createElement call in core/workbench.ts (the only element-creating module; the per-module createElement bans in this scan cover the rest of the core tree)");
+  assert.ok(wb.includes('createElement("canvas")'), "and it creates only ever a canvas");
+  assert.equal((wb.match(/\.body\.appendChild\(/g) ?? []).length, 1, "exactly one append call");
+  assert.equal((wb.match(/\.body\.removeChild\(/g) ?? []).length, 1, "exactly one remove call");
+  assert.equal((wb.match(/\.addEventListener\(/g) ?? []).length, 1, "exactly one listener call (the Reload wiring)");
+  for (const banned of ["document.", "window.", "innerHTML", "textContent", "insertAdjacentHTML", "document.write", "querySelector", "style.", "localStorage"]) {
+    assert.ok(!wb.includes(banned), `core/workbench.ts must not use ${banned} — the panel is PAINTED onto its canvas, never marked up`);
+  }
+});
+
 // Story 1.5: the game's presentation half is DOM-free like the room painters
 // — the kernel hands it a canvas (injected makeCanvas), it never grows one,
 // and it never reaches for any other browser surface (AD-2/AD-11). The scan
@@ -202,6 +229,9 @@ test("dev serve (real HTTP): the served body is unchanged, the 1.2 shell modules
       "/core/patrons/scheduler.ts",
       "/core/patrons/presenter.ts",
       "/core/storage.ts",
+      "/core/entry.ts",
+      "/core/workbench.ts",
+      "/core/room/door.ts",
       "/generated/game-registry.ts",
       "/games/moon-patrol/presentation/adapter.js",
     ]) {

@@ -49,6 +49,27 @@ export const STREET_GRAY = 0x57534c;
 // guard still pins this hex here as its only home.
 export const FACE_TINT = 0xffffff;
 
+// Story 1.9 (AC6, UX-DR26): the mockup's outside-fiction panel family —
+// the street-door-loading mockup's ui-* tokens, hexes verbatim. The
+// workbench panel (core/workbench.ts) is painted from these, and the hue-
+// set guard pins each hex's single home at tokens.ts (scene.ts,
+// workbench.ts and every other module reference the NAME, never a literal).
+/** UI Surface: the workbench panel ground (mockup --ui-surface #191919). */
+export const UI_SURFACE = 0x191919;
+/** UI Text: the panel heading (mockup --ui-text #EDEDED, ui-heading role). */
+export const UI_TEXT = 0xededed;
+/** UI Border: the panel frame (mockup --ui-border #2E2E2E). */
+export const UI_BORDER = 0x2e2e2e;
+/** UI Focus: the Reload affordance (mockup --ui-focus #5BC8FF, ui-body link).
+ * Same hex as GLOW_CYAN by mockup design — the guard binds the hex to this
+ * file, not to one name. */
+export const UI_FOCUS = 0x5bc8ff;
+/** Glass Dark / Glass Dim: the door glazing's two-tone sheet (mockup .glass
+ * gradient #3a2c20 -> #2a2018) — painted, never emissive (1.3's identity
+ * law holds from the street side too). */
+export const GLASS_DARK = 0x3a2c20;
+export const GLASS_DIM = 0x2a2018;
+
 /** CSS paint form of a token (for canvas painters, Rule 14: derived). */
 export function toCss(hex: number): string {
   return `#${hex.toString(16).padStart(6, "0")}`;

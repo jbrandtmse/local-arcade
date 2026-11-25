@@ -2,13 +2,28 @@
 title: 'Story 1.9: The street-door beat — loading as fiction''s first shot'
 type: 'feature'
 created: '2026-11-24'
-status: 'ready-for-dev'
+status: 'done'
+baseline_revision: '8571790b9f12565a00ee301181ee9d759196f862'
 review_loop_iteration: 0
-followup_review_recommended: false
+followup_review_recommended: true
 context:
   - _bmad-output/planning-artifacts/architecture/architecture-local-arcade-2026-11-19/ARCHITECTURE-SPINE.md
 warnings: ['oversized']
-deferred: []
+deferred:
+  - summary: >-
+      A renderer.render throw AFTER the first successful frame is uncontained: the stall
+      law arms only while framesRendered === 0, so a post-first-frame wedge (context loss,
+      driver hiccup) throws every rAF with a frozen camera and no workbench.
+    evidence: |-
+      core/main.ts wraps the game draw legs (supervisor hook "draw" + the persistent
+      drawFaulted flip, 1.7) but renderer.render itself has been unwrapped since 1.1 —
+      pre-existing posture, not caused by 1.9; 1.9's zero-frame stall self-heal stays
+      correct for the wedge it covers. Settle it at a later story with a render-fault
+      flip in the 1.7 drawFaulted idiom or a context-loss handler, adjudicated at that
+      story's smoke tier.
+    location: >-
+      core/main.ts (frame(): renderer.render leg) + core/entry.ts (stall arm: framesRendered === 0)
+    severity: medium
 ---
 
 <intent-contract>
@@ -92,6 +107,35 @@ Rule 6 AD ids: see Design Notes below. Rule 3: the canvas-painted panel + source
 
 ## Review Triage Log
 
+### 2026-11-24 — Review pass
+- verdicts: 25 findings — high 4, medium 4, low 10, false 7, maybe-false 0
+- findings:
+  - `[high]` `[patch]` [blind 1] The boot catch mounts with `removeCanvas: null` for EVERY boot throw — a fault after the canvas append (the new scene.ts no-door throw, a painter with no 2d context) leaves the 3D canvas in the body while the workbench canvas is appended: two canvases, breaking AC4's every-path law — fixed: the append is receipted at boot scope (`bootCanvas = renderer.domElement;`) and the catch passes the receipt (null before the append, so the WebGL2 path is byte-identical in effect); glue pin moved to the receipted call.
+  - `[medium]` `[patch]` [blind 2] The boot catch's own `mountWorkbench` call was unguarded — a mount throw (broken document, no 2d context — plausible exactly on the browsers that took this path) produced an uncaught error swallowing the original boot error — fixed: the catch's mount runs in try/catch, one logged line (`} catch (mountErr) {`).
+  - `[low]` `[patch]` [blind 3] The `reason` option's comment claimed "Recorded for the debug surface" while both call sites discard the mount record — fixed: comment now states it rides the returned mount record for the caller and is never painted (labels kept: they are the matrix's own path names).
+  - `[false]` `[reject]` [blind 4] "Reload wiring is the whole viewport canvas, not the painted Reload line" — the intent's I/O matrix names exactly this law: "pointerdown/click on the workbench canvas -> location.reload()"; on a failed page there is no drag-look to mis-fire, the panel IS the page. Comments/test wording corrected to state the whole-canvas law deliberately.
+  - `[low]` `[reject]` [blind 5] No resize path after the workbench swap (panel keeps its mount-time viewport size) — cosmetic on a page whose whole canvas is already the reload affordance; the smallest fix adds a second `addEventListener` + repaint state (complexity + amends the pinned narrow-DOM law) — disproportionate at this grade for everyday use.
+  - `[medium]` `[defer]` [blind 6] A render throw AFTER the first successful frame has no containment (stall law is cancelled by any rendered frame) — pre-existing render posture (1.7 wraps game draw legs, never `renderer.render`; unchanged since 1.1), not caused by this story. The mis-scoped "self-heals to the workbench" pin comment it named was corrected in-pass (see next row); the behavior is recorded in frontmatter `deferred`.
+  - `[low]` `[patch]` [blind 7] After the mount, `frame()` ran the whole room pipeline forever (draw legs, composites, render into the detached canvas, an unread frame counter) and the comment misnamed the law "self-heal" — fixed: `if (workbenchMounted) return;` right after the one-shot swap, terminal-phase comment, and a new glue pin (`mutation: remove the post-mount frame guard -> the glue pin reds; revert.`).
+  - `[low]` `[reject]` [blind 8] The recorded test-count baseline ("319 baseline at HEAD 98606b3 + new") was not updated in the spec — the fix IS an edit to this build's spec (rejected on its terms by the triage rule); the post-implement counts are booked in `## Auto Run Result` (347/347 with review-pass tests).
+  - `[low]` `[reject]` [blind 9] At full open the panel's corner overlaps the wall-front-left jamb by up to DOOR_T/2 = 0.06 — whether that reads wrong is by-eye at the lead's DW-12 smoke (the constants are labelled "tuned by eye"), and the fix rewrites the exact hinge pose law and its bit-exact pins mid-story; smoke adjudicates, not worth a pose-law move at this grade.
+  - `[low]` `[patch]` [blind 10] No drift pin between ENTRY_TIMEOUT_MS and ENTRY_TIMEOUT_TICKS — fixed: entry.test.ts pins `Math.round(ENTRY_TIMEOUT_TICKS * MS_PER_TICK) === ENTRY_TIMEOUT_MS` (MS_PER_TICK from loop.ts — the shared rate, no retyped constant).
+  - `[high]` `[patch]` [edge 1] Claim-kind trace of the same defect as blind 1 (boot throw after append leaves two canvases; the catch comment "the throw happens at renderer construction" pinned nowhere) — same fix and pin move as blind 1.
+  - `[false]` `[reject]` [edge 2] A second `kind === "door"` volume would silently overwrite the poseable panel — collision-volumes.ts contains exactly ONE door-kind volume (line 121, comment names it); the overwrite branch is unreachable authoring-wise, and an untestable guard would add a dead branch (the story's only sanctioned defensive branch is already documented).
+  - `[medium]` `[patch]` [edge 3] `bleedFraction` is never recomputed past the ready wait — on a healthy load it FREEZES (~0.52) the moment the open leg starts and the street lights never reach full, breaking the smoke law "bleed+glass reach full" — fixed: the ramp rides the global tick through door/ready-handle/open (clamped at 1, holds at control); the new pacing pin measured the frozen value red (0.5166666666666667 vs 1) and is green after the fix.
+  - `[low]` `[patch]` [edge 4] The hue-home guard's regex was case-sensitive — a duplicated `0xEDEDED` would pass as a second home — fixed: `i` flag added; demonstrated by planting a case-variant duplicate (guard red; probe removed; entry.ts hash byte-identical ee4b2d08...).
+  - `[low]` `[patch]` [edge 5] A viewport smaller than the panel painted the panel at negative px/py (off-canvas) — fixed: clamp both axes to the edge inset (`mutation: drop the clamp -> the tiny-viewport pin reds at [-86, 2]; revert.`).
+  - `[medium]` `[patch]` [verification-gap 1] The bleed-ramp pacing was pinned only in the tick window where any phase-local formula gives identical values (phaseStartTick === 0 during the door phase), and no spec mutation line touched it — fixed with the pacing pins + mutation line of edge 3 (same root cause: the frozen ramp).
+  - `[high]` `[patch]` [verification-gap 2] The same boot-catch defect, and the glue pin BAKED the wrong call (`removeCanvas: null` literal) so it would have reddened against the fix — fixed: the pin asserts the receipted call + the receipt line (`mutation: pass removeCanvas: null in the catch -> the boot-gate pin reds; revert.`).
+  - `[high]` `[patch]` [intent a] The fourth path no reading enumerated: broad-catch (R2b) x `removeCanvas: null` (R4a) intersect at a post-append boot fault — the comment asserted the pre-append premise, nothing pinned it — same root cause and fix as the three rows above (bootCanvas receipt).
+  - `[false]` `[reject]` [intent b] "A wedged entry.step that throws before taking its tick freezes the beat clock while frames render — the half-door the intent forbids" — unreachable in today's step(): no throw-capable statement precedes `tick += 1`; the tick-first ordering IS the documented, now-pinned law (the loop-rig containment test self-heals through a fault on every tick). Future-proofing a throw before the tick would guard state this change did not demonstrate.
+  - `[false]` `[reject]` [intent c] "Slow-init reading (R3a) says the room should never boot at all; the diff boots fully and swaps at the first frame" — the Approach's own words ("swaps the 3D canvas for the workbench canvas") presuppose the 3D canvas exists, and "the beat never starts" holds at every pinned surface: phase workbench at init, zero beat ticks, swap before the first render. R3b implemented is the coherent reading.
+  - `[low]` `[patch]` [intent d] Page-tier one-canvas composition has no headless witness (by design — Code Map assigns the page tier to the lead's DW-12 smoke) and one scan-message over-claimed scope ("the whole core tree" while scanning workbench.ts only) — fixed: the message names workbench.ts and points at the per-module ban scans; the witness half stands at the smoke tier.
+  - `[false]` `[reject]` [intent e] "The byte-unchanged law survived by moving pins" — the pinned substrings themselves (boot-eager identity, two-rAF) are byte-unchanged; the four re-anchored regex witnesses are documented in the spec's Shared-surfaces paragraph as part of the sanctioned bootArcade wrap. No law moved.
+  - `[low]` `[reject]` [intent f] AC3's "never rendered anywhere" is enforced only by absence (no painter reads entry state) — a scan pinning it adds complexity for an unreachable harm: the only text-paint paths are the workbench's constant copy and the scene painters, neither of which takes entry state; everyday-use likelihood nil at this grade.
+  - `[false]` `[reject]` [intent g] "Rule-19 mutation evidence is prose, not artifact" — the spec's `mutation:` lines (applied, observed red, reverted, byte-identical hash) ARE the artifact Rule 19 prescribes; no repro artifact is asked for.
+  - `[false]` `[reject]` [intent h] The hue-home guard generalized to every tokens.ts hex across the core tree — a superset of the ui-* home law the spec asked for; a stricter guard cannot contradict AC6 and runs green.
+
 ## Design Notes
 
 **Ledger inbox (Rule 17):** EMPTY — `LEDGER slice 1-9-the-street-door-beat-loading-as-fiction-s-first-shot` has no entries; nothing to address or decline.
@@ -124,21 +168,53 @@ Rule 6 AD ids: see Design Notes below. Rule 3: the canvas-painted panel + source
 - `node tools/gen-registry.mjs && git diff --exit-code -- generated/` -- (loop) expected: no drift (registry untouched)
 - `npm run build` -- (once per story) expected: Vite build succeeds (entry-chunk warning tier precedent)
 
-**Rule 19 — pinning tests + intended mutations (implement stage: apply, observe red, revert byte-identical, record the `mutation:` lines):**
-- AC1 pin: entry boot-phase test (phase door at boot) + no-ui-dom single-canvas/module-list + scene composition furniture pins. `mutation: entry.step starts in phase "control" (skip the beat) -> the boot-phase pin and the input-gate pins red; revert.`
-- AC2 pin: phase-window sequence test + dolly-endpoint pin (=== ENTRY_SPAWN/EYE_HEIGHT, math module) + composed playerView glue pin. `mutation: dolly end uses STREET_VIEW z (no walk-in) -> the endpoint pin red (takeover pop); revert. mutation: entry.playerView passes the view through during "open" -> the zeroing pin red (visitor walks mid-beat); revert.`
-- AC3 pin: control-stamp test (fake now: state().timeToPlayableMs === the fake now at the control tick). `mutation: the stamp reads loop.tickCount instead of injected now -> the measurement pin red; revert.`
-- AC4 pin: renderer-throw path (mount called, boot skipped — glue source pin + entry test), init slow-load straight-to-workbench, 5400-tick stall -> workbench phase, workbench.test.ts narrow-DOM call-law test + copy pin. `mutation: drop the removeChild of the 3D canvas on timeout -> the one-canvas call-law pin red (two canvases); revert. mutation: ENTRY_TIMEOUT_TICKS off-by-order (compares before incrementing) -> the exact-tick stall pin red; revert.`
-- AC5 pin: byte-unchanged boot-eager + two-rAF pins stay green + 1.7/1.8 pins untouched + entry-throw containment test (real loop rig: fault record, tick count advances). `mutation: register "entry" AFTER "player" -> the system-order source pin red (player steps one tick unzeroed); revert.`
-- AC6 pin: scene-tier token-only material pins over the new furniture + hue-set guard (new hexes only in tokens.ts). `mutation: the awning material uses a literal hex -> the hue-set guard red; revert.`
+**Rule 19 — pinning tests + demonstrated mutations (implement stage 2026-11-24: each applied, observed red, reverted, file hash byte-identical):**
+- AC1 pin: entry boot-phase test (phase door at boot) + no-ui-dom single-canvas/module-list + scene composition furniture pins. `mutation: entry init skips the beat (drops straight to phase "control") -> 7 entry-suite pins red (boot-phase, input-gate, pose windows); revert.`
+- AC2 pin: phase-window sequence test + dolly-endpoint pin (=== ENTRY_SPAWN/EYE_HEIGHT, math module) + composed playerView glue pin. `mutation: dolly lerp direction reversed -> the dolly-window + endpoint pins red (takeover runs street-ward); revert. mutation: entry.playerView passes the view through during "open" -> the zeroing pin red (visitor walks mid-beat); revert.` (Finding: the planned "dolly end uses STREET_VIEW z at fraction 1" is unobservable — step() flips openFraction and phase "control" in the SAME call, so pose() is never read at open-phase fraction 1; that branch is defensive. The exact-endpoint law is enforced and pinned through the control-branch pose plus the mid-window lerp pins.)
+- AC3 pin: control-stamp test (fake now: state().timeToPlayableMs === the fake now at the control tick). `mutation: the stamp reads the beat tick count instead of injected now -> the measurement pin red; revert.`
+- AC4 pin: renderer-throw path (mount called, boot skipped — glue source pin + workbench boot-throw test), init slow-load straight-to-workbench, 5400-tick stall -> workbench phase, workbench.test.ts narrow-DOM call-law test + copy pin. `mutation: remove-last instead of remove-first on the timeout mount -> the workbench order pin red (two canvases at one instant); revert. mutation: stall law compares before incrementing the tick -> the exact-tick stall pin red; revert.`
+- AC5 pin: byte-unchanged boot-eager + two-rAF pins stay green + 1.7/1.8 pins untouched + entry-throw containment test (real loop rig: fault record `core.system.entry.tick#N`, loop keeps ticking, stall law self-heals to the workbench). `mutation: register "entry" AFTER "player" -> the system-order source pin red (player steps one tick unzeroed); revert. mutation: remove the zero-frame stall self-heal block from entry.step -> the containment self-heal pin red (the AC4 stall pin with it); revert.`
+- AC6 pin: scene-tier token-only material pins over the new furniture + hue-home guard (every tokens.ts exported hex appears in no other core non-test source). `mutation: the awning material uses a literal hex -> the street-composition pin AND the hue-home guard red; revert.`
 
-**Shared surfaces (Rule 19):** `window.arcadeDebug` shape (+`entry` — main-glue pin line moves), the player-step view line (`seat.playerView(input.takeView())` -> composed `entry.playerView(seat.playerView(input.takeView()))` — main-glue :172 pin moves), `RoomHandles` (+`frontDoor` — scene.test/scene-qa furniture+count pins move, per-volume copy law preserved), the scene mesh set (+awning/glass/handle/two lights, token-only), `no-ui-dom.test.ts` dev-serve module list (+entry, workbench, room/door) + a new narrow workbench scan, the recorded test-count baseline. Standing criterion: every test added or changed passes on a fresh environment, standalone and against its neighbours in either order.
+**Review pass 1 — added demonstrated mutations (2026-11-24; each applied, observed red, reverted, hash byte-identical):**
+- AC1/AC5 pacing pin (entry.test.ts): bleed rides the global tick through ready AND open and reaches 1 by control. `mutation: the as-shipped freeze (bleed not recomputed in the open leg) -> the pacing pin red at control (0.5166666666666667 vs 1); fixed in-pass.`
+- AC4 boot-gate pin (main-glue.test.ts): the catch's mount removes the append receipt. `mutation: pass removeCanvas: null in the boot catch -> the boot-gate glue pin red (a post-append boot fault would leave two canvases); revert.`
+- AC4 frame-guard pin (main-glue.test.ts): `if (workbenchMounted) return;` stops the room's draw legs at the terminal phase. `mutation: remove the post-mount frame guard -> the glue pin red (the room pipeline runs into the detached canvas every frame); revert.`
+- AC4 tiny-viewport pin (workbench.test.ts): panel coords clamp to the edge inset. `mutation: drop the clamp -> the pin red at [-86, 2] on a 240x120 viewport; revert.`
+- AC6 hue-home guard (case-insensitive): `mutation: plant a case-variant duplicate (0xEDEDED in core/entry.ts) -> the guard red; revert, entry.ts hash byte-identical.`
+- Timeout-drift pin (entry.test.ts): `Math.round(ENTRY_TIMEOUT_TICKS * MS_PER_TICK) === ENTRY_TIMEOUT_MS` (MS_PER_TICK from loop.ts; self-reddening on either constant, no separate mutation).
+
+**Shared surfaces (Rule 19):** `window.arcadeDebug` shape (+`entry` — main-glue pin line moves), the player-step view line (`seat.playerView(input.takeView())` -> composed `entry.playerView(seat.playerView(input.takeView()))` — main-glue :172 pin moves), `RoomHandles` (+`frontDoor` — scene.test/scene-qa furniture+count pins move, per-volume copy law preserved), the scene mesh set (+awning/glass/handle/two lights, token-only), `no-ui-dom.test.ts` dev-serve module list (+entry, workbench, room/door) + a new narrow workbench scan, the recorded test-count baseline. Also moved (bootArcade re-indentation, Rule 19 update-in-place): `main-glue.test.ts` frameBody/creationBlock/patrons-block regexes re-anchor to the fixed two-space indent, and `core/seat-controls.test.ts`'s SEAT_KEYS block regex re-anchors the same way (the substring laws themselves stay byte-unchanged). Standing criterion: every test added or changed passes on a fresh environment, standalone and against its neighbours in either order.
 
 **Lead's manual smoke (DW-12 tier — Chrome AND Edge):** fresh load of `npm run dev`: the view is the closed door from the street (composition matches the mockup: sidewalk band, facade, awning, glassed door, handle, bleed widening under the door while the page settles — Patrons' room-glow is the light source), no progress bar anywhere; bleed+glass reach full, handle turns, door swings open with the camera walking in, then WASD walks and drag-look looks (pointer-lock denial silent); console `arcadeDebug.entry.state()` shows phase "control" and a REAL `timeToPlayableMs` — RECORD the number for the lead's budget entry (the spine Deferred row closes at the lead's spine write, Rule 20); `arcadeDebug.entry.failNow()` -> the 3D canvas is replaced by the plain workbench panel reading "The arcade didn't open. Reload." (ui-* tokens, click reloads); at all three moments DevTools shows body = exactly script + ONE canvas, zero other elements.
 
 ## Auto Run Result
 
-Status: ready-for-dev
+Status: done
 Blocking condition: none
 
-Plan stage (2026-11-24): spec written from the epics 1.9 block, epic-1 context (reused, not recompiled), the spine (Rule 6 map above), the 1.8 continuity spec, and the 1.9 planning sweep (PRD FR-1 ceiling, UX-DR15/16/26 verbatim, mockup composition/tokens, boot-pin evidence). Not implemented, not committed — the plan stage halts for the lead's validation gate per the dispatch.
+**Summary:** The street-door beat is shipped: `core/entry.ts` owns the phase law (boot-check -> door -> ready-handle -> open -> control, with workbench as the terminal outside-fiction phase), tick-derived throughout (AD-3: wall-clock only at the init check and the control stamp, both via injected `now`); `core/room/door.ts` extends the coin-door hinge idiom to the front door (exact closed pose = the old extrusion, bit-exact open pose, handle twist, light ramps); `core/room/scene.ts` builds the street composition (awning, glazing, handle, two dark street lights — one mesh per volume intact); `core/workbench.ts` is the sole element-creating module (remove-first mount, painted panel, click-reload); `core/main.ts` wraps the whole boot body in one `bootArcade()` behind the boot catch (append receipted at boot scope), registers "entry" before "player", branches the camera on entry phase, re-poses the door + lights every frame, stamps the ready gate on a successful render only, and swaps canvases exactly once with a terminal guard. Review pass 1 patched the caught defects (below) and added its demonstrated mutations; one pre-existing item deferred.
+
+**Files changed:**
+- `core/entry.ts` (new) — phase/timeout/dolly/view-gate law + measurement; bleed ramp rides the global tick through the open leg (review patch).
+- `core/entry.test.ts` (new, 12 tests) — exact phase windows, stall at the 5400th beat tick, exact dolly endpoint, composed playerView gate, stamp-once, plain-data state, loop-rig entry-fault containment (real `createKernelLoop`), pacing pins, timeout drift pin.
+- `core/room/door.ts` (new) / `door.test.ts` (new, 7) — hinge/handle/ramp law + furniture constants + street-glass painter; byte-continuity closed pose.
+- `core/workbench.ts` (new) / `workbench.test.ts` (new, 5) — remove-first mount law, pure painter, edge-clamped panel (review patch), injected reload.
+- `core/main.ts` — bootArcade wrap + receipted boot catch with guarded mount (review patch), entry system + composed player line, camera branch, front-door frame legs, render-success stamp, one-shot swap + terminal frame guard (review patch), `arcadeDebug.entry`.
+- `core/room/scene.ts` + `tokens.ts` — street furniture, `handles.frontDoor`, ui-*/glass token home, no-door authoring throw.
+- `core/main-glue.test.ts` (11) — 1.9 wiring pins incl. boot-receipt, frame-guard, moved mount pin; boot-eager + two-rAF pins byte-unchanged.
+- `core/no-ui-dom.test.ts` — module list + narrow workbench scan + entry DOM-free scan (message precision, review patch).
+- `core/room/scene.test.ts` + `scene-qa.test.ts` — street composition, case-insensitive hue-home guard (review patch), light counts.
+- `core/seat-controls.test.ts` — one SEAT_KEYS block regex re-anchored to the bootArcade indent (law byte-unchanged).
+
+**Review pass 1 breakdown (25 findings: high 4, medium 4, low 10, false 7, maybe-false 0):**
+- Patched (13 rows / 3 root-cause groups): boot catch passed `removeCanvas: null` for every boot throw -> append receipt + pin move (grouped: blind 1 / edge 1 / verification-gap 2 / intent a — the pass's `high`); unguarded boot-catch mount -> try/catch; frame legs ran forever into the detached canvas -> terminal guard + glue pin; bleed ramp froze mid-ramp on healthy loads -> global-tick ramp through open + pacing pins + pacing pins red-before-fix demonstration (edge 3 / verification-gap 1); case-sensitive hue-home guard -> `i` flag + probe demonstration; negative panel coords on tiny viewports -> edge clamp + pin; dead `reason` comment -> truthful comment; missing timeout drift pin -> added; scan-message over-claim -> corrected.
+- Deferred (1): post-first-frame render throw is uncontained — pre-existing posture (renderer.render unwrapped since 1.1; 1.7 wraps game draw legs only), frontmatter `deferred` carries it with severity medium.
+- Rejected: 7 `false` with refutations in the triage log (whole-canvas reload = the matrix law; second door volume unauthorable; wedged-before-tick entry unreachable; slow-init R3b = the Approach's reading; pin-move = law preserved; prose mutation lines ARE the Rule-19 artifact; hue-guard generalization is a harmless superset) and 4 `low` per the reject rule (resize-after-swap, test-count booking [fix = this build's spec; counts booked here], door-hinge jamb overlap [lead's by-eye smoke tier], no scan pinning the measurement's absence-only guardrail).
+
+**Follow-up review: recommended (true).** This pass patched a `high` entry. Specific unverified risk that survives: every page-tier law (one canvas at each of the three observed moments, click-reload on the real page, the beat's pacing *feel*) is witnessed only at source-pin + headless tier — the Chrome+Edge smoke is the lead's tier and has not run yet; the by-eye constants (HANDLE/OPEN/RAMP ticks, street-view z, panel composition) await the same smoke.
+
+**Verification performed (absolute workdir C:/git/local-arcade, each command one foreground call):** `npm run typecheck` clean; `npm test` 347/347 pass, 0 fail (319 baseline at HEAD 8571790 + 28 new, incl. 3 review-pass tests); `node ci/depcheck.mjs` OK; `node ci/lint-bans.mjs` OK; `node tools/gen-registry.mjs && git diff --exit-code -- generated/` NO-DRIFT; `npm run build` succeeds (chunk-size warning tier precedent). Hermeticity: the 8 added/changed suites pass standalone and in both orders (forward, then reverse). Demonstrated mutations: the 9 implement-stage lines (see above) plus 5 review-pass lines — each applied, red observed, reverted, file hash byte-identical (entry.ts ee4b2d08..., main.ts a1e4f2c8...); the bleed pacing pin additionally observed the as-shipped defect red (0.5167 vs 1) before the fix. Matrix Test Audit: all 14 rows mapped to executed passing tests except "Chrome + Edge matrix" and "Fresh environment" (lead tiers by dispatch) — rows and evidence in the implement-stage record.
+
+**Residual risks:** beat pacing and the open-panel jamb overlap adjudicate at the lead's smoke; workbench panel keeps its mount-time viewport after a window resize (rejected low — cosmetic on a page whose whole canvas is the reload affordance); post-first-frame render wedge deferred (frontmatter).
+

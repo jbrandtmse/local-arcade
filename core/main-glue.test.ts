@@ -22,6 +22,12 @@
 // the face gate to containment.faultedFor + drawFaulted, and pins the
 // supervisor-wrapped draw legs (the wall-clock ban stands byte-unchanged —
 // frame() stamps draw-fault records from the drawTick tick-state variable).
+// Story 1.9 moved the boot body inside one bootArcade() function behind a
+// boot-gate catch (renderer construction throws -> workbench), so the
+// multi-line regexes re-anchor to the two-space indentation bootArcade
+// gives its body; the substring pins survive byte-unchanged. 1.9 adds the
+// entry-beat wiring pins below and moves two pins (the player-step view
+// composition, the arcadeDebug line).
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -32,7 +38,10 @@ const MAIN = readFileSync(path.join(REPO, "core", "main.ts"), "utf8");
 const CONTAINMENT = readFileSync(path.join(REPO, "core", "containment.ts"), "utf8");
 
 function frameBody(src: string): string {
-  const m = src.match(/function frame\(\): void \{([\s\S]*?)\n\}/);
+  // 1.9: frame() now lives inside bootArcade(), so its closing brace sits
+  // at exactly two spaces — the fixed two-space anchor (not \s*) keeps the
+  // body ending at frame()'s own brace, not an inner block's.
+  const m = src.match(/function frame\(\): void \{([\s\S]*?)\n {2}\}/);
   assert.ok(m, "core/main.ts has a frame() render function");
   return m[1]!;
 }
@@ -40,9 +49,10 @@ function frameBody(src: string): string {
 // 1.7 block tier: the seat/scheduler creations became multi-line (the
 // faultedFor injection), so substring pins read the whole creation block —
 // the substring must sit INSIDE the named service's block, not just
-// somewhere in the file.
+// somewhere in the file. 1.9: the blocks close at bootArcade's two-space
+// indent now (fixed width, same reason as frameBody).
 function creationBlock(src: string, decl: string): string {
-  const m = src.match(new RegExp(`const ${decl} = create\\w+\\(\\{[\\s\\S]*?\\n\\}\\);`));
+  const m = src.match(new RegExp(`const ${decl} = create\\w+\\(\\{[\\s\\S]*?\\n {2}\\}\\);`));
   assert.ok(m, `core/main.ts creates "${decl}" in a multi-line creation block`);
   return m[0];
 }
@@ -149,9 +159,11 @@ test("1.4 cabinet wiring: the phase advances as a kernel system, coin doors togg
   assert.match(body, /repaintScreen\(\s*s\.canvas,\s*zones,/, "the repaint consumes the composed zone records");
   assert.ok(body.includes("paintStep,"), "the repaint receives the tick-derived paint step (liveness source)");
   assert.ok(body.includes("three.markTextureUpdated(s.texture)"), "a repaint marks the SAME texture dirty (no second canvas)");
+  // 1.9 moved pin: the arcadeDebug line gains the entry sequence (phase +
+  // timeToPlayableMs + failNow) beside the rest — console-only, zero UI.
   assert.ok(
-    MAIN.includes("window.arcadeDebug = { player, loop, cabinets, seat, scheduler, presenter, containment, storage };"),
-    "the console smoke can read the cabinet runtime, the seat cycle (1.5), the Patron scheduler + figure presenter (1.6), the containment handle with injectFault (1.7 — the smoke drives a REAL fault chain), and the storage/identity service (1.8 — the smoke reads visitorId + rowsFor, console-only) — console-only, zero UI (AD-24)",
+    MAIN.includes("window.arcadeDebug = { player, loop, cabinets, seat, scheduler, presenter, containment, storage, entry };"),
+    "the console smoke can read the cabinet runtime, the seat cycle (1.5), the Patron scheduler + figure presenter (1.6), the containment handle with injectFault (1.7 — the smoke drives a REAL fault chain), the storage/identity service (1.8 — the smoke reads visitorId + rowsFor), and the entry sequence (1.9 — phase, the timeToPlayableMs measurement, and failNow to drive the workbench swap through the real law) — console-only, zero UI (AD-24)",
   );
   for (const banned of ["performance.now", "Date.now", "Math.random", "tickCount"]) {
     assert.ok(!body.includes(banned), `the 1.4 frame legs must not read ${banned} either (liveness derives from tick state)`);
@@ -169,7 +181,10 @@ test("1.5 seat wiring (1.6/1.7-moved pins): the seat service owns the game-cabin
   assert.ok(MAIN.includes("seat.track({"), "game-wired placements track with instance, kernel input object, controls, and the authored legend keys");
   assert.ok(MAIN.includes("seatTrackVolumeIds.has(p.volumeId)"), "the seat E-routing gate IS the track gate (an entry without controls or legend keys keeps the plain 1.4 law, never an untracked-seat fault)");
   assert.ok(MAIN.includes("player.registerInteractable(p.volumeId, (id) => seat.handleInteract(id));"), "a tracked game cabinet routes E through the seat (the plain 1.4 toggle stays for the rest)");
-  assert.ok(MAIN.includes("player.step(1, seat.playerView(input.takeView()));"), "the player system consumes the seat's view (seated -> zeroed axes/aim, E kept)");
+  // 1.9 moved pin: the entry gate composes OUTSIDE the seat law — the
+  // player system consumes the seat's view through the entry's input gate
+  // (seated -> zeroed axes/aim, E kept; pre-control -> everything quiet).
+  assert.ok(MAIN.includes("player.step(1, entry.playerView(seat.playerView(input.takeView())));"), "the player system consumes the seat's view under the entry gate (1.9 composition law; the seat's own law byte-unchanged)");
   assert.ok(MAIN.includes('loop.addSystem("seat", () => seat.step(input.takeCodeView(), patronsRecords));'), "the seat maps raw codes onto declared slots inside the tick, AFTER the patrons dispatch, on the records the patrons system drained (1.6 pin move: the seat no longer drains — AD-23)");
   assert.ok(MAIN.includes("seat.setEventSink((rec) => presentations.get(rec.gameId)?.onEvent?.(rec.event));"), "the seat's drained records ride to the presentation half (sole M0 consumer)");
   assert.match(
@@ -226,7 +241,7 @@ test("1.6 patrons wiring: one drain per tick in a patrons system registered BETW
   // records (a reorder keeps every substring above and still feeds the
   // scheduler the previous tick's records — AC2's same-tick reaction law and
   // break-tick arbitration would ship broken through the shipped entry).
-  const pm = MAIN.match(/loop\.addSystem\("patrons", \(\) => \{([\s\S]*?)\n\}\);/);
+  const pm = MAIN.match(/loop\.addSystem\("patrons", \(\) => \{([\s\S]*?)\n {2}\}\);/);
   assert.ok(pm, "the patrons system is one registered block");
   const pBody = pm![1];
   const drainAt = pBody.indexOf("patronsRecords = loop.drainEvents();");
@@ -369,4 +384,56 @@ test("1.8 storage wiring (AD-16): the service is a core import created with brow
   const startAt = MAIN.indexOf("loop.start();");
   assert.ok(bootAt >= 0 && startAt >= 0 && bootAt < startAt, "the identity is generated EAGERLY at boot (\"first visit generates\"): the id exists before the loop runs — 1.9's boot beat rides this wiring");
   assert.ok(MAIN.includes("storage: StorageService;"), "the arcadeDebug type carries the storage service (the console smoke reads the table — zero UI, AD-24)");
+});
+
+// Story 1.9: the street-door beat in the shipped entry. The boot gate
+// (renderer construction throws -> workbench, never a half-loaded room),
+// the supervisor-wrapped entry system registered BEFORE player, the camera
+// branch, the front-door re-pose + light-ramp legs, the render-success
+// stamp, and the one-shot workbench swap. The executed beat laws live in
+// core/entry.test.ts / core/room/door.test.ts / core/workbench.test.ts;
+// these pins prove the SHIPPED entry routes through them (DW-12 tier).
+test("1.9 entry-beat wiring: the whole boot runs inside ONE bootArcade() under a catch that mounts the workbench instead, the entry system registers BEFORE player and gates its view from outside the seat law, the camera branches on entry.phase, the front-door assembly re-poses and the street lights ramp from entry state every frame, markFrameRendered rides ONLY a successful render, the workbench swap is one-shot with removeCanvas first, and arcadeDebug carries the entry (AC1-AC4 wiring)", () => {
+  // Boot gate (AC4): one catch over the WHOLE body. The mount's
+  // removeCanvas is the append receipt (bootCanvas — null until the
+  // append runs), so even a boot fault AFTER the canvas is in leaves the
+  // body with one canvas, and the catch's own mount cannot die uncaught.
+  assert.ok(MAIN.includes("try {\n  bootArcade();\n} catch (err) {"), "the whole boot body runs under ONE catch at the device edge");
+  assert.ok(MAIN.includes("bootCanvas = renderer.domElement;"), "the append is receipted at boot scope (mutation: pass removeCanvas: null in the catch and a post-append boot fault leaves TWO canvases — the AC4 every-path law)");
+  assert.ok(MAIN.includes('mountWorkbench({ reason: "unsupported", removeCanvas: bootCanvas'), "the catch mounts the workbench INSTEAD of booting, removing the appended canvas if the fault came after the append");
+  assert.ok(MAIN.includes("} catch (mountErr) {"), "the boot catch guards its own mount (a broken document must not swallow the original boot error)");
+  assert.ok(MAIN.includes("function bootArcade(): void {"), "the boot body is exactly one wrapped function (mutation: leave boot code OUTSIDE the try and the half-boot ships)");
+  assert.equal((MAIN.match(/mountWorkbench\(\{/g) ?? []).length, 2, "exactly two mount sites: the boot gate and the one-shot frame swap — nowhere else in the glue");
+  // Entry system: registered BEFORE player (the gate composes the view the
+  // player consumes on the same tick); supervisor-wrapped like every system
+  // (the wrap law is core/loop.test.ts; the call site is pinned here).
+  const entryAt = MAIN.indexOf('loop.addSystem("entry"');
+  const playerAt = MAIN.indexOf('loop.addSystem("player"');
+  assert.ok(entryAt >= 0 && playerAt > entryAt, "the entry system registers BEFORE \"player\" (mutation: register it after and the beat's gate misses a tick of input — this order pin reds)");
+  assert.ok(MAIN.includes('loop.addSystem("entry", () => entry.step());'), "the beat steps inside the tick (AD-3/AD-15: supervisor-wrapped, tick-counted)");
+  const entryBlock = creationBlock(MAIN, "entry");
+  assert.ok(entryBlock.includes("createEntrySequence({"), "the sequence is created at boot");
+  assert.ok(entryBlock.includes("spawn: ENTRY_SPAWN,") && entryBlock.includes("eyeHeight: EYE_HEIGHT,"), "the dolly ends on the authored spawn pose at the authored eye height (the no-pop takeover, AC1)");
+  assert.ok(entryBlock.includes("now: () => performance.now(),"), "wall-clock enters the sequence ONLY as the injected source (AD-3: init check + control stamp, both labelled inside entry.ts)");
+  // The frame legs.
+  const body = frameBody(MAIN);
+  assert.ok(body.includes('if (entry.phase() !== "control")'), "the camera belongs to the entry until control hands over");
+  assert.ok(body.includes("camera.position.set(ep.x, ep.y, ep.z)"), "beat frames pose the camera from entry.pose() — street view, then the tick-derived dolly");
+  assert.ok(body.includes("camera.position.set(p.x, EYE_HEIGHT + math.sin(p.bobPhase) * p.bobAmp, p.z)"), "the existing player-read lines survive byte-unchanged in the else branch");
+  assert.ok(body.includes("frontDoorOpenPose(front.openFraction)"), "the front-door assembly re-poses from entry state every frame (the coin-door idiom: render READS the beat)");
+  assert.ok(body.includes("fd.panel.rotation.set(0, fdPose.panel.yaw, 0)"), "the panel's swing is APPLIED (a law nobody applies leaves the door frozen)");
+  assert.ok(body.includes("fd.handle.rotation.set(0, fdPose.handle.yaw + frontDoorHandleYaw(front.handleFraction), 0)"), "the handle's twist composes ON TOP of the swing yaw (its own beat leg)");
+  assert.ok(body.includes("frontDoorRamp(front.bleedFraction)"), "the street lights ramp off the entry's bleedFraction");
+  assert.ok(body.includes("fd.bleedLight.intensity = ramp.bleed.intensity;") && body.includes("fd.glassLight.distance = ramp.glass.distance;"), "the ramp values are APPLIED to both lights every frame");
+  // One-shot workbench swap with the remove-first law at the call site.
+  assert.ok(MAIN.includes("let workbenchMounted = false;"), "the swap guard is persistent boot state (1.7's drawFaulted posture: never a silent per-frame try)");
+  assert.ok(body.includes('if (front.phase === "workbench" && !workbenchMounted)'), "the swap is gated on the phase AND the one-shot flag");
+  assert.ok(body.includes("removeCanvas: canvas,"), "the live 3D canvas is handed to the mount (workbench.ts removes it FIRST — the <=1-canvas law); mutation: drop it and workbench.test's order pin reds");
+  assert.ok(body.includes("if (workbenchMounted) return;"), "the terminal phase stops the frame legs — the room's draw legs never run into the detached canvas (mutation: remove the guard and the workbench page runs the whole room pipeline every frame for nothing)");
+  // The ready-gate evidence rides only a SUCCESSFUL render.
+  const renderAt = body.indexOf("renderer.render(scene, camera);");
+  const stampAt = body.indexOf("entry.markFrameRendered();");
+  assert.ok(renderAt >= 0 && stampAt > renderAt, "the frame stamp rides AFTER the render call returned (a throwing render never counts — while ZERO frames have rendered the stall law drives the workbench, AC4; a wedge AFTER the first rendered frame is outside this story's matrix — deferred, review pass 1)");
+  // Debug surface gains the entry (console-only trigger for the swap).
+  assert.ok(MAIN.includes("entry: EntrySequence;"), "the arcadeDebug type carries the entry sequence");
 });

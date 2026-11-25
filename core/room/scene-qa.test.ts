@@ -16,6 +16,7 @@ import { DOOR_HALF_W, INTERIOR, WALL_T, WALL_TOP } from "./collision-volumes.ts"
 import { signSurfaces, WELCOME_FLYER } from "./signage.ts";
 import { cabinetPlacements } from "./cabinets.ts";
 import { zones } from "./zones.ts";
+import { FRONT_DOOR_LIGHTS } from "./door.ts";
 import { GLOW_CYAN, GLOW_MARQUEE, GLOW_RED, ROOM_BLACK, toCss } from "./tokens.ts";
 import type { PaintContext, PaintSurface } from "./surfaces.ts";
 
@@ -232,8 +233,8 @@ test("the scene consumes the authored lighting: one point light per zone + roadm
   }
   assert.equal(
     built.lights.length,
-    zones.length + 2 + 1 + 2 * cabinetPlacements.length,
-    "4 zone + 2 amber + 1 door glow + 2 cabinet (spill + halo) point lights",
+    zones.length + 2 + 1 + FRONT_DOOR_LIGHTS + 2 * cabinetPlacements.length,
+    "4 zone + 2 amber + 1 door glow + 2 cabinet (spill + halo) + the 1.9 street pair (bleed + glass sheen) point lights",
   );
   assert.equal(built.ambientCount(), 1);
 });

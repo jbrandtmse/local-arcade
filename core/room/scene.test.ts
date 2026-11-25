@@ -13,7 +13,7 @@
 // geometry kind the seam can even ask for.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { AMBIENT_INTENSITY, buildRoomScene, DOOR_GLOW_INTENSITY, DOOR_GLOW_REACH, FACE_T, type Placed, type RoomScene, type Three } from "./scene.ts";
 import { DOOR_TOP, INTERIOR, WALL_T, WALL_TOP, collisionVolumes } from "./collision-volumes.ts";
@@ -32,6 +32,17 @@ import {
   coinDoorPose,
   placementGeometry,
 } from "./cabinets.ts";
+import {
+  FRONT_DOOR_AWNING,
+  FRONT_DOOR_BLEED_REACH_MIN,
+  FRONT_DOOR_FURNITURE_MESHES,
+  FRONT_DOOR_GLASS,
+  FRONT_DOOR_GLASS_REACH_MIN,
+  FRONT_DOOR_HANDLE,
+  FRONT_DOOR_LIGHTS,
+  FRONT_DOOR_LIGHT_SPOTS,
+  frontDoorOpenPose,
+} from "./door.ts";
 import {
   CARD_INK,
   CARPET_BASE,
@@ -318,15 +329,15 @@ test("empty Wall Slots get baseplate meshes (20, Wall Panel, raised), and the on
   );
   assert.equal(
     built.canvasTexts.length,
-    2 + 2 * cabinetPlacements.length,
-    "painted canvases: carpet + flyer + one marquee + one screen per placement",
+    3 + 2 * cabinetPlacements.length,
+    "painted canvases: carpet + flyer + the 1.9 street glazing sheet + one marquee + one screen per placement",
   );
 });
 
 // --- lighting: hues arrive from lights, never from emissive -------------------
 
-test("point lights = 4 zone identity + 2 roadmap amber + 1 door glow + 2 per cabinet shell (marquee spill + screen halo); hues are glow-anchor tokens only; one token-coloured Room Black fill ambient (1.3 AC4, 1.4)", () => {
-  assert.equal(built.lights.length, 7 + 2 * cabinetPlacements.length);
+test("point lights = 4 zone identity + 2 roadmap amber + 1 door glow + 2 per cabinet shell (marquee spill + screen halo) + the 1.9 street-side door pair (bleed + glass); hues are glow-anchor tokens only; one token-coloured Room Black fill ambient (1.3 AC4, 1.4, 1.9)", () => {
+  assert.equal(built.lights.length, 7 + FRONT_DOOR_LIGHTS + 2 * cabinetPlacements.length);
   const zoneLights = [PINBALL_CORNER, WORKSHOP, SNACK_BAR, CASUAL_ALLEY].flatMap((z) => [z.light]);
   for (const zl of zoneLights) {
     const l = built.lights.find((x) => x.x === zl.x && x.y === zl.y && x.z === zl.z);
@@ -395,7 +406,8 @@ test("static authored scene: the build emits exactly one mesh per volume + wains
     2 + // ceiling + floor
     wallSlots.length +
     signSurfaces.length +
-    SHELL_PART_MESHES * cabinetPlacements.length;
+    SHELL_PART_MESHES * cabinetPlacements.length +
+    FRONT_DOOR_FURNITURE_MESHES; // 1.9: awning + glazing + handle
   assert.equal(built.meshes.length, expectedMeshes, "mesh count derives from the authored data");
   assert.equal(
     built.objects.length,
@@ -566,4 +578,104 @@ test("scene lighting hues match the authored zone hues (no drift between zones.t
   assert.equal(CASUAL_ALLEY.hue, GLOW_GREEN);
   assert.equal(CARPET_PATTERN, 0x3e3046);
   assert.equal(CARD_INK, 0x2a241c);
+});
+
+// --- Story 1.9: the street-side front-door furniture + lights ---------------
+
+test("1.9 street composition: the door-front extrusion becomes the poseable panel (one mesh per volume preserved), the awning/glass/handle build from door.ts dims at the CLOSED pose in token-only materials, and the two street lights are BUILT DARK on the street side (AC5/AC6)", () => {
+  const closed = frontDoorOpenPose(0);
+  const fd = built.handles.frontDoor;
+  assert.ok(fd, "the front-door assembly is returned for the frame side to pose and ramp");
+
+  // One mesh per volume: the panel IS the door-front extrusion, not a copy.
+  const doorV = collisionVolumes.find((v) => v.id === "door-front");
+  assert.ok(doorV);
+  const panels = built.meshes.filter(
+    (m) =>
+      m.geo.w === doorV!.max.x - doorV!.min.x &&
+      m.geo.h === doorV!.max.y - doorV!.min.y &&
+      m.geo.d === doorV!.max.z - doorV!.min.z,
+  );
+  assert.equal(panels.length, 1, "the beat makes the extrusion handle-tracked, never duplicates it");
+  const panelMesh = panels[0]!;
+  assert.equal(panelMesh.mat.params["color"], WALL_PANEL, "the panel keeps the volume extrusion's material");
+  assert.ok(
+    Math.abs(panelMesh.x - closed.panel.x) < 1e-12 && Math.abs(panelMesh.y - closed.panel.y) < 1e-12 && Math.abs(panelMesh.z - closed.panel.z) < 1e-12,
+    "the extruded box's placement IS the closed swing pose (byte-continuity: the frame's first re-pose moves nothing)",
+  );
+
+  // Awning: Wall Panel, proud of the front wall's exterior above the head.
+  const awning = meshByDims(FRONT_DOOR_AWNING.width, FRONT_DOOR_AWNING.height, FRONT_DOOR_AWNING.depth);
+  assert.equal(awning.mat.params["color"], WALL_PANEL, "awning material is the WALL_PANEL token by name (mutation: a literal hex reds the hue-home guard below AND this pin)");
+  assert.equal(awning.x, 0);
+  assert.equal(awning.y, FRONT_DOOR_AWNING.centerY);
+  assert.ok(awning.y > DOOR_TOP, "above the door head");
+  assert.ok(awning.z > INTERIOR.depth / 2 + WALL_T, "proud of the front wall's exterior face (street side)");
+
+  // Glazing: painted two-tone sheet on the panel's street face, closed pose.
+  const glass = meshByDims(FRONT_DOOR_GLASS.width, FRONT_DOOR_GLASS.height, FRONT_DOOR_GLASS.thickness);
+  assert.equal(glass.mat.params["color"], FACE_TINT, "painted map carries the hues; the material stays the neutral tint (1.3's identity law from the street too)");
+  assert.ok(typeof glass.mat.params["map"] === "object", "the glazing is texture-mapped, never emissive");
+  assert.ok(
+    Math.abs(glass.x - closed.glass.x) < 1e-12 && Math.abs(glass.y - closed.glass.y) < 1e-12 && Math.abs(glass.z - closed.glass.z) < 1e-12,
+    "the glazing builds at the closed pose from door.ts",
+  );
+  assert.ok(glass.z > INTERIOR.depth / 2, "on the street face of the wall");
+
+  // Handle: Sign Chalk on the free edge, closed pose.
+  const handle = meshByDims(FRONT_DOOR_HANDLE.width, FRONT_DOOR_HANDLE.height, FRONT_DOOR_HANDLE.thickness);
+  assert.equal(handle.mat.params["color"], SIGN_CHALK, "handle in the Sign Chalk family (mockup .handle)");
+  assert.ok(
+    Math.abs(handle.x - closed.handle.x) < 1e-12 && Math.abs(handle.z - closed.handle.z) < 1e-12,
+    "the handle builds at the closed pose from door.ts",
+  );
+
+  // The street pair: GLOW_MARQUEE hues, intensity ZERO at build.
+  const bleed = built.lights.find(
+    (l) => l.x === FRONT_DOOR_LIGHT_SPOTS.bleed.x && l.y === FRONT_DOOR_LIGHT_SPOTS.bleed.y && l.z === FRONT_DOOR_LIGHT_SPOTS.bleed.z,
+  );
+  assert.ok(bleed, "the door-bleed pool sits at the door base on the street side");
+  assert.ok(bleed.z > INTERIOR.depth / 2 + WALL_T, "outside the front wall (the room spilling onto the street)");
+  assert.equal(bleed.color, GLOW_MARQUEE);
+  assert.equal(bleed.intensity, 0, "BUILT DARK — the entry's bleedFraction ramps it as the page settles (AC5 'both start dark')");
+  assert.equal(bleed.distance, FRONT_DOOR_BLEED_REACH_MIN);
+  const sheen = built.lights.find(
+    (l) => l.x === FRONT_DOOR_LIGHT_SPOTS.glass.x && l.y === FRONT_DOOR_LIGHT_SPOTS.glass.y && l.z === FRONT_DOOR_LIGHT_SPOTS.glass.z,
+  );
+  assert.ok(sheen, "the glass sheen light rides the glazing height");
+  assert.equal(sheen.color, GLOW_MARQUEE);
+  assert.equal(sheen.intensity, 0, "also BUILT DARK");
+  assert.equal(sheen.distance, FRONT_DOOR_GLASS_REACH_MIN);
+});
+
+// AC6's single-home law, generalized to every token: a hex literal may live
+// in tokens.ts ONLY (the 1.9 mockup family --ui-surface/-text/-border/
+// -focus and the glass pair included). scene.ts, workbench.ts, door.ts and
+// every other core module reference the NAME and derive css via toCss.
+test("token hue home: every hex literal exported by tokens.ts appears in NO other core non-test source (AC6; mutation: an awning literal hex in scene.ts reddens here)", () => {
+  const tokensSrc = readFileSync(path.join(import.meta.dirname, "tokens.ts"), "utf8");
+  const hexes = [...tokensSrc.matchAll(/0x[0-9a-fA-F]{6}\b/g)].map((m) => m[0]);
+  assert.ok(hexes.length >= 22, `the full token set exists to scan (found ${hexes.length})`);
+  const walk = (dir: string): string[] => {
+    const out: string[] = [];
+    for (const ent of readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, ent.name);
+      if (ent.isDirectory()) out.push(...walk(full));
+      else if (ent.name.endsWith(".ts") && !ent.name.endsWith(".test.ts")) out.push(full);
+    }
+    return out;
+  };
+  const coreDir = path.join(import.meta.dirname, "..");
+  for (const file of walk(coreDir)) {
+    if (path.basename(file) === "tokens.ts") continue;
+    const src = readFileSync(file, "utf8");
+    for (const hex of hexes) {
+      // Hex-run boundaries: a token hex inside a longer hex literal (a hash
+      // constant's 0xff... mask, say) is NOT this token home. Case-insensitive:
+      // a duplicated 0xEDEDED is the same hue as 0xededed, letter case does
+      // not buy a second home.
+      const re = new RegExp(`(?<![0-9a-fA-F])${hex}(?![0-9a-fA-F])`, "i");
+      assert.ok(!re.test(src), `${path.relative(coreDir, file)} carries the token hex ${hex} as a literal — its single home is tokens.ts (reference the token by name, derive css via toCss)`);
+    }
+  }
 });

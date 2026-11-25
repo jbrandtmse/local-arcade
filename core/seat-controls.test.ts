@@ -258,7 +258,10 @@ test("the on-screen legend, the authored kernel key map, and the keys these test
 
   // The kernel's authored map (core/main.ts SEAT_KEYS block) and the set
   // the executed tests above drive — each must equal the screen's set.
-  const block = /const SEAT_KEYS[\s\S]*?\n\};/.exec(main)?.[0];
+  // 1.9 moved this block: the whole boot body now lives inside bootArcade(),
+  // so SEAT_KEYS' closing brace sits at two-space indent — fixed-width anchor,
+  // never \s* (an inner 4-space `};` would truncate the block).
+  const block = /const SEAT_KEYS[\s\S]*?\n {2}\};/.exec(main)?.[0];
   assert.ok(block != null, "core/main.ts authors a SEAT_KEYS legend map");
   const advertised = ["ArrowLeft", "ArrowRight", "Enter", "KeyA", "KeyD", "KeyJ", "KeyK", "KeyX", "KeyZ"];
   assert.deepEqual(codesOf(block), advertised, "SEAT_KEYS advertises exactly the nine keys the screen teaches (no dead key advertised, no working key hidden)");
