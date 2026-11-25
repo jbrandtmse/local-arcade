@@ -425,6 +425,15 @@ test("1.9 entry-beat wiring: the whole boot runs inside ONE bootArcade() under a
   assert.ok(body.includes("fd.handle.rotation.set(0, fdPose.handle.yaw + frontDoorHandleYaw(front.handleFraction), 0)"), "the handle's twist composes ON TOP of the swing yaw (its own beat leg)");
   assert.ok(body.includes("frontDoorRamp(front.bleedFraction)"), "the street lights ramp off the entry's bleedFraction");
   assert.ok(body.includes("fd.bleedLight.intensity = ramp.bleed.intensity;") && body.includes("fd.glassLight.distance = ramp.glass.distance;"), "the ramp values are APPLIED to both lights every frame");
+  assert.ok(
+    body.includes("fd.panel.position.set(fdPose.panel.x, fdPose.panel.y, fdPose.panel.z)") &&
+      body.includes("fd.glass.position.set(fdPose.glass.x, fdPose.glass.y, fdPose.glass.z)") &&
+      body.includes("fd.glass.rotation.set(0, fdPose.glass.yaw, 0)") &&
+      body.includes("fd.handle.position.set(fdPose.handle.x, fdPose.handle.y, fdPose.handle.z)") &&
+      body.includes("fd.bleedLight.distance = ramp.bleed.distance;") &&
+      body.includes("fd.glassLight.intensity = ramp.glass.intensity;"),
+    "every frame-leg ASSIGNMENT is pinned, not just a subset: drop the glass position and the glazing welds to the closed pose while the panel swings; drop a light pair and the ramp half-runs (cr-1: six of the ten assignments were droppable with the whole suite green; mutation: delete any one assignment and this pin reds)",
+  );
   // One-shot workbench swap with the remove-first law at the call site.
   assert.ok(MAIN.includes("let workbenchMounted = false;"), "the swap guard is persistent boot state (1.7's drawFaulted posture: never a silent per-frame try)");
   assert.ok(body.includes('if (front.phase === "workbench" && !workbenchMounted)'), "the swap is gated on the phase AND the one-shot flag");

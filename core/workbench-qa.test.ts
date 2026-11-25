@@ -58,6 +58,7 @@ function recordWorld() {
 test("the DEFAULT reload wiring: with no injected source, a click on the workbench canvas calls location.reload() — the device wiring the shipped timeout and boot-fault paths actually use (matrix 'Workbench click', AC4)", () => {
   let reloads = 0;
   const host = globalThis as unknown as { location?: unknown };
+  const hadLocation = "location" in host;
   const saved = host.location; // undefined under node --test; restored after
   host.location = {
     reload: () => {
@@ -76,6 +77,8 @@ test("the DEFAULT reload wiring: with no injected source, a click on the workben
     canvas.listeners[0]!.handler();
     assert.equal(reloads, 2, "every click reloads (the whole canvas is the affordance; there is no once-guard on it)");
   } finally {
-    host.location = saved;
+    if (hadLocation) host.location = saved;
+    else delete host.location;
+    assert.equal("location" in host, hadLocation, "the spy leaves the global exactly as it found it — no own 'location' property lingers for the rest of the process (hermeticity: no leftovers a same-process test could trip on; mutation: restore with host.location = saved and this pin reds)");
   }
 });

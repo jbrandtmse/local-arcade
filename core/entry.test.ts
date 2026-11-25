@@ -189,14 +189,18 @@ test("timeToPlayableMs is the injected wall clock stamped ONCE at control — ne
   assert.ok(controlTick > 0 && controlTick < 12_345, "sanity: the tick count and the clock value are different quantities");
 });
 
-test("failNow drops to workbench from any non-terminal phase; state() is plain data (matrix 'manual fail', Rule: debug snapshots)", () => {
+test("failNow drops to workbench from EVERY phase — control included, the console trigger the smoke uses after takeover; state() is plain data (matrix 'manual fail', Rule: debug snapshots)", () => {
   const e = rig();
   e.step();
   e.failNow();
   assert.equal(e.phase(), "workbench", "the console trigger drives the same phase the law drives");
   e.step();
   assert.equal(e.state().phase, "workbench", "terminal: stepping stays there");
-  const s = e.state();
+  const e2 = rig();
+  runToControl(e2);
+  e2.failNow();
+  assert.equal(e2.phase(), "workbench", "from CONTROL too: the lead's smoke calls failNow() only after state() shows phase control (Verification's manual check), so the trigger is NOT gated behind the beat's terminal law (mutation: gate failNow behind terminal(phase) and this pin reds — the smoke could never drive the swap on a real page)");
+  const s = e2.state();
   assert.deepEqual(JSON.parse(JSON.stringify(s)), s, "state() survives a JSON round-trip — plain data, no internals");
   for (const v of Object.values(s)) assert.notEqual(typeof v, "function", "no live interface leaks through state()");
 });

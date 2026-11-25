@@ -137,7 +137,7 @@ function clampUnit(v: number): number {
  */
 export function frontDoorOpenPose(fraction: number): FrontDoorPose {
   const yaw = clampUnit(fraction) * FRONT_DOOR_OPEN_YAW;
-  // Deterministic trig only (AD-13 law for anything pose-derived).
+  // Deterministic trig only (AD-4's contract-math law for anything pose-derived).
   const cos = math.cos(yaw);
   const sin = math.sin(yaw);
   const swing = (px: number, pz: number): { x: number; z: number } => ({

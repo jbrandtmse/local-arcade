@@ -195,3 +195,18 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: 1-9-the-street-door-beat-loading-as-fiction-s-first-shot | severity: medium | fix-risk: low | footprint: core
 - evidence: core/main.ts frame(): the renderer.render leg unwrapped since 1.1 (1.7 supervisor hook draw wraps the game draw legs); core/entry.ts stall arms only while framesRendered===0 so any rendered frame cancels the self-heal — pre-existing posture surfaced by the 1.9 review pass
 - 2026-11-25T06:52:46Z status=routed owner=3-14-liveness-tiers-the-room-scales-while-the-law-holds by=lead note=harvested from spec 1-9 frontmatter deferred; pre-existing since 1.1 not a 1.9 regression; underpowered-device tiers are 3-14's own ground; adjudicate at that story's smoke tier
+
+### DW-36: workbench panel paints at 1x device pixels — soft text on HiDPI displays
+- source: spec-1-9-the-street-door-beat-loading-as-fiction-s-first-shot.md | severity: low | fix-risk: med | footprint: in-story
+- evidence: core/workbench.ts sizes the canvas backing store in CSS px; DPR scaling needs CSS sizing (a style write) that the pinned narrow-DOM law (one createElement/append/remove + one listener) forbids
+- 2026-11-25T09:53:02Z status=by-design owner=1-9-the-street-door-beat-loading-as-fiction-s-first-shot by=cr note=spec-bound: the narrow-DOM exception is the story's own pinned law; simplest option consistent with the spine
+
+### DW-37: entry camera + front-door frame legs still run every rAF after the workbench mount (terminal page)
+- source: spec-1-9-the-street-door-beat-loading-as-fiction-s-first-shot.md | severity: low | fix-risk: med | footprint: in-story
+- evidence: core/main.ts frame(): the camera branch and front-door re-pose block sit before the workbenchMounted guard (main.ts:499) — dead writes to a detached scene each frame, no DOM change, draw legs already guarded (main-glue-qa order pin)
+- 2026-11-25T09:53:02Z status=wontfix-accepted owner=1-9-the-street-door-beat-loading-as-fiction-s-first-shot by=cr note=reopen_if=smoke/profiling shows measurable per-frame cost on the workbench page or story 3-14 reworks the frame legs
+
+### DW-38: mount-record reason mislabels 2 of 4 workbench paths: 'unsupported' for every boot throw, 'asset-timeout' also for failNow
+- source: spec-1-9-the-street-door-beat-loading-as-fiction-s-first-shot.md | severity: low | fix-risk: med | footprint: in-story
+- evidence: no consumer reads mount.reason today (review pass 1 blind 3 kept the option for the caller); deriving true provenance needs an entry-side path source the API does not expose
+- 2026-11-25T09:53:03Z status=wontfix-accepted owner=1-9-the-street-door-beat-loading-as-fiction-s-first-shot by=cr note=reopen_if=first consumer of mount.reason attributes a fault from it (console/telemetry) and sees a wrong label
