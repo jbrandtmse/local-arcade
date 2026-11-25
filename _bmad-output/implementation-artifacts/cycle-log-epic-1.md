@@ -192,3 +192,4 @@
 2026-11-25T02:19:26Z	Story 1.8	committed	sha=59ece75	submodules=none	ci=none	note=story_code=d5ee1c3;QA_tier=7b460cc;CR_close=f32cd9c;smoke+fresh rows+17 evidence in 59ece75;pushed_on_close
 2026-11-25T02:19:26Z	Story 1.8	owner_decision	id=U-2	at=2026-11-25T01:38:45Z#9	via=inbox	by=josh	answer=keep B, proceed	quote=keep B, proceed	note=relay_of_owner_in-session_words_recorded_via_script;veto_kept;AD-28_attract-yield_law_stands_no_file_changes
 2026-11-25T02:19:26Z	Story 1.8	story_cycle	plan_to_commit_min=665	implement_passes=2	reviews=1	rework=0	first_ci=n/a	note=round2_after_AD-28_block-ruling(not rework);smoke leg retries=lead-tool misreads not product (sit law + event-window filter);Edge human-PB chain closes DW-12 Chrome AND Edge tier;0 rework
+2026-11-25T02:23:23Z	Story 1.9	stage_spawned	stage=plan	spawn_at=2026-11-25T02:23:23Z	agent_name=1-9-street-door-plan-1	cycle_iteration=1
