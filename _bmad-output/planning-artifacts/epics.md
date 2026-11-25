@@ -395,6 +395,19 @@ So that entering is already the product's first beat, not a technical wait.
 **And** a detected unsupported/underpowered browser gets the workbench panel *before* the 3D canvas — entry never half-loads (UX-DR15 partial; full site page lands in Epic 2)
 **And** composition matches `mockups/street-door-loading.html` for composition and tokens only (UX-DR26)
 
+### Story 1.10: Epic 1 burn-down
+
+As the owner (the lead closing the epic),
+I want the deferred-work items that sit squarely inside Epic 1's own footprint closed in one bounded pass,
+So that Epic 1 merges with no burndown debt: two CI/tooling gaps, one test-law gap, and the owner-priority cabinet-shell realism pass, all through the story pipeline.
+
+**Acceptance Criteria:**
+
+- DW-29: Cabinet shell reads as a vending machine, not an upright arcade cabinet: wants a real marquee box on top plus cabinet contours (shaped side panels, screen bezel/hood, control-deck silhouette) (ledger; routed by burndown gate 2026-11-25; owner-initiated priority)
+- DW-1: ci/lint-bans depth evasion: Math["random"], destructured Math, new Date()/Date() pass the sim-path ban gate (ledger; routed by burndown gate 2026-11-25)
+- DW-5: tools/gen-registry.mjs does not validate simPath points under games/<id>/sim/ — AD-1 direction unenforced at the build step (ledger; routed by burndown gate 2026-11-25)
+- DW-11: in-view half of the no-UI law unpinned: a camera-parented mesh (crosshair/HUD) added in core/main.ts keeps the suite green; DOM half pinned only (ledger; routed by burndown gate 2026-11-25)
+
 ## Epic 2: Find It by Ear — The Room Is Alive Around You *(M1)*
 
 The full pull ladder with zero UI hints — occluded spatial sound → attract graphics → Patron intensity — so a Visitor drifts toward a sound around a pillar, catches the attract glow, and sits down. Both SM-1 variants (normal audio AND master-muted) pass the M1 human walk, with Deaf/HoH and low-vision testers as mandatory participants.
@@ -522,6 +535,8 @@ So that "local LLMs build, CI verifies, the human judges feel" is machinery — 
 **And** the contract-test skill generates and runs a game's L0–L1 suite from the contract — a thin orchestrator over `ci/` scripts; skills contain no gate logic
 **And** GitHub Actions runs per-push L0/L1 for the touched game + a build; actions pinned to commit SHAs; zero LLM tokens anywhere (AD-20)
 **And** the Core→games dependency check runs in CI (AD-1)
+- DW-12: core/main.ts glue has no executed test host: addSystem takeView wiring, device listeners, silent-denial path pinned only by source-text and dev-serve text asserts (ledger; routed by burndown 2026-11-25)
+- DW-15: main.ts real-THREE adapter executed coverage — same browser-harness tier as DW-12 (ledger; routed by burndown 2026-11-25)
 
 ### Story 3.3: The ledger and Registration — a Game joins by Manifest alone
 
@@ -665,6 +680,7 @@ So that a reported fault reproduces exactly ("evidence, not an anecdote" — Flo
 **And** playback is entered only by a Visitor; the scheduler never initiates it; a takeover at a break seals the replay recording and opens the play recording — the Cabinet's latest is always what gets reported (AD-26)
 **And** replays are never captured as new Run Recordings (CAP-13)
 **And** periodic hashes localize divergence — `tools/replay` output pinpoints the first differing cycle (AD-26)
+- DW-7: cross-engine determinism (browser kernel === Node CI stateHashes) never exercised on two engines; construction property only — the replay harness must prove both engines agree (ledger; routed by burndown 2026-11-25)
 
 ### Story 3.13: The claim-check and the report endpoint — a bad run is provable
 
@@ -695,6 +711,7 @@ So that the room works far beyond v1 density without any visible cabinet ever re
 **And** no sleeping or idle-pulsing machine ever reads dead to a Visitor; wake-on-approach is seamless (EXPERIENCE · State Patterns: Distant machines)
 **And** headless L1/L2 runs disable culling entirely — audit mode: CI always sees the unculled full room (AD-27)
 **And** the thresholds from Story 3.7 (near radius, frustum margin, pulse cadence, audio N) are consumed from the single global config
+- DW-35: renderer.render throws AFTER the first successful frame are uncontained (no supervisor receipt covers the post-first-frame draw path) — the liveness/containment legs must close it (ledger; routed by harvest at story 1.9 dev_complete 2026-11-25)
 
 ### Story 3.15: The public posture — one sealed bundle to one droplet
 

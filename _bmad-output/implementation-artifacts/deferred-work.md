@@ -7,6 +7,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - evidence: review G2/edge-6; extension-set half patched; full L0 gate lands Epic 3 (3.1/3.2)
 - 2026-11-21T12:01:42Z status=routed owner=burndown by=harvest note=depth forms deferred to the Epic 3 L0 gate
 - 2026-11-21T23:06:38Z occurrence=1-1-project-bootstrap-and-the-deterministic-kernel-core by=cr note=Math["random"], Math?.random and new Date() re-sighted in ci/lint-bans self-test probe
+- 2026-11-25T10:56:57Z owner=1-10-epic-1-burn-down by=burndown note=chartered_into_Story_1.10_closes_now_in-Epic-1-footprint
 
 ### DW-2: core/main.ts boot: a throwing createSim factory is unguarded - one faulty game kills the whole room at page load (AD-15)
 - source: _bmad-output/implementation-artifacts/spec-1-1-project-bootstrap-and-the-deterministic-kernel-core.md | severity: med | fix-risk: low | footprint: core/
@@ -32,6 +33,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: _bmad-output/implementation-artifacts/spec-1-1-project-bootstrap-and-the-deterministic-kernel-core.md | severity: med | fix-risk: low | footprint: tools/
 - evidence: review G26/edge-20; manifest + L0 land Epic 3
 - 2026-11-21T12:01:43Z status=routed owner=burndown by=harvest note=
+- 2026-11-25T10:56:58Z owner=1-10-epic-1-burn-down by=burndown note=chartered_into_Story_1.10_low_fix-risk_build-step_validation
 
 ### DW-6: matrix Out-of-tick-write row has no composable fault-chain test surface (gate throws to caller; supervisor wraps kernel sites - two disjoint surfaces)
 - source: _bmad-output/implementation-artifacts/spec-1-1-project-bootstrap-and-the-deterministic-kernel-core.md | severity: med | fix-risk: med | footprint: core/contract/
@@ -43,6 +45,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: _bmad-output/implementation-artifacts/spec-1-1-project-bootstrap-and-the-deterministic-kernel-core.md | severity: med | fix-risk: med | footprint: epics-3-replay/
 - evidence: review G31/intent-4; tools/replay (Epic 3) provides the surface
 - 2026-11-21T12:01:43Z status=routed owner=burndown by=harvest note=
+- 2026-11-25T10:56:59Z owner=3-12-replay-headless-and-in-room-on-the-same-harness by=burndown note=cross-engine_proof_needs_replay_surface_that_lands_in_3.12;bullet_written_in_epics.md
 
 ### DW-8: ci/lint-bans ban set covers only the 9 spine-named transcendentals: ECMA implementation-approximated Math fns (atan, log2, log10, hypot, cbrt, expm1, log1p, sinh/cosh/tanh family) and the ** operator pass the sim gate
 - source: _bmad-output/implementation-artifacts/spec-1-1-project-bootstrap-and-the-deterministic-kernel-core.md | severity: med | fix-risk: med | footprint: ci/
@@ -64,6 +67,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - evidence: verification-gap demo in spec-1-2 deferred.evidence: crosshair mesh in core/main.ts scene assembly -> npm test stays green; core/no-ui-dom.test.ts pins the DOM half
 - 2026-11-22T03:30:17Z status=routed owner=burndown by=harvest note=routed from spec-1-2 deferred 2026-11-22; Epic 3 owns the machine lint (3.1/3.2 L0, 3.7 L2 audit) - route-to-story or own at the Epic 1 burn-down gate; also fixes the AC5 numbering drift (epics AC5 folded into spec AC1 bullet)
 - 2026-11-22T06:53:55Z occurrence=1-2-first-person-walk-look-and-move-no-prompts
+- 2026-11-25T10:56:58Z owner=1-10-epic-1-burn-down by=burndown note=chartered_into_Story_1.10_in-view_no-UI_law_pin_test_closes_now_no_new_dep
 
 ### DW-12: core/main.ts glue has no executed test host: addSystem takeView wiring, device listeners, silent-denial path pinned only by source-text and dev-serve text asserts
 - source: _bmad-output/implementation-artifacts/spec-1-2-first-person-walk-look-and-move-no-prompts.md | severity: med | fix-risk: high | footprint: in-story
@@ -73,6 +77,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - 2026-11-23T23:39:02Z occurrence=1-5-moon-patrol-plays-in-place-vendored-wrapped-alive by=cr note=seat/wrapper and the new draw-chain legs stay pinned by source-text asserts + dev-serve text only (acceptance-auditor A3/A1); executed-host tier still open
 - 2026-11-24T06:44:33Z occurrence=1-6-one-busy-machine-a-patron-actually-plays
 - 2026-11-24T14:40:31Z occurrence=1-7-fault-containment-a-broken-game-never-kills-the-room
+- 2026-11-25T10:56:59Z owner=3-2-the-gate-goes-deterministic-l0-l1-scripts-contract-test-skil by=burndown note=browser-harness_tier_is_planned_Epic_3_scope_executed-host_tests_need_it;bullet_in_epics.md_3.2
 
 ### DW-13: requestPointerLock synchronous throw escapes the promise catch, logging to console and breaking AC3 silent denial; no target engine throws synchronously
 - source: _bmad-output/implementation-artifacts/spec-1-2-first-person-walk-look-and-move-no-prompts.md | severity: low | fix-risk: low | footprint: in-story
@@ -90,6 +95,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - 2026-11-22T11:32:43Z status=routed owner=burndown by=harvest note=DW-12 tier; Epic 3 browser harness (3.2/3.15) closes it
 - 2026-11-23T23:39:02Z occurrence=1-5-moon-patrol-plays-in-place-vendored-wrapped-alive by=cr note=the 1.5 drawFrame/compositeScreen chain adds real-THREE legs with no executed browser coverage; source-pin tier until the Epic-3 browser harness
 - 2026-11-24T06:44:33Z occurrence=1-6-one-busy-machine-a-patron-actually-plays
+- 2026-11-25T10:56:59Z owner=3-2-the-gate-goes-deterministic-l0-l1-scripts-contract-test-skil by=burndown note=same_browser-harness_tier_as_DW-12;bullet_in_epics.md_3.2
 
 ### DW-16: Front wall open above the door head: no lintel volume over the door gap (visible see-through band y 2.1-3.0 when looking up at the door; 13cm recess behind the panel)
 - source: spec-1-3-the-arcade-room-slots-pillars-zones-and-the-roadmap-wall.md | severity: med | fix-risk: med | footprint: in-story
@@ -139,12 +145,14 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: owner report 2026-11-23 (mid-run, story 1.5 in plan) | severity: minor | fix-risk: small | footprint: core/player.ts look math / camera basis (yaw wrap, pitch clamp)
 - evidence: Owner-observed while using the game: after dragging the mouse far left or right the view becomes the floor. Repro not yet confirmed by the lead; smoke drags never exceeded ~2.5 rad so the path is untested.
 - 2026-11-23T14:51:13Z status=routed owner=burndown by=owner note=owner said: do not fix now; address in the next pass over the backlog
+- 2026-11-25T10:57:00Z status=decision-pending owner=burndown by=burndown note=to_x0:schedule_the_mouse-look_yaw-wrap/pitch-clamp_pass_at_Epic-2_X.0_per_owner_ruling_2026-11-23_do-not-fix-during-stories
 
 ### DW-25: Moon Patrol respawn pad-clear filter never removes minefields (x/w vs x1/x2 NaN predicate) — buggy can respawn onto a mine
 - source: story 1.5 implement review B3+E4 (shared root cause); spec-1-5 frontmatter deferred | severity: medium | fix-risk: small | footprint: games/moon-patrol/sim/world.js:106 respawn predicate; data shape sim/course.js:100; vendored law kept world.js unmodified below seam edits (AC1)
 - evidence: Spec 1.5 Review Triage Log B3/E4: respawn() filters with (o.x + o.w > padL && o.x < padR); minefields carry x1/x2 -> NaN -> never filtered. Present in vendored source C:/git/moonpatrol@49c3519... Settle: fix predicate for x1/x2 kinds (upstream first, then re-vendor) + sim test that respawns a run with a minefield on the pad.
 - 2026-11-23T20:25:26Z status=routed owner=1-6-one-busy-machine-a-patron-actually-plays by=dev note=1.6 drives the sim to a real end state via autoplay (AD-8 L1) — the respawn unfairness lands squarely in that path; fix upstream at C:/git/moonpatrol then re-vendor
 - 2026-11-24T07:01:45Z status=routed owner=1-6-one-busy-machine-a-patron-actually-plays by=lead note=bundle_half_resolved_in_1-6_(x1/x2_predicate_re-vendored + pad-clear pin world_gameplay.test.js);upstream C:/git/moonpatrol commit is owner call — routed to epic-1 decision sheet;entry stays open pending upstream commit
+- 2026-11-25T10:57:00Z status=escalated owner=burndown by=burndown note=bundle_half_resolved_in_1.6;remainder_is_the_upstream_C:/git/moonpatrol_commit_owner-only_to_epic-1_decision_sheet
 
 ### DW-26: the PROVISIONAL play(seed) seam flips the wrapper to mode play even for a sim that ships no play hook (kernel-side restart owns the start verb)
 - source: spec-1-5-moon-patrol-plays-in-place-vendored-wrapped-alive.md | severity: low | fix-risk: low | footprint: in-story
@@ -165,6 +173,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: owner walkthrough of :5173 build, 2026-11-24 | severity: med | fix-risk: med | footprint: core
 - evidence: owner verbatim: 'it looks like a vending machine now... hoping for something more like a real arcade cabinet, with a marquee on top and contours like a real cabinet'; current stand-up shell is a flat slab with a lit marquee band (1.4 geometry)
 - 2026-11-24T14:24:52Z status=routed owner=burndown by=lead note=owner-initiated; NOT an AC miss for 1-4 (marquee-lit law met) - enhancement beyond current ACs; priority-rank at the Epic 1 burndown gate, candidate new story (visual polish) on the decision sheet; geometry lives in core/room/cabinets.ts + collision volumes + screen surface mapping
+- 2026-11-25T10:56:58Z owner=1-10-epic-1-burn-down by=burndown note=chartered_into_Story_1.10_owner-prioritized_cabinet_realism_pass
 
 ### DW-30: boot identity uses crypto.randomUUID outside any supervisor: a runtime without Web Crypto (insecure-context http origin) throws at boot instead of degrading — settle with the deploy origin's scheme (droplet https vs plain http)
 - source: 1-8-the-room-knows-you-without-an-account | severity: medium | fix-risk: low | footprint: core
