@@ -7,7 +7,7 @@ paradigm: 'microkernel (plugin architecture)'
 scope: 'Local Arcade v1 (M0-M6): Arcade Core, Games, Game Factory, deployment envelope'
 status: final
 created: 2026-11-19
-updated: 2026-11-22
+updated: 2026-11-25
 binds: []
 sources:
   - '_bmad-output/planning-artifacts/prds/prd-local-arcade-2026-11-19/prd.md'
@@ -369,7 +369,7 @@ flowchart LR
 - **Thicker backend API** — the minimal report-ingest endpoint (AD-26) is **v1, not deferred**; anything beyond it returns only for (a) donation-completion polling (BMC supporter feed) → its own later epic; (b) leaderboards / multiplayer → post-M6. Report triage stays manual (pull + replay) until an epic says otherwise.
 - **Soft multi-ray audio occlusion** — single-ray first (AD-7); revisit when occlusion quality/perf demands it.
 - **Numeric thresholds** — framerate floor (FR-15/SM-C2), audio channel budget (distance-cull/nearest-N), seated focus-mix duck levels, wake-set near radius / frustum margin / idle-pulse cadence (AD-27), Patron reaction window: set at M2 when the health-check skill is built. Not deferred: attract liveness is enforceable now via stateHash-delta (AD-8 L1); only the pixel/fps/reaction-window numbers wait for M2. Until they land, the full no-dead-machines law is not CI-enforceable; M2 acceptance is incomplete without them.
-- **Time-to-playable budget** — FR-1's ≤60s is a guardrail ceiling, not the target; the real budget is set when the shell is first measured.
+- **Time-to-playable budget** — **CLOSED at story 1.9's smoke (2026-11-25, lead Rule-20 write).** FR-1's ≤60s stays the guardrail ceiling, not a target: the shell's first measurement is ~4.9 s to control on dev-serve desktop Chrome (`timeToPlayableMs` 4948.5) and ~16.8 s on headless SwiftShader Edge (16775) — one-canvas page, zero markup, entry beat included. No tighter M0 number is set; the framerate-floor numbers remain deferred to M2 (this row's other half).
 - **Marquee name of the arcade** (OQ-9) — revisit at launch prep. Not to be confused with per-cabinet marquees, which display `Manifest.title` from M0 (AD-24).
 - **Cabinet relocation** — no moves in v1 (FR-16); any relocation is a future epic.
 - **Room growth** — its own epic when Wall Slots run out (FR-10).
