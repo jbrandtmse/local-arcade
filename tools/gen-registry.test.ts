@@ -230,6 +230,17 @@ test("simPath law: a wrong home and a '..' traversal fail nonzero naming the law
   assert.ok(!existsSync(path.join(dir, "out", "game-registry.ts")), "a failing entry emits nothing");
 });
 
+// QA (Story 1.10, DW-5 gap): the law's empty-relative leg. A simPath that
+// names the games/<id>/sim/ DIRECTORY itself passes existsSync, and the
+// relative path is empty — the generator must die on the law, not emit an
+// import of a directory.
+test("simPath law: naming the games/<id>/sim/ directory itself dies naming the law and emits nothing", () => {
+  const dir = fixtureRoot();
+  writeFileSync(path.join(dir, "list.json"), JSON.stringify([{ id: "alpha", simPath: "games/alpha/sim" }]));
+  expectFailure(dir, "must resolve strictly under games/alpha/sim/");
+  assert.ok(!existsSync(path.join(dir, "out", "game-registry.ts")), "a directory-as-simPath entry emits nothing");
+});
+
 test("the repo's own list regenerates the committed registry byte-identically", () => {
   const repo = path.resolve(import.meta.dirname, "..");
   const committedPath = path.join(repo, "generated", "game-registry.ts");

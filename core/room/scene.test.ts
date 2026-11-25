@@ -657,6 +657,49 @@ test("1.10 DW-29 upright contours: deck slab, kick plate, screen hood, and two s
   }
 });
 
+// QA (Story 1.10, DW-29 geometry-continuity gap): every existing pin on the
+// untouched shell records is DERIVED from those same constants (the AABB pin
+// compares the volume against the live cabinetAABB derivation; the face pins
+// read SHELL.screen/marquee/bezel directly), so a nudge to a constant moves
+// pin and subject together — no existing test can see it. These ARE-value
+// pins are the drift cure for the matrix row "byte-identical to HEAD": the
+// constants are their 723fa3f values, and the B0 collision volume sits at
+// the exact HEAD box (the contours added no invisible wall).
+test("1.10 QA continuity: the untouched shell records and the B0 collision AABB ARE their HEAD values (DW-29 byte-unchanged drift pins)", () => {
+  assert.equal(SHELL.body.width, 0.6, "body width IS 0.60m — room-layout's stand-up contract");
+  assert.equal(SHELL.body.depth, 0.6, "body depth IS 0.60m (the AABB x/z pins ride it)");
+  assert.equal(SHELL.body.height, 1.8, "body height IS 1.80m (the AABB y-max rides it)");
+  assert.equal(SHELL.marquee.width, 0.58, "the marquee FACE width IS 0.58 (1.4's face law never re-ran at DW-29's raised box)");
+  assert.equal(SHELL.marquee.height, 0.5, "the marquee FACE height IS 0.50 (paintMarquee's fit dims byte-unchanged)");
+  assert.equal(SHELL.screen.width, 0.44, "the screen face width IS 0.44");
+  assert.equal(SHELL.screen.height, 0.52, "the screen face height IS 0.52");
+  assert.equal(SHELL.screen.centerY, 1.05, "the screen face centerY IS 1.05");
+  assert.equal(SHELL.bezel.width, 0.48, "the bezel width IS 0.48");
+  assert.equal(SHELL.bezel.height, 0.56, "the bezel height IS 0.56");
+  assert.equal(SHELL.bezel.depth, 0.04, "the bezel depth IS 0.04 — the proud offset the screen exposure law reads");
+  assert.equal(SHELL.bezel.centerY, 1.05, "the bezel centerY IS 1.05");
+  assert.equal(SHELL.coinDoor.width, 0.26, "the coin door width IS 0.26");
+  assert.equal(SHELL.coinDoor.height, 0.3, "the coin door height IS 0.30");
+  assert.equal(SHELL.coinDoor.thickness, 0.02, "the coin door thickness IS 0.02");
+  assert.equal(SHELL.coinDoor.centerY, 0.58, "the coin door centerY IS 0.58");
+  assert.equal(SHELL.coinSlot.width, 0.1, "the coin slot detail width IS 0.10");
+  assert.equal(SHELL.coinSlot.height, 0.02, "the coin slot detail height IS 0.02");
+  assert.equal(SHELL.coinSlot.thickness, 0.006, "the coin slot detail thickness IS 0.006");
+  assert.equal(SHELL.coinSlot.centerY, 0.67, "the coin slot detail centerY IS 0.67");
+  assert.equal(FACE_T, 0.005, "the painted-face thickness IS 0.005 (every face-proud pin reads it)");
+
+  const near = (a: number, b: number) => Math.abs(a - b) < 1e-9;
+  const p = cabinetPlacements[0]!;
+  const v = collisionVolumes.find((c) => c.id === p.volumeId);
+  assert.ok(v, `volume "${p.volumeId}" is registered`);
+  assert.ok(
+    near(v.min.x, -4.5) && near(v.max.x, -3.9) &&
+    near(v.min.y, 0) && near(v.max.y, 1.8) &&
+    near(v.min.z, -6.15) && near(v.max.z, -5.55),
+    `the cabinet-B0 collision AABB IS the exact HEAD box 0.60x0.60x1.80 at B0 (${JSON.stringify({ min: v.min, max: v.max })}) — DW-29's contours are decor, not a new invisible wall`,
+  );
+});
+
 // zone token sanity (the same hues the scene builder lights with)
 test("scene lighting hues match the authored zone hues (no drift between zones.ts identity and the lights the builder hangs)", () => {
   const hues = new Set(zones.map((z) => z.hue));

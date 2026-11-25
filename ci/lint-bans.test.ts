@@ -132,6 +132,60 @@ test("wall-clock reached through globalThis/window members goes red (dotted, bra
   assert.match(result.stderr, /games[/\\]globalclock[/\\]sim[/\\]g\.js:1:/);
 });
 
+// QA (Story 1.10, DW-1 gap): the patched legs — positional regex masking,
+// the composed ?.["prop"] subscript tolerance, and the division-preserving
+// slash — COMPOSE on one line. Masking must not swallow the rest of the
+// line, the tolerance must not disturb the division that follows, and a
+// slash after ")" must read as division, not a regex opener. The line holds
+// exactly three real references (and the bracket Date["now"] hits exactly
+// once, not bare+bracket double); the regex body and the divisions are inert.
+test("compound one-liner: regex masking, the composed ?.['prop'] evasion, and division coexist — exactly the three real hits, each single", () => {
+  const dir = fixtureGames({
+    "games/compound/sim/c.js":
+      'export const v = (6000 + 400) / 100; const r = Math?.["random"] / 8; const re = /Date.now/; const scale = 60000 / Date?.["now"]; const d = Date["now"]; export { v, r, re, scale, d };\n',
+  });
+  const result = run(dir);
+  assert.equal(result.ok, false);
+  assert.ok(result.stderr.includes("no-math-random"), 'composed Math?.["random"] hit');
+  assert.ok(result.stderr.includes("no-date-now"), 'composed Date?.["now"] and bracket Date["now"] hits');
+  assert.match(result.stderr, /games[/\\]compound[/\\]sim[/\\]c\.js:1:/);
+  const summaries = [...result.stderr.matchAll(/lint-bans: (\d+) banned-API use\(s\)/g)];
+  assert.equal(summaries.length, 1, "exactly one summary line");
+  assert.equal(
+    Number(summaries[0]![1]),
+    3,
+    'exactly the three real references hit — Math?.["random"], Date?.["now"], and (single, not bare+bracket double) Date["now"]; the /Date.now/ body and the division slashes contribute nothing',
+  );
+});
+
+// QA (Story 1.10, DW-1 gap): the destructure leg's receiver spellings
+// compose — a renamed binding on a member source, the wall-clock globals
+// pulled out of globalThis/window directly (the bare/chain legs are
+// guarded at these positions, so ONLY the destructure leg flags them),
+// and the bracket-member source spelling. One fixture per spelling: each
+// file's location pin holds its own leg.
+test("destructured wall-clock members: renamed binding, globalThis/window sources, and the bracket-member spelling each hit the destructure leg", () => {
+  const dir = fixtureGames({
+    "games/destrename/sim/a.js": "const { random: r } = window.Math; export { r };\n",
+    "games/destmember/sim/b.js": "const { now: t } = globalThis.Date; export { t };\n",
+    "games/destglobal/sim/c.js": "const { Date: D } = window; export { D };\n",
+    "games/destglobalperf/sim/d.js": "const { performance: perf } = globalThis; export { perf };\n",
+    "games/destbracket/sim/e.js": 'const { now: t } = window["performance"]; export { t };\n',
+  });
+  const result = run(dir);
+  assert.equal(result.ok, false);
+  assert.ok(result.stderr.includes("no-math-random"), "{ random: r } = window.Math — renaming plus a value-receiver source does not launder");
+  assert.ok(result.stderr.includes("no-date-now"), "{ now: t } = globalThis.Date — member source resolves through globalThis");
+  assert.ok(result.stderr.includes("no-date-use"), "{ Date: D } = window — pulling the wall-clock global itself out");
+  assert.ok(result.stderr.includes("no-performance-use"), "{ performance: perf } = globalThis");
+  assert.ok(result.stderr.includes("no-performance-now"), '{ now: t } = window["performance"] — bracket-member source');
+  assert.match(result.stderr, /games[/\\]destrename[/\\]sim[/\\]a\.js:/);
+  assert.match(result.stderr, /games[/\\]destmember[/\\]sim[/\\]b\.js:/);
+  assert.match(result.stderr, /games[/\\]destglobal[/\\]sim[/\\]c\.js:/); // destructure-leg-only witness
+  assert.match(result.stderr, /games[/\\]destglobalperf[/\\]sim[/\\]d\.js:/); // destructure-leg-only witness
+  assert.match(result.stderr, /games[/\\]destbracket[/\\]sim[/\\]e\.js:/);
+});
+
 test("sanctioned forms stay green: Math-as-value, Math.floor, regex literals and comments", () => {
   const dir = fixtureGames({
     // mirrors games/moon-patrol/sim/helpers.js: the vendored world is handed
@@ -156,6 +210,24 @@ test("sanctioned forms stay green: Math-as-value, Math.floor, regex literals and
   assert.equal(result.stderr, "");
 });
 
-test("the repo tree (no games yet) passes", () => {
+// QA (Story 1.10, DW-1 gap): the bare wall-clock rule's colon guard (M4) —
+// a property key or label NAMED `Date`/`performance` is not a value
+// reference at runtime. No fixture pinned this when the guard landed in the
+// implement review pass; this is that pin.
+test("sanctioned spelling: object-literal property keys named Date/performance stay green (bare-rule colon guard)", () => {
+  const dir = fixtureGames({
+    "games/propkeys/sim/p.js": 'export const cfg = { Date: "attract", performance: 1, random: 2 }; export default cfg;\n',
+  });
+  const result = run(dir);
+  assert.equal(result.ok, true, result.stderr);
+  assert.equal(result.stderr, "");
+});
+
+// Real-repo witness (matrix row 4, the vendored-sim false-red guard): the
+// extended rules run over the shipped games/**/sim/** tree — helpers.js's
+// sanctioned Math-as-value and autoplay.test.js's regex bodies included —
+// and the gate still exits 0. A new rule that false-reds the vendored sim
+// reddens HERE (execFileSync throws on nonzero exit).
+test("the REAL repo tree stays green under the extended rules (vendored-sim false-red guard)", () => {
   execFileSync(process.execPath, [SCRIPT], { cwd: REPO, encoding: "utf8" }); // exit 0
 });
