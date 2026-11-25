@@ -1,0 +1,144 @@
+---
+title: 'Story 1.10: Epic 1 burn-down'
+type: 'chore'
+created: '2026-11-25'
+status: 'ready-for-dev'
+baseline_revision: '723fa3f793e45613c04ec74e2b5daf2d7ef689f2'
+review_loop_iteration: 0
+followup_review_recommended: false
+context:
+  - _bmad-output/planning-artifacts/architecture/architecture-local-arcade-2026-11-19/ARCHITECTURE-SPINE.md
+warnings: ['oversized', 'multiple-goals']
+deferred: []
+---
+
+<intent-contract>
+
+## Intent
+
+**Problem:** The burn-down gate (2026-11-25) routed four ledger items into this story, all inside Epic 1's own footprint: the sim-path ban gate is evaded by *form* rather than substance — `Math["random"]`, `Math?.random`, a destructured `const { random } = Math`, or `new Date()`/bare `Date()` walk straight through it (DW-1); the registry build step never checks that a sim half lives where the AD-1/AD-2 direction says it must (DW-5); the no-UI law is pinned only in its DOM half — a `camera.add(crosshair)` in `core/main.ts` keeps the whole suite green (DW-11); and the cabinet shell reads as a vending-machine slab, not an upright arcade cabinet — owner walkthrough, verbatim (DW-29).
+
+**Approach:** Harden the existing gates in place — no new tiers, no new dependencies. `ci/lint-bans.mjs`'s token scanner gains the evasion forms (bracket-string access, optional-chain dots, destructured-global binding sources, bare `Date`/`performance` references); `tools/gen-registry.mjs` gains a path law (simPath must resolve under `games/<id>/sim/`); `core/no-ui-dom.test.ts` gains the in-view half of the law (the camera never hosts content); and the SHELL record in `core/room/cabinets.ts` gains the real upright contours (marquee box riding the body top, control-deck slab, kick plate, screen hood, side wings), extruded by `scene.ts` while collision AABBs, screen faces, painted canvases, and light counts stay byte-unchanged.
+
+## Boundaries & Constraints
+
+**Always:**
+- (DW-1) `ci/lint-bans.mjs` stays the deterministic token scanner it is (typescript/unstable/ast, comments are trivia and never match); every new hit names its rule and `file:line:col` exactly like the existing rules. The sanctioned Math-as-value form (`globalThis.Math` at `games/moon-patrol/sim/helpers.js:15`, whose header comment names the allowance) stays GREEN — the new rules bind FORMS of already-banned APIs (AD-3/AD-4), never new API families.
+- (DW-5) gen-registry stays byte-deterministic (sorted entries, fixed template, no timestamps): validation happens before emission, and the shipped `tools/registry-list.json` regenerates byte-identical (it already complies).
+- (DW-11) the pin follows the `no-ui-dom.test.ts` scan idiom at the source-text tier (the executed-host tier is the Epic 3 browser harness, already owned by 3-2/3-15 per DW-12/DW-15): core/main.ts camera references ride an allowlist (construction, `rotation.order`, `position.set`/`rotation.set`, `aspect`, `updateProjectionMatrix`, `render(scene, camera)`); `camera.add`/`camera.attach` is banned across core non-test sources; the pose-producing modules (`core/room/*.ts`, `core/entry.ts`, `core/player.ts`) stay camera-blind (comment-stripped code).
+- (DW-29) all new contour dimensions live ONLY in the SHELL record (cabinets.ts) and scene.ts reads the constants (the one-geometry-source law); mesh counts stay formulas derived from `SHELL_PART_MESHES`; materials are tokens.ts tokens only (the hue-home guard stays green); every new part sits within 0.06m of the body AABB, and the `cabinet-B0` collision volume stays byte-unchanged (movement, targetability, and the future occlusion all read that one entry).
+- Every loop command finishes in one foreground call (`timeout: 600000`).
+
+**Never:**
+- No new dependencies (the scanner's TypeScript import already ships; no browser harness — that is Epic 3's tier), zero LLM/model calls, zero new markup (the one-canvas/zero-markup laws stay literal), no outbound calls.
+- No edits to vendored `games/**` sources — DW-1 closes at the GATE, not in the game; no edit to `core/contract/*`, `core/main.ts`, `core/entry.ts`, `core/player.ts`, `core/room/scene.ts`'s volume-extrusion loop, `generated/*`, `index.html`, `slot-config.ts`, `collision-volumes.ts`, or the CONTENT of `registry-list.json` (validation reads it only).
+- No change to the transcendental ban SET (DW-8's scope-widening question stays escalated/owner-only), no full data-flow analysis (Epic 3 L0), no rename or relocation of the existing lint-bans rules.
+- No move of the screen face, bezel, coin door, or the marquee FACE dims (1.4/1.8 pins byte-unchanged; AD-28's untouched-placements clause); `MARQUEE_CAP_M`'s 0.18m floor and the paintMarquee fit law never re-run at new dims.
+- No touch of the tracker `_bmad-output/implementation-artifacts/sprint-status.yaml` (lead-owned); never read or write `_bmad-output/unattended` and never run `_bmad/scripts/unattended-inbox.sh`; the untracked `_bmad-output/planning-artifacts/sprint-status.yaml` stray is never committed and never deleted; no commits by this story's stages; do NOT touch the dev server on :5173.
+
+## I/O & Edge-Case Matrix
+
+| Scenario | Input / State | Expected Output / Behavior | Error Handling |
+|----------|--------------|---------------------------|----------------|
+| DW-1 bracket/optional-chain evasion | sim source with `Math["random"]`, `Math?.random`, `Math["sin"]`, `Date["now"]` | each goes red naming no-math-random / no-engine-transendental / no-date-now, with file:line:col | exit 1 |
+| DW-1 destructured global | `const { random } = Math;`, `const { now: t } = Date;` | red (no-math-random / no-date-now) — renaming the binding does not launder it (SOURCE names are checked) | exit 1 |
+| DW-1 wall-clock forms | `new Date()`, bare `Date()`, alias `const d = Date`, bare `performance` reference | red via new no-date-use / no-performance-use rules | exit 1 |
+| DW-1 sanctioned forms stay green | `globalThis.Math` passed as a value (helpers.js pattern), `Math.floor(...)`, a regex literal containing the text "new Date", comments naming Math.random | exit 0, no hits — false-red guard for the vendored sim and autoplay.test.js | — |
+| DW-5 bad simPath | list entry `{ id: "alpha", simPath: "sims/alpha/sim.js" }` | exit 1, stderr names the `games/<id>/sim/` law | build step dies |
+| DW-5 traversal | `simPath: "games/moon-patrol/../core/evil.js"` | exit 1 — the relative check normalizes, `..` is dead | build step dies |
+| DW-5 shipped list | `node tools/gen-registry.mjs && git diff --exit-code -- generated/` | no drift (the shipped moon-patrol entry already sits under the law) | — |
+| DW-11 planted HUD | `camera.add(crosshairMesh)` (or any camera reference off the allowlist) added in core/main.ts | the new pin REDS; a plain `scene.add(mesh)` stays green — the room may grow meshes, the camera may not | — |
+| DW-11 camera-blindness | a core/room module or entry.ts/player.ts names `camera` in code (comments stripped) | the camera-blind pin REDS | — |
+| DW-29 contour build | scene build of cabinet B0 | five new contour meshes with SHELL dims and token-only materials; mesh count = volumes + wainscot + ceiling + floor + baseplates + flyer + SHELL_PART_MESHES(11) x placements; painted-canvas and point-light counts UNCHANGED | — |
+| DW-29 geometry continuity | cabinet-B0 AABB, screen face dims/proud/centerY, marquee FACE dims | byte-identical to HEAD (cabinetAABB and the face records untouched) | — |
+| Fresh environment (Rule 19) | fresh clone, install, test | every added/changed test passes standalone and against its neighbours in either order (351 baseline at 723fa3f + new) | n/a |
+| Chrome + Edge matrix | lead's manual smoke (DW-12 tier) | see Verification manual checks — realism is adjudicated by eye at the lead's gate, precedent | lead adjudicates |
+
+</intent-contract>
+
+## Code Map
+
+- `ci/lint-bans.mjs` -- the L0-subset scanner. `BANS`/`BAN_LOOKUP` (:21-31) is the rule surface; `bannedChains()` (:75-107) is the token machine to extend — today it matches only Identifier-Dot-Identifier chains. Add: (a) bracket-string access — Identifier + `[` + string/template token + `]` -> BAN_LOOKUP on `${receiver}.${stringValue}` (kills `Math["random"]`, `Date["now"]`, `Math["sin"]`); (b) optional-chain connector — treat `?.` like a dot in the chain (kills `Math?.random`, `Date?.now`); (c) destructured-global source — when `=` is followed by a bare `globalThis`/`window`/direct `Math|Date|performance`, and the token before the `=` closes an object binding pattern, walk back to the matching `{` and flag every BANNED source name inside it (`{ random: r }` renames but does not launder); (d) bare wall-clock globals — identifier `Date`/`performance` with a non-dot token on BOTH sides (`new Date()`, `Date()`, aliases) -> new `no-date-use`/`no-performance-use` rules. Materializing tokens into an array first is fine if the lookback reads cleaner than state-machine plumbing — same output contract (rule + receiverPos). Math-as-value stays sanctioned (see Design Notes 1).
+- `ci/lint-bans.test.ts` -- extends the existing spawn-fixture suite: `run()`/`fixtureGames()` (:13-31) are the harness. Add the three evasion fixtures (red, each naming its rule) and the sanctioned-forms fixture (exit 0).
+- `tools/gen-registry.mjs` -- entry-validation loop (:43-136). Add the DW-5 law directly after the simPath existsSync check (:53-55): the resolved target must sit STRICTLY under `games/<entry.id>/sim/` (path.relative; `".."`-prefixed or absolute -> fail with a message naming the law). Emission bytes unchanged.
+- `tools/gen-registry.test.ts` + `tools/registry-e2e.test.ts` -- fixtures move from `sims/<id>/sim.js` to `games/<id>/sim/sim.js` (the presentation fixtures may stay put — presPath's law is untouched, which is itself the signal); add the bad-path `expectFailure()` case (gen-registry.test.ts :36-47 idiom) and the traversal case; update the e2e header comment ("fixture sims are temp files, never under games/" -> under the TEMP repo's games/).
+- `tools/registry-list.json` -- read-only evidence: the shipped entry already sits at `games/moon-patrol/sim/index.js`; the law must pass it unchanged.
+- `core/no-ui-dom.test.ts` -- the no-UI law's home. The main.ts DOM scan (:37-47) and the room-module loop (:60-70) are the DOM half. Add ONE test for the in-view half (DW-11): comment-stripped allowlist over every `camera` reference in core/main.ts (exactly the six surviving forms); `camera.add`/`camera.attach` absent across core non-test sources; zero `camera` identifiers in `core/room/*.ts` + `core/entry.ts` + `core/player.ts`. Reuse the file's local comment-strip idiom (:123) — DW-33's counted site; a FOURTH independent strip site would trip its reopen_if, so do not hoist a shared helper and do not add another (per-file isolation is the 1.9-confirmed convention).
+- `core/main.ts` -- READ-ONLY evidence (the story does not touch it): the camera exists only at :119-120 (construction + rotation.order), :451-456 (entry/player pose sets), :603 (`renderer.render`), :614-615 (resize); the `camera` words at :4/:20 are comments.
+- `core/entry.ts` / `core/player.ts` / `core/room/scene.ts` -- read-only evidence the camera-blind scan will not false-red: every current "camera" mention is comment (entry.ts :4,:25,:60; player.ts :95,:213; scene.ts: none).
+- `core/room/cabinets.ts` -- `SHELL` (:37-47) gains the contour records; the marquee entry deepens and rises; new `deck`, `kick`, `hood`, `sidePanels` fields; `SHELL_PART_MESHES` (:53) 6 -> 11. `cabinetAABB` (:155-167), `coinDoorPose`, the phase/paint law, and the light constants: untouched.
+- `core/room/scene.ts` -- the per-shell parts loop (:367-479) with its `mount()` idiom (:374-394) extrudes the new parts from SHELL constants; the marquee bar mesh becomes the deeper marquee box (FACE dims and the paintMarquee call byte-unchanged); the spill light already rides `marquee.centerY` by formula; the volume-extrusion loop (:250-284) untouched.
+- `core/room/collision-volumes.ts` -- read-only: cabinet entries derive from `cabinetAABB` (:166-176); byte-unchanged, which is the collision-law proof.
+- `core/room/scene.test.ts` -- the mesh-count formula pin (:402-411) absorbs SHELL_PART_MESHES automatically; the marquee pin (:486-498) and the exposure pins (:448-475) derive from SHELL constants and follow; ADD dims+material+position pins for the five contour meshes and an AABB byte-pin; painted-canvas (:332) and point-light (:340) count pins stay byte-unchanged (no new canvases, no new lights).
+- `core/room/scene-qa.test.ts` -- lettering/hue pins (:166-200) ride the existing canvases; expected untouched — demonstrate green.
+- `games/moon-patrol/sim/helpers.js` -- read-only: the sanctioned `globalThis.Math` value form (:15) and its comment (:5) — the false-red guard fixture mirrors this exact pattern.
+
+## Tasks & Acceptance
+
+**Execution:**
+- `ci/lint-bans.mjs` + `ci/lint-bans.test.ts` -- extend -- DW-1: bracket access, optional-chain dots, destructured-global sources, bare Date/performance go red; sanctioned forms stay green
+- `tools/gen-registry.mjs` + `tools/gen-registry.test.ts` + `tools/registry-e2e.test.ts` -- add the simPath law; move fixture layouts to `games/<id>/sim/` -- DW-5: AD-1 direction enforced at the build step
+- `core/no-ui-dom.test.ts` -- add the in-view camera-law test -- DW-11: the no-UI law's in-view half pinned at the source tier
+- `core/room/cabinets.ts` + `core/room/scene.ts` -- SHELL contours + extrusion -- DW-29: upright-cabinet silhouette; AABB, faces, canvases, lights byte-unchanged
+- `core/room/scene.test.ts` (+ scene-qa green-check) -- contour pins + formula counts -- DW-29's geometry law
+- matrix edge tests -- covered by the suites above (lint-bans fixtures, gen-registry failure cases, camera-law scans, scene contour pins)
+
+**Acceptance Criteria:**
+
+**AC 1 — The ban gate binds forms, not spellings (DW-1, AD-3/AD-4).** Given sim-path sources containing `Math["random"]`, `Math?.random`, `const { random } = Math`, `new Date()`, a bare `Date()` call, an aliased `Date`/`performance` reference, or bracket access to any other banned member, when `node ci/lint-bans.mjs` runs, then each trips a named rule with file:line:col and the gate exits 1. Given the sanctioned forms (Math-as-value at the helpers.js pattern, `Math.floor`, regex literals and comments naming banned APIs), then the gate exits 0 over the real repo — the vendored sim stays untouched and green. New fixture tests pin every form both ways.
+
+**AC 2 — The build step enforces the plugin direction (DW-5, AD-1/AD-2/AD-11).** Given a provisional-list entry whose `simPath` resolves outside `games/<id>/sim/` (wrong home or `..` traversal), when `node tools/gen-registry.mjs` runs against it, then it exits 1 naming the law and emits nothing. Given the shipped `tools/registry-list.json`, when the drift gate runs (`node tools/gen-registry.mjs && git diff --exit-code -- generated/`), then the registry regenerates byte-identical.
+
+**AC 3 — The in-view half of the no-UI law is pinned (DW-11, AD-24).** Given a camera-parented mesh (`camera.add(...)`, any camera reference outside the allowlist) added in `core/main.ts`, or a `camera` identifier added to a pose/room module's code, when `npm test` runs, then the new pin in `core/no-ui-dom.test.ts` goes red. At HEAD the suite is green, the DOM-half pins are byte-unchanged, and adding a plain `scene.add(mesh)` stays green.
+
+**AC 4 — The shell reads as an upright cabinet, geometry law intact (DW-29, spine Room-geometry convention, AD-13 monorepo, AD-28).** Given the scene build of cabinet B0, when scene.test runs, then the five new contour meshes (deep marquee box on the body top, control-deck slab, kick plate, screen hood, two side wings) exist at SHELL-derived dims with token-only materials, the mesh count follows the formula with `SHELL_PART_MESHES = 11`, and the painted-canvas and point-light counts are unchanged. The `cabinet-B0` AABB, the screen face (dims, proud, centerY), the bezel, the coin door, and the marquee FACE dims are byte-identical to HEAD; the marquee title face + spill light (the 1.4 marquee-lit law) survive at the raised box. The owner's realism verdict is adjudicated at the lead's smoke — CI proves the geometry, not the taste.
+
+**AC 5 — No prior law regresses.** The whole existing suite (351 tests at HEAD 723fa3f + new) stays green; typecheck, depcheck, lint-bans over the real repo, and the registry drift check are green; `npm run build` once at finalize succeeds; zero new deps, zero outbound calls, zero new markup; no vendored `games/**` file, `core/main.ts`, or collision volume changed; boot-eager and two-rAF pins untouched.
+
+## Spec Change Log
+
+## Review Triage Log
+
+## Design Notes
+
+**Ledger inbox (Rule 17):** four entries routed to this key — ALL addressed: DW-1 -> task 1 + AC1 + matrix rows 1-4; DW-5 -> task 2 + AC2 + rows 5-7; DW-11 -> task 3 + AC3 + rows 8-9; DW-29 -> tasks 4-5 + AC4 + rows 10-11. None declined, none ignored.
+
+**Governing Architecture Decisions (Rule 6):** AD-3/AD-4 (the sim-path law DW-1 hardens: no wall-clock, no random, no engine-variable transcendentals — the banned SET is untouched, DW-8's owner-only widening stays parked); AD-1/AD-2 (kernel/plugin direction and the two-half plugin — DW-5 makes the build step enforce where the sim half lives before the registry re-exports it); AD-8 (L0 posture: the gate dies at build, never at runtime); AD-11/AD-9 (build-generated deterministic registry; validation precedes emission, byte-stable output); AD-13 (Monorepo — the `games/<id>/sim/` law presumes the one-repo layout). NOTE: the dispatch text cites "AD-13 (one-mesh-per-volume)"; the spine's AD-13 is Monorepo — the one-source/extrusion law is the spine's Consistency Conventions row "Room geometry & collision" plus the 1.3/1.4 one-mesh-per-volume pins (the 1.9 review corrected the same misattribution); AD-24 (diegetic integrity — DW-11 pins the in-view half of its no-HUD/HUD-marker Rule); AD-15 (the cabinet tick/pose law DW-29 must leave alone — new parts are static decor, built once at scene build); AD-28 + 1.4's screen law (the fallback face, placements, and authored constants untouched byte-unchanged — DW-29 changes silhouette, not face); AD-18/AD-20 + NFR-4 (sealed bundle: the scanner stays deterministic, zero LLM, zero network).
+
+**Rule 1 — integration ACs:** this story introduces NO new service or shared component — it hardens ones that already have consumers, recorded here instead of pretending otherwise. Consumers exercised: CI + the vendored sim read the lint-bans gate (the fixture tests are real CLI invocations — Rule 3 CLI evidence); the registry drift gate reads the DW-5 validation and produces the observable effect "byte-identical regeneration on the shipped list"; the lead's smoke reads the DW-29 geometry through the rendered room. `Consumed-by:` 3-1/3-2 (the full L0 gate builds atop the extended scanner and adds the executed-host tier for DW-12/15), 3-15 + every later cabinet story (the FR-6 "no visible change" reimplementation now has this updated visual baseline to preserve), 3-12/3-2 (replay and harness ride the byte-deterministic registry DW-5 protects). `Consumes:` 1.1's ci/tools scaffolding and its shipped scanner import, 1.4's shell records + light constants + the 1.4 marquee-lit law, 1.3's one-source volume law, 1.8/AD-28's untouched-face law, 1.9's entry/pose wiring (the camera allowlist codifies exactly what 1.9 shipped).
+
+**Rule 2 — extend-don't-copy:** every change extends its sibling — the lint-bans fixtures extend `ci/lint-bans.test.ts`'s existing `run()`/`fixtureGames()` harness; the gen-registry law joins its existing entry-validation chain and its test extends `expectFailure()`; the camera-law test joins the `no-ui-dom.test.ts` scan family (its comment-strip reused in-file — DW-33's reopen_if names a fourth independent strip site as the unify trigger, and reusing the existing site's helper adds none); DW-29's new mounts extend the per-shell `mount()` idiom — no new builder function. No copies.
+
+**Decided in-stage (unattended; inferences labelled):**
+1. (DW-1) The bare-global rule covers `Date` and `performance` but NOT `Math`: `games/moon-patrol/sim/helpers.js:15` sanctions Math-as-value (the vendored world is handed `globalThis.Math` for exact arithmetic; its header comment names the allowance and the vendored file may not be edited — 1.5 provenance law). Date/performance have NO sanctioned value form on a sim path (wall-clock is the banned substance itself), so they additionally die bare. Verified: the current sim tree contains no bare `Date`/`performance` identifiers; `autoplay.test.js:70`'s `/Date.../ ` patterns tokenize as single regex literals and stay green.
+2. (DW-1) Residual evasions deliberately left for Epic 3's full L0 data-flow: alias chains (`const m = Math; m.random()`), computed receivers (`window["Math"]["random"]`), dynamic member names. Consistent with DW-8/DW-10's recorded posture; the chartered scope is the three named forms. Named so review does not grade the scanner complete.
+3. (DW-5) The law binds `simPath` only — the entry's root cause is the SIM half's location (the registry re-exports it to the kernel); presPath direction is already guarded by depcheck plus the adapter import bans, and the entry text names simPath.
+4. (DW-11) Source-text tier pinning: main.ts has no executed host until the Epic 3 browser harness (DW-12/DW-15 re-owned to 3-2/3-15 at the burndown gate) — source-tier pins are Epic 1's recorded verification arrangement (main-glue precedent). The allowlist + camera-blind pair kills the crosshair scenario in both plausible homes: the assembly site and any module that would grow a camera.
+5. (DW-29) Authored contour dims (inference — "tuned by eye at the smoke" binds the lead's smoke): marquee deepens to depth 0.28 and rises to centerY 1.87 (box top ~2.12m, under the 3.0m wall; FACE dims 0.58x0.50 byte-unchanged, so paintMarquee's fit law and the 0.18m cap never re-run; the spill light follows by formula). New parts: control-deck slab 0.58x0.08x0.12 at centerY 0.80 proud 0.06; kick plate 0.56x0.12x0.62 at centerY 0.06; screen hood lip 0.50x0.05x0.10 at centerY 1.36 proud 0.05; side wings 0.06 thick x 0.50 tall x 0.66 deep at centerY 1.5, offset +/-0.33. Every part within 0.06m of the AABB sides (the >=1.20m aisle law holds at collision AND at eye scale); bezel, coin door, and both faces untouched. SHELL_PART_MESHES 6 -> 11.
+6. `multiple-goals` carried: four independently shippable workstreams, bundled deliberately by the burn-down charter, not a planning accident.
+
+## Verification
+
+**Commands (absolute workdir `C:/git/local-arcade`; every command finishes in one foreground call, `timeout: 600000`):**
+- `npm run typecheck` -- (loop) expected: zero errors (lint-bans/gen-registry are .mjs; cabinets/scene TS gains new SHELL fields)
+- `npm test` -- (loop, and once as the full suite) expected: all pass (351 baseline at HEAD 723fa3f + new; suite stays comfortably inside one call)
+- `node ci/depcheck.mjs` -- (loop) expected: green (no production import edges change)
+- `node ci/lint-bans.mjs` -- (loop) expected: green over the REAL repo — the extended rules must not red the vendored sim (matrix row 4 is the guard)
+- `node tools/gen-registry.mjs && git diff --exit-code -- generated/` -- (loop) expected: no drift (the shipped list complies with the new law)
+- `npm run build` -- (once per story) expected: Vite build succeeds
+
+**Rule 19 — pinning tests (the implement stage applies each mutation, observes red, reverts, confirms the tree byte-identical):**
+- AC1 (DW-1): three new fixture tests in `ci/lint-bans.test.ts` (evasion-red, destructure-red, sanctioned-green). `mutation: revert the bracket-access leg -> the Math["random"] fixture exits 0; revert.` `mutation: skip the binding-name check (flag only bare-name destructures, not renamed) -> the { random: r } fixture green; revert. mutation: remove the bare-Date rule -> the new Date() fixture green; revert.`
+- AC2 (DW-5): new `expectFailure()` case + moved fixture layouts. `mutation: drop the games/<id>/sim/ check, keep existsSync -> the sims/-home entry emits (exit 0); revert.`
+- AC3 (DW-11): new camera-law test. `mutation: plant camera.add(new THREE.Mesh(boxGeo, mat)) at core/main.ts:121 -> the allowlist pin reds; revert (main.ts hash byte-identical). mutation: name camera in scene.ts code (e.g. a const) -> the camera-blind pin reds; revert.`
+- AC4 (DW-29): contour pins in scene.test.ts (dims/material/position per new part; formula count at 11; AABB deep-equal pin; screen-face proud pin). `mutation: delete the deck-slab mount -> the contour pin AND the formula count red; revert.`
+- AC5: the existing suite is the regression witness; main.ts byte-unchanged proves the boot pins untouched.
+
+**Shared surfaces (Rule 19):** `SHELL_PART_MESHES` 6 -> 11 (scene.test formula and any count copy follow the constant — verify scene-qa's canvases/lights counts stay byte-unchanged); `SHELL.marquee` dims + centerY (marquee bar mesh pin, exposure `proud` formula, spill-light Y — all derive from constants); the gen-registry test fixtures' path layout (`sims/<id>/` -> `games/<id>/sim/`) and the e2e header comment; the recorded test-count baseline (351 + new). Collision volume list, painted-canvas count, point-light count, module lists, `window.arcadeDebug` shape: UNCHANGED. Standing criterion: every test added or changed passes on a fresh environment, standalone and against its neighbours in either order.
+
+**Lead's manual smoke (DW-12 tier — Chrome AND Edge, after review):** fresh `npm run dev`: cabinet B0 reads as an upright arcade cabinet from 2m and 6m — marquee box on top with the title lit and legible across the room, hooded screen, control-deck silhouette, shaped side panels, kick base; the screen's attract/NEXT faces paint byte-identical to 1.9; walking into the cabinet presses against the same body box (no new invisible wall); body = script + ONE canvas at all times. The owner's realism verdict on DW-29's verbatim closes the entry at the lead's gate.
+
+## Auto Run Result
+
+Status: ready-for-dev
+Blocking condition: none
