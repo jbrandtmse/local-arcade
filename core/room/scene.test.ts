@@ -28,6 +28,7 @@ import {
   CABINET_LIGHT_STANDOFF_M,
   SHELL,
   SHELL_PART_MESHES,
+  cabinetAABB,
   cabinetPlacements,
   coinDoorPose,
   placementGeometry,
@@ -562,6 +563,97 @@ test("1.4 shell build: marquee bar + painted face, bezel + live screen face, coi
     assert.ok(faceMap.source === screen.canvas, "and that texture's source is the handle's canvas (one canvas, one texture, one face)");
     assert.ok(built.canvasTexts.some((t) => t.includes(p.screenZones.next.toUpperCase())), "the screen canvas is lettered with the NEXT zone at build (step 0)");
     assert.ok(built.textureUpdateCount() === 0, "the BUILD itself never marks textures updated (repaint is frame-side)");
+  }
+});
+
+// Story 1.10 (DW-29, AC4): the upright-cabinet contour law. The five new
+// SHELL parts build at the record's dims in token-only materials, every
+// horizontal extent inside 0.06m of the body AABB sides (the >=1.20m aisle
+// law holds at eye scale as it does at collision), and the cabinet-B0
+// collision volume stays byte-identical to the untouched cabinetAABB
+// derivation — movement, targetability, and the future occlusion all read
+// that one entry. The mesh-count formula test above absorbs the new parts
+// through SHELL_PART_MESHES (11); the painted-canvas and point-light count
+// pins above stay byte-unchanged because this story adds neither.
+test("1.10 DW-29 upright contours: deck slab, kick plate, screen hood, and two side wings at SHELL dims in token-only materials within the 0.06m body-AABB law; the cabinet-B0 collision AABB byte-identical (AC4)", () => {
+  for (const p of cabinetPlacements) {
+    const g = placementGeometry(p.slotId);
+    const lat = (x: number, z: number): number => (x - g.center.x) * g.right.x + (z - g.center.z) * g.right.z;
+    const along = (x: number, z: number): number => (x - g.center.x) * g.facing.x + (z - g.center.z) * g.facing.z;
+
+    // Control-deck slab: Wall Panel woodwork, its face exactly deck.proud
+    // proud of the body front; its top edge meets the screen face bottom
+    // (0.79) without ever covering the painted NEXT row.
+    const deck = meshByDims(SHELL.deck.width, SHELL.deck.height, SHELL.deck.depth);
+    assert.equal(deck.mat.params["color"], WALL_PANEL, "the deck slab is Wall Panel (body woodwork, token only)");
+    assert.equal(deck.y, SHELL.deck.centerY);
+    assert.ok(
+      Math.abs(along(deck.x, deck.z) - SHELL.body.depth / 2 + SHELL.deck.depth / 2 - SHELL.deck.proud) < 1e-12,
+      "deck face sits exactly SHELL.deck.proud proud of the body front plane",
+    );
+    assert.ok(
+      Math.abs(deck.y + SHELL.deck.height / 2 - (SHELL.screen.centerY - SHELL.screen.height / 2)) < 1e-12,
+      "the deck top meets the screen face's bottom edge exactly (the NEXT row stays uncovered)",
+    );
+
+    // Kick plate: Card Ink, body-centred — its front protrusion derives
+    // from the SHELL depth difference, and it stays clear of the B0
+    // baseplate faces (no coplanar z-fighting).
+    const kick = meshByDims(SHELL.kick.width, SHELL.kick.height, SHELL.kick.depth);
+    assert.equal(kick.mat.params["color"], CARD_INK, "the kick plate is Card Ink (bezel family, token only)");
+    assert.ok(Math.abs(kick.y - SHELL.kick.centerY) < 1e-12, "kick centred on its record height, bottom at the floor");
+    assert.ok(Math.abs(along(kick.x, kick.z)) < 1e-12, "the kick plate is body-centred");
+    assert.ok(SHELL.kick.depth / 2 < SHELL.body.depth / 2, "kick depth stays inside the body faces (baseplate coplanarity avoided)");
+    assert.ok(SHELL.kick.width > SHELL.body.width, "the kick plate stands outside the body sides — a body-interior plate would render inside the opaque volume box and show nothing");
+
+    // Screen hood lip: Card Ink, exactly hood.proud proud, riding above the
+    // screen face (the 1.4 face and its proud pin above stay byte-unchanged).
+    const hood = meshByDims(SHELL.hood.width, SHELL.hood.height, SHELL.hood.depth);
+    assert.equal(hood.mat.params["color"], CARD_INK, "the hood lip is Card Ink (bezel family, token only)");
+    assert.equal(hood.y, SHELL.hood.centerY);
+    assert.ok(hood.y - SHELL.hood.height / 2 > SHELL.screen.centerY + SHELL.screen.height / 2, "the hood rides clear above the screen face");
+    assert.ok(
+      Math.abs(along(hood.x, hood.z) - SHELL.body.depth / 2 + SHELL.hood.depth / 2 - SHELL.hood.proud) < 1e-12,
+      "hood face sits exactly SHELL.hood.proud proud of the body front plane",
+    );
+
+    // Side wings: two Wall Panel wings at the record's lateral offsets,
+    // symmetric about the body centre line.
+    const wings = built.meshes.filter(
+      (m) => m.geo.w === SHELL.sidePanels.thickness && m.geo.h === SHELL.sidePanels.height && m.geo.d === SHELL.sidePanels.depth,
+    );
+    assert.equal(wings.length, 2, "two side wings per shell");
+    for (const w of wings) assert.equal(w.mat.params["color"], WALL_PANEL, "wings are Wall Panel (body woodwork, token only)");
+    assert.equal(wings[0]!.y, SHELL.sidePanels.centerY);
+    assert.equal(wings[1]!.y, SHELL.sidePanels.centerY);
+    const wingOffsets = wings.map((m) => lat(m.x, m.z)).sort((a, b) => a - b);
+    assert.ok(Math.abs(wingOffsets[0] + SHELL.sidePanels.lateralOffset) < 1e-12, "the left wing sits at -lateralOffset");
+    assert.ok(Math.abs(wingOffsets[1] - SHELL.sidePanels.lateralOffset) < 1e-12, "the right wing sits at +lateralOffset");
+
+    // The 0.06m AABB law: every new part's horizontal extent (lateral and
+    // along-facings, boxes are axis-aligned) stays within 0.06m of the body
+    // AABB sides.
+    const halfW = SHELL.body.width / 2;
+    const halfD = SHELL.body.depth / 2;
+    const lawTol = 0.06 + 1e-9;
+    for (const m of [deck, kick, hood, ...wings]) {
+      const latHalf = (m.geo.w / 2) * Math.abs(g.right.x) + (m.geo.d / 2) * Math.abs(g.right.z);
+      const alongHalf = (m.geo.w / 2) * Math.abs(g.facing.x) + (m.geo.d / 2) * Math.abs(g.facing.z);
+      assert.ok(Math.abs(lat(m.x, m.z)) + latHalf <= halfW + lawTol, `contour part ${m.geo.w}x${m.geo.h}x${m.geo.d} lateral extent within 0.06m of the body AABB`);
+      assert.ok(Math.abs(along(m.x, m.z)) + alongHalf <= halfD + lawTol, `contour part ${m.geo.w}x${m.geo.h}x${m.geo.d} along-facings extent within 0.06m of the body AABB`);
+    }
+
+    // The collision-law proof: the cabinet volume entry is still byte-for-
+    // byte the untouched cabinetAABB derivation — the contours are decor,
+    // never a new invisible wall.
+    const volume = collisionVolumes.find((v) => v.id === p.volumeId);
+    assert.ok(volume, `volume "${p.volumeId}" is still registered`);
+    const aabb = cabinetAABB(p);
+    assert.ok(
+      volume.min.x === aabb.min.x && volume.min.y === aabb.min.y && volume.min.z === aabb.min.z &&
+      volume.max.x === aabb.max.x && volume.max.y === aabb.max.y && volume.max.z === aabb.max.z,
+      "the cabinet-B0 collision AABB is byte-identical to the untouched cabinetAABB derivation",
+    );
   }
 });
 

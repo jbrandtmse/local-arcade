@@ -2,7 +2,7 @@
 title: 'Story 1.10: Epic 1 burn-down'
 type: 'chore'
 created: '2026-11-25'
-status: 'ready-for-dev'
+status: 'done'
 baseline_revision: '723fa3f793e45613c04ec74e2b5daf2d7ef689f2'
 review_loop_iteration: 0
 followup_review_recommended: false
@@ -99,6 +99,30 @@ deferred: []
 
 ## Review Triage Log
 
+Implement-stage review (four layers: adversary, edge-case, verify-BDD, verification-gap), triaged in stage. No intent_gap, no HALT, nothing deferred — `deferred: []` stands.
+
+**Patched (all mutations re-observed against the patched code, reverted byte-identical):**
+- H1 — the 0.56x0.12x0.58 kick plate sat ENTIRELY inside the body AABB (its faces behind the opaque volume box): DW-29's "kick base" would render nothing. Fixed: kick width 0.64 (stands 0.02m outside the body sides, inside the 0.06m aisle law); `scene.test.ts` pins `SHELL.kick.width > SHELL.body.width` with the render rationale. Mutation: width 0.56 back -> the pin reds; revert.
+- H2 — the scanner's regex posture was inverted: the unstable scanner lexes `/` as SlashToken and TOKENIZES regex bodies as code, so unescaped dotted regex bodies naming banned APIs (`/Date.now/`) false-RED'd while a blanket slash-skip let division operands (`60000 / Date`) false-GREEN. Fixed: `scanTokens` recognizes regex literals positionally (a DIVISION_PRECEDING token set plus a character-level `regexEnd` and `setText` re-anchor) and masks each body into one opaque token; division slashes stay in the stream. Mutation: masking disabled -> the sanctioned fixture's unescaped `/Date.now/` line reds; revert. (Corrects Decided-in-stage 1's mechanism claim — see claim-check below.)
+- M1 — the sanctioned value receivers laundered the wall clock: `globalThis.Date`, `window.Date`, `globalThis["Date"]`, `window.performance`, `{ random } = window.Math` stayed green. Fixed: a GLOBAL_CLOCK rule map (globalThis/window + Date/performance -> no-date-use/no-performance-use) on both accessHits legs, and member-source resolution in destructureHits (`= window.Math` / `= globalThis["Date"]`); Math-as-value stays sanctioned. New `games/globalclock` fixture test. Mutation: GLOBAL_CLOCK lookups removed -> that test reds; revert.
+- M3 — the two named evasion forms COMPOSE undetected: `Math?.["random"]`. Fixed: the bracket leg tolerates a preceding `?.` (offset guard); `games/optbracket` fixture pins the location. Mutation: tolerance removed -> the optbracket location pin fails; revert.
+- M4 — `{ performance: 1 }` false-red (property keys/labels name nothing at runtime). Fixed: colon guard in bareWallclockHits. L4 — `Date["now"]` double-hit (bare + bracket) -> OpenBracket guard keeps the chain/bracket rule sole owner. L3 — merged hit streams now sorted by source position.
+- M2/L2 — the camera pin bound two spellings, not the forms: `camera?.add(`, `camera["add"](`, and dotted-prefix `ctx.camera.add(` escaped the substring bans; the blind regex's `[^\w$.]` prefix missed `.camera` entirely; one line (`camera.aspect = 1; camera.add(m)`) smuggled a second camera use past the line-level allowlist. Fixed: a camHost regex (dot, optional chain, string/template subscript, dotted prefix); cameraRef prefix widened to `[^\w$]`; allowlist evaluated per `;`-delimited statement (the six-form counts unchanged). Mutations: `camera.aspect = 2; camera.add(new THREE.Mesh());` planted in main.ts -> the segment pin reds on the add statement (main.ts restored byte-identical to HEAD); dotted `void probe.camera;` planted in scene.ts -> the blind pin reds; both revert.
+- L1 — template-subscript spelling (`Math[\`random\`]`) unpinned -> joined the bracket fixture (the NoSubstitutionTemplateLiteral branch already handled it).
+- L6 — the DW-5 comment overstated depcheck's coverage (it binds import edges FROM presentation files, not presPath's home). Fixed (comment only): accurate scope plus a note that the law is lexical (symlinked homes join the Epic 3 L0 sweep).
+
+**Rejected, with grounds:**
+- Marquee box outside the 0.06m law loop — the marquee is the repositioned 1.4 part (its FACE law is 1.4's, and the law's horizontal-aisle intent holds; box top 2.12m sits under the 3.0m wall). Not one of the five new contour parts.
+- existsSync-before-law ordering — the Code Map prescribes "directly after the simPath existsSync check"; the matrix behavior (a wrong-home entry fails before emission) holds for any simPath whose file exists, and the failure fixture plants an existing loose file.
+- Symlink escape around the lexical path law — the spec prescribes the lexical mechanism (path.relative); the residual is recorded in the code comment and the Epic 3 L0 tier.
+- Naive `strip()` string-`//` laundering in no-ui-dom.test.ts — the file's 1.8-confirmed shared idiom (the spec orders its reuse, DW-33's counted site); hardening it would touch the 1.8 storage contract outside this story.
+- Alias chains / computed receivers / dynamic member names — NOT findings: Decided-in-stage 2's recorded Epic 3 residuals.
+- faces-X rename in scene.test.ts's meshByDims arrangement — pre-existing 1.4 pin structure; churns byte-unchanged tests for no law value.
+
+**Claim-check (spec text vs. code):**
+- Decided-in-stage 1 claims the `autoplay.test.js:70` patterns "tokenize as single regex literals" — mechanistically wrong at spec time (the unstable scanner splits them, the H2 finding). The claim's CONCLUSION holds and is now enforced: scanTokens masks every regex body into one opaque token. Recorded here; the spec body is the spec stage's artifact and stands.
+- Decided-in-stage 5's contour dims are labelled inference; the shipped values deviate where binding law forced it: marquee depth 0.09 (the 1.4-pinned exposure law caps at <=0.0939 — 0.28 is impossible under the unchanged light constants), deck centerY 0.75 (top 0.79 meets the screen face's bottom edge without covering the NEXT row), kick depth 0.58 (no coplanar face against the 0.62-deep baseplate) and kick width 0.64 (review H1: a body-interior plate renders nothing). All remain smoke-tuned values; the realism verdict closes at the lead's Chrome+Edge smoke per Verification.
+
 ## Design Notes
 
 **Ledger inbox (Rule 17):** four entries routed to this key — ALL addressed: DW-1 -> task 1 + AC1 + matrix rows 1-4; DW-5 -> task 2 + AC2 + rows 5-7; DW-11 -> task 3 + AC3 + rows 8-9; DW-29 -> tasks 4-5 + AC4 + rows 10-11. None declined, none ignored.
@@ -128,10 +152,10 @@ deferred: []
 - `npm run build` -- (once per story) expected: Vite build succeeds
 
 **Rule 19 — pinning tests (the implement stage applies each mutation, observes red, reverts, confirms the tree byte-identical):**
-- AC1 (DW-1): three new fixture tests in `ci/lint-bans.test.ts` (evasion-red, destructure-red, sanctioned-green). `mutation: revert the bracket-access leg -> the Math["random"] fixture exits 0; revert.` `mutation: skip the binding-name check (flag only bare-name destructures, not renamed) -> the { random: r } fixture green; revert. mutation: remove the bare-Date rule -> the new Date() fixture green; revert.`
+- AC1 (DW-1): three new fixture tests in `ci/lint-bans.test.ts` (evasion-red, destructure-red, sanctioned-green) plus a fourth (globalThis/window receivers). `mutation: revert the bracket-access leg -> the Math["random"] fixture exits 0; revert.` `mutation: skip the binding-name check (flag only bare-name destructures, not renamed) -> the { random: r } fixture green; revert. mutation: remove the bare-Date rule -> the new Date() fixture green; revert.` `mutation: disable the scanTokens regex masking -> the sanctioned fixture's unescaped /Date.now/ line reds; revert.` `mutation: remove the GLOBAL_CLOCK lookups -> the globalThis/window fixture test reds; revert.` `mutation: drop the ?.["prop"] subscript offset tolerance -> the optbracket fixture's location pin fails; revert.`
 - AC2 (DW-5): new `expectFailure()` case + moved fixture layouts. `mutation: drop the games/<id>/sim/ check, keep existsSync -> the sims/-home entry emits (exit 0); revert.`
-- AC3 (DW-11): new camera-law test. `mutation: plant camera.add(new THREE.Mesh(boxGeo, mat)) at core/main.ts:121 -> the allowlist pin reds; revert (main.ts hash byte-identical). mutation: name camera in scene.ts code (e.g. a const) -> the camera-blind pin reds; revert.`
-- AC4 (DW-29): contour pins in scene.test.ts (dims/material/position per new part; formula count at 11; AABB deep-equal pin; screen-face proud pin). `mutation: delete the deck-slab mount -> the contour pin AND the formula count red; revert.`
+- AC3 (DW-11): new camera-law test. `mutation: plant camera.add(new THREE.Mesh(boxGeo, mat)) at core/main.ts:121 -> the allowlist pin reds; revert (main.ts hash byte-identical). mutation: name camera in scene.ts code (e.g. a const) -> the camera-blind pin reds; revert.` `mutation: plant "camera.aspect = 2; camera.add(new THREE.Mesh());" as one line in main.ts -> the segment-level allowlist reds on the add statement; revert (main.ts byte-identical to HEAD). mutation: plant only a dotted reference (void probe.camera) in scene.ts -> the blind pin reds; revert.`
+- AC4 (DW-29): contour pins in scene.test.ts (dims/material/position per new part; formula count at 11; AABB deep-equal pin; screen-face proud pin; kick-visibility pin). `mutation: delete the deck-slab mount -> the contour pin AND the formula count red; revert.` `mutation: restore the kick width to 0.56 (fully body-interior) -> the kick-visibility pin reds; revert.`
 - AC5: the existing suite is the regression witness; main.ts byte-unchanged proves the boot pins untouched.
 
 **Shared surfaces (Rule 19):** `SHELL_PART_MESHES` 6 -> 11 (scene.test formula and any count copy follow the constant — verify scene-qa's canvases/lights counts stay byte-unchanged); `SHELL.marquee` dims + centerY (marquee bar mesh pin, exposure `proud` formula, spill-light Y — all derive from constants); the gen-registry test fixtures' path layout (`sims/<id>/` -> `games/<id>/sim/`) and the e2e header comment; the recorded test-count baseline (351 + new). Collision volume list, painted-canvas count, point-light count, module lists, `window.arcadeDebug` shape: UNCHANGED. Standing criterion: every test added or changed passes on a fresh environment, standalone and against its neighbours in either order.
@@ -140,5 +164,11 @@ deferred: []
 
 ## Auto Run Result
 
-Status: ready-for-dev
+Status: done
 Blocking condition: none
+
+All four ledger entries addressed (DW-1, DW-5, DW-11, DW-29) in ten implementation files plus this spec. Loop evidence at finalize: typecheck zero errors; `npm test` 359/359 pass (351 baseline at 723fa3f + 8 new); `node ci/depcheck.mjs` green; `node ci/lint-bans.mjs` exit 0 over the real repo (the sanctioned `helpers.js:15` Math-as-value and the `autoplay.test.js:70` regexes stay green — now via positional regex masking, not escape spacing); the registry drift gate byte-identical; `npm run build` succeeded once at finalize (standing chunk-size notice only).
+
+Review layers (adversary, edge-case, verify-BDD, verification-gap) triaged in stage: the PATCH tier was applied inline (H1 kick-plate visibility, H2 regex-vs-division scanner masking, M1 globalThis/window receivers, M2/L2 camera-law forms and segment-level allowlist, M3 composed `?.["prop"]`, M4/L3/L4 hit hygiene, L1 template subscript, L6 comment accuracy); rejects carry grounds in the Review Triage Log; no intent_gap; nothing new deferred (`deferred: []` stands). Every Rule 19 mutation was applied, observed red, and reverted byte-identical (`git hash-object`): the seven listed above as planned plus six re-observed against the patched code — masking off, GLOBAL_CLOCK removed, `?.[` tolerance dropped, compound-line plant in main.ts (restored byte-identical to HEAD), dotted plant in scene.ts, kick width 0.56 back.
+
+Never-clauses verified byte-identical to HEAD at finalize: `games/**`, `core/contract/*`, `core/main.ts`, `core/entry.ts`, `core/player.ts`, `collision-volumes.ts`, `slot-config.ts`, `index.html`, `generated/*`, and the CONTENT of `registry-list.json`. Still open by design (not blocking): DW-29's realism verdict and the DW-12-tier visual checks close at the lead's Chrome+Edge smoke, per the Verification manual-check tier.

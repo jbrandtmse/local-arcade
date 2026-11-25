@@ -78,7 +78,7 @@ test("exactly one placement record: Moon Patrol's shell in slot B0 with title + 
   assert.equal(p.hue, GLOW_CYAN, "attract title + halo carry the machine's glow family (mockup .attract)");
   assert.equal(p.marqueeHue, GLOW_MARQUEE, "marquee + NEXT carry DESIGN's amber (the token name is the fiction)");
   assert.ok(wallSlots.some((s) => s.id === p.slotId), "the shell stands on an authored Wall Slot; slot config stays unchanged");
-  assert.equal(SHELL_PART_MESHES, 6, "six part meshes per shell (bar, face, bezel, screen, door, slot)");
+  assert.equal(SHELL_PART_MESHES, 11, "eleven part meshes per shell (bar, face, bezel, screen, door, slot + the 1.10 DW-29 contours: deck, kick, hood, two wings)");
 });
 
 test("the collision list derives its cabinet entry from the placement record — exact AABB, kind grammar, never hand-copied (AC1, one geometry source)", () => {

@@ -53,6 +53,18 @@ for (const [i, entry] of list.entries()) {
   if (!existsSync(path.resolve(cwd, entry.simPath))) {
     fail(`entry ${i} (${entry.id}): sim source not found: ${entry.simPath}`);
   }
+  // Story 1.10 (DW-5; AD-1/AD-2/AD-13): the sim half of a plugin lives in
+  // games/<id>/sim/ — the registry re-exports simPath to the kernel, so the
+  // build step enforces the plugin direction. path.relative normalizes, so
+  // a `..` relocation dies on the same law message; the law is lexical (a
+  // symlinked home joins the Epic 3 L0 sweep). presPath is not bound here:
+  // depcheck binds the import edges OF presentation files and the adapter
+  // import bans guard what those edges reach — presPath's own home
+  // directory is outside this story's charter (DW-5 names the sim half).
+  const simHome = path.relative(path.resolve(cwd, "games", entry.id, "sim"), path.resolve(cwd, entry.simPath));
+  if (simHome === "" || simHome === ".." || simHome.startsWith(`..${path.sep}`) || path.isAbsolute(simHome)) {
+    fail(`entry ${i} (${entry.id}): simPath must resolve strictly under games/${entry.id}/sim/ (AD-1 plugin direction), got ${entry.simPath}`);
+  }
   // Integer, not merely finite: the kernel scheduler validates integer
   // authored seeds at track() (32-bit derived-seed arithmetic), so the
   // build gate must not emit a seed the boot site would reject.

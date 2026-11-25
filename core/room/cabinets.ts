@@ -19,12 +19,13 @@ import { wallSlots } from "./slot-config.ts";
 // --- Shell spec (hard-cornered boxes only; mockup rounded.cabinet 0px) -----
 // Body footprint 0.60m x 0.60m is room-layout's stand-up contract; the rest
 // (inference from the mockup's stacked composition within that width):
-// body height 1.80m, marquee face 0.58 x 0.50 at y 1.55 (the face widened
-// toward the 0.60m body width per the spec's residual-risk lever), screen
-// face 0.44 x 0.52 at y 1.05 (grown taller than the first reading so the
-// 0.18m-next-minimum NEXT row and the attract band stack without overlap),
-// coin door 0.26 x 0.30 at y 0.58, coin slot detail ON the door's upper
-// face (the mockup nests .slot inside .coindoor, ~20% below the door top).
+// body height 1.80m, marquee face 0.58 x 0.50 riding the body top (1.10
+// DW-29 raised the box to centerY 1.87; the FACE dims stay byte-unchanged,
+// 1.4/1.8 pins), screen face 0.44 x 0.52 at y 1.05 (grown taller than the
+// first reading so the 0.18m-next-minimum NEXT row and the attract band
+// stack without overlap), coin door 0.26 x 0.30 at y 0.58, coin slot detail
+// ON the door's upper face (the mockup nests .slot inside .coindoor, ~20%
+// below the door top).
 export interface CabinetShellSpec {
   body: { width: number; depth: number; height: number };
   marquee: { width: number; height: number; depth: number; centerY: number };
@@ -32,11 +33,30 @@ export interface CabinetShellSpec {
   screen: { width: number; height: number; centerY: number };
   coinDoor: { width: number; height: number; thickness: number; centerY: number };
   coinSlot: { width: number; height: number; thickness: number; centerY: number };
+  /** DW-29 contour records. `proud` is how far the part's front face sits
+   * (metres) out from the body front plane — the scene mounts the box centre
+   * at `proud - depth/2`, keeping the face exactly at `proud`. The kick
+   * plate is body-centred instead (its front protrusion derives from the
+   * SHELL depth difference, and its 0.64m width stands it outside the body
+   * sides so the plate actually renders). */
+  deck: { width: number; height: number; depth: number; proud: number; centerY: number };
+  kick: { width: number; height: number; depth: number; centerY: number };
+  hood: { width: number; height: number; depth: number; proud: number; centerY: number };
+  sidePanels: { thickness: number; height: number; depth: number; centerY: number; lateralOffset: number };
 }
 
 export const SHELL: CabinetShellSpec = {
   body: { width: 0.6, depth: 0.6, height: 1.8 },
-  marquee: { width: 0.58, height: 0.5, depth: 0.06, centerY: 1.55 },
+  // 1.10 DW-29: the marquee box rides the body top (box top 1.87 + 0.25 =
+  // 2.12m, under the 3.0m wall); FACE dims stay 0.58 x 0.50 so paintMarquee's
+  // fit law and the 0.18m MARQUEE_CAP_M floor never re-run. The depth is
+  // capped by the 1.4-pinned exposure law (unchanged light constants): the
+  // spill hangs at CABINET_LIGHT_STANDOFF_M off the body front, and own
+  // contribution 0.25/dNear^2 <= the 2.0 ceiling demands
+  // dNear >= sqrt(0.125) = 0.3536m, i.e. depth <= 0.45 - 0.3536 - FACE_T/2
+  // = 0.0939; 0.09 sits at 1.96 with the far corner 0.62 above the 0.5
+  // floor. (inference — dims are the smoke-tuned values, the law is pinned.)
+  marquee: { width: 0.58, height: 0.5, depth: 0.09, centerY: 1.87 },
   bezel: { width: 0.48, height: 0.56, depth: 0.04, centerY: 1.05 },
   screen: { width: 0.44, height: 0.52, centerY: 1.05 },
   coinDoor: { width: 0.26, height: 0.3, thickness: 0.02, centerY: 0.58 },
@@ -44,13 +64,29 @@ export const SHELL: CabinetShellSpec = {
   // top edge (26 of 128 door px) — on the door face, inside the door's
   // 0.43..0.73 span and clear of the bezel bottom at 0.77. (inference.)
   coinSlot: { width: 0.1, height: 0.02, thickness: 0.006, centerY: 0.67 },
+  // 1.10 DW-29 upright contours (inference — "tuned by eye at the smoke"):
+  // every part sits within 0.06m of the body AABB sides, so the >=1.20m
+  // aisle law holds at eye scale as it does at collision (collision-volumes
+  // and cabinetAABB are untouched — the one volume entry still carries
+  // movement, targetability, and occlusion). The deck top (0.79) meets the
+  // screen face's bottom edge without ever covering the painted NEXT row.
+  // The kick plate stands 0.02m outside the body sides (0.64 wide): a plate
+  // fully inside the body footprint would render inside the opaque volume
+  // box and show nothing; its depth (0.58) stays inside the body faces so
+  // the B0 baseplate (0.62 deep) keeps no coplanar face against it.
+  deck: { width: 0.58, height: 0.08, depth: 0.12, proud: 0.06, centerY: 0.75 },
+  kick: { width: 0.64, height: 0.12, depth: 0.58, centerY: 0.06 },
+  hood: { width: 0.5, height: 0.05, depth: 0.1, proud: 0.05, centerY: 1.36 },
+  sidePanels: { thickness: 0.06, height: 0.5, depth: 0.66, centerY: 1.5, lateralOffset: 0.33 },
 };
 
 /** The scene extrudes these part meshes per shell, on top of the body box
  * the volume-list extrusion already provides (marquee bar, marquee face,
- * screen bezel, screen face, coin-door panel, coin-slot detail). The scene
- * mesh-count pin derives from this number — formula, never magic. */
-export const SHELL_PART_MESHES = 6;
+ * screen bezel, screen face, coin-door panel, coin-slot detail, and the
+ * 1.10 DW-29 contours: deck slab, kick plate, hood lip, two side wings).
+ * The scene mesh-count pin derives from this number — formula, never
+ * magic. */
+export const SHELL_PART_MESHES = 11;
 
 // --- Placement (this story authors a placement RECORD; AD-10 keeps the
 // Layout System's fill function Epic 3's) -------------------------------------

@@ -20,6 +20,21 @@ const REPO = path.resolve(import.meta.dirname, "..");
 const CONFIG = path.join(REPO, "vite.config.ts");
 const DEV_PORT = 4641; // named target, distinct from app-serve's 4639; strictPort pins identity
 
+// Comment-strip + core-tree walk, ONE site in this file (module scope so the
+// 1.8 storage scan and the 1.10 camera-law scan REUSE the same site — DW-33
+// counts comment-strip sites repo-wide; a fourth independent strip reopens
+// it, and per-file isolation is the 1.9-confirmed convention).
+const strip = (src: string): string => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+const walk = (dir: string, ext: string): string[] => {
+  const files: string[] = [];
+  for (const ent of readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, ent.name);
+    if (ent.isDirectory()) files.push(...walk(full, ext));
+    else if (ent.name.endsWith(ext) && !ent.name.includes(".test.")) files.push(full);
+  }
+  return files;
+};
+
 function bodyInner(html: string): string {
   const m = html.match(/<body>([\s\S]*?)<\/body>/);
   assert.ok(m, "index.html has a <body>");
@@ -120,16 +135,6 @@ test("the game presentation half is DOM-free: every presentation source paints o
 // (comments stripped) so a module can document a ban it enforces without
 // tripping the scan.
 test("1.8 single storage owner: only core/storage.ts touches the device store, and no games source names storage/identity at all (AD-16)", () => {
-  const strip = (src: string): string => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
-  const walk = (dir: string, ext: string): string[] => {
-    const files: string[] = [];
-    for (const ent of readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, ent.name);
-      if (ent.isDirectory()) files.push(...walk(full, ext));
-      else if (ent.name.endsWith(ext) && !ent.name.includes(".test.")) files.push(full);
-    }
-    return files;
-  };
   const coreSources = walk(path.join(REPO, "core"), ".ts");
   assert.ok(coreSources.length >= 10, "the core tree exists to scan (a moved/deleted module would silently shrink this scan)");
   const owners = coreSources
@@ -144,6 +149,69 @@ test("1.8 single storage owner: only core/storage.ts touches the device store, a
     for (const banned of ["localStorage", "arcade.visitor", "arcade.pb", "visitorId", "rowsFor", "storage."]) {
       assert.ok(!src.includes(banned), `games/${path.relative(path.join(REPO, "games"), file)} must not name ${banned} — the table never reaches the game halves (AD-16)`);
     }
+  }
+});
+
+// Story 1.10 (DW-11, AD-24): the IN-VIEW half of the no-UI law — the camera
+// is never a content host. Source-text tier (Epic 1's recorded verification
+// arrangement for the main glue; the executed-host tier is the 3-2/3-15
+// browser harness, DW-12/DW-15 re-owned at the burn-down gate): the camera
+// references surviving in core/main.ts code ride an allowlist — exactly the
+// six forms 1.9 shipped, checked per `;`-delimited statement so an allowed
+// line smuggles no second use — every `camera.add`/`camera.attach` FORM
+// (chain, subscript, dotted prefix) appears nowhere in
+// core non-test code, and the pose/room modules (core/room/*.ts, entry.ts,
+// player.ts) stay camera-blind. A planted `camera.add(crosshairMesh)` in
+// main.ts reds the allowlist leg (and the ban leg); a `camera` name added
+// to a pose module's code reds the camera-blind leg; a plain `scene.add`
+// stays green — the room may grow meshes, the camera may not.
+test("the camera never hosts content: main.ts camera refs ride the allowlist, camera.add/attach appear nowhere in core non-test code, and pose/room modules stay camera-blind (DW-11, AD-24)", () => {
+  const cameraRef = /(^|[^\w$])camera(?![\w$])/;
+  const allowForms: Array<[string, RegExp]> = [
+    ["construction", /^const camera = new THREE\.PerspectiveCamera\(/],
+    ["rotation.order", /^camera\.rotation\.order = "YXZ"$/],
+    ["pose sets", /^camera\.(position|rotation)\.set\(/],
+    ["aspect", /^camera\.aspect = /],
+    ["updateProjectionMatrix", /^camera\.updateProjectionMatrix\(\)$/],
+    ["render(scene, camera)", /renderer\.render\(scene, camera\)$/],
+  ];
+  const counts: Record<string, number> = {};
+  // Segment-level: every `;`-delimited statement that names the camera
+  // must stand on its own as one of the six forms — a second camera use
+  // smuggled onto an allowed line (`camera.aspect = 1; camera.add(m)`)
+  // is its own segment and gets no pass.
+  for (const raw of strip(readFileSync(path.join(REPO, "core", "main.ts"), "utf8")).split("\n")) {
+    if (!cameraRef.test(raw)) continue;
+    for (const seg of raw.split(";")) {
+      const stmt = seg.trim();
+      if (!cameraRef.test(stmt)) continue;
+      const hit = allowForms.find(([, re]) => re.test(stmt));
+      assert.ok(hit, `core/main.ts camera statement is not on the allowlist: "${stmt}" — the camera never hosts content (AD-24)`);
+      counts[hit[0]] = (counts[hit[0]] ?? 0) + 1;
+    }
+  }
+  assert.deepEqual(
+    counts,
+    { construction: 1, "rotation.order": 1, "pose sets": 4, aspect: 1, updateProjectionMatrix: 1, "render(scene, camera)": 1 },
+    "exactly the six surviving camera forms the 1.9 entry shipped remain — nothing may join them",
+  );
+
+  // The host-call FORMS, not the two spellings: dot, optional chain, and
+  // string/template subscript, each also reached through a dotted prefix
+  // (`ctx.camera.add(...)`).
+  const camHost = /(^|[^\w$])camera\s*(?:\?\.|\.)\s*(?:add|attach)\s*\(|(^|[^\w$])camera\s*\[\s*['"`](?:add|attach)['"`]\s*\]/g;
+  for (const file of walk(path.join(REPO, "core"), ".ts")) {
+    const src = strip(readFileSync(file, "utf8"));
+    const bad = src.match(camHost);
+    assert.ok(!bad, `${path.relative(REPO, file)} must not host content on the camera (${bad?.[0]}) — a camera-parented mesh would ride the view (AD-24)`);
+  }
+
+  const blind: string[] = readdirSync(path.join(REPO, "core", "room"))
+    .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"))
+    .map((f) => path.join(REPO, "core", "room", f));
+  blind.push(path.join(REPO, "core", "entry.ts"), path.join(REPO, "core", "player.ts"));
+  for (const file of blind) {
+    assert.ok(!cameraRef.test(strip(readFileSync(file, "utf8"))), `${path.relative(REPO, file)} must stay camera-blind — pose and room data never name the camera (DW-11)`);
   }
 });
 

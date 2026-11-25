@@ -5,8 +5,9 @@
 // emitted module loads in Node, carries the declared ids/seeds/factories, and
 // drives sims to a run transcript identical to constructing the same sims
 // directly — so a lost seed or misbound factory in the template turns this red.
-// Needs: os tmpdir only (fixture sims are temp files, never under games/);
-// each test builds its own temp repo and removes it.
+// Needs: os tmpdir only (fixture sims are temp files under the TEMP repo's
+// games/ — the simPath law (DW-5) binds the sim half to games/<id>/sim/ and
+// these fixtures comply); each test builds its own temp repo and removes it.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -22,7 +23,7 @@ const GENERATOR = path.resolve(import.meta.dirname, "gen-registry.mjs");
 // Fixture sim sources: plain-JS sims on the injected rng and gated state,
 // deterministic and gate-clean (they must also survive ci/lint-bans style rules).
 const SIM_SOURCES: Record<string, string> = {
-  "sims/beta/sim.js": `export function createSim(ctx) {
+  "games/beta/sim/sim.js": `export function createSim(ctx) {
   const state = ctx.gated({ t: 0, rolls: [] });
   let out = [];
   return {
@@ -37,7 +38,7 @@ const SIM_SOURCES: Record<string, string> = {
   };
 }
 `,
-  "sims/alpha-game/sim.js": `export function createSim(ctx) {
+  "games/alpha-game/sim/sim.js": `export function createSim(ctx) {
   const state = ctx.gated({ t: 0, rolls: [] });
   let out = [];
   return {
@@ -54,8 +55,8 @@ const SIM_SOURCES: Record<string, string> = {
 };
 
 const LIST = JSON.stringify([
-  { id: "beta", simPath: "sims/beta/sim.js", seed: 9 }, // deliberately unsorted
-  { id: "alpha-game", simPath: "sims/alpha-game/sim.js", seed: 123 },
+  { id: "beta", simPath: "games/beta/sim/sim.js", seed: 9 }, // deliberately unsorted
+  { id: "alpha-game", simPath: "games/alpha-game/sim/sim.js", seed: 123 },
 ]);
 
 function tempRepo(): string {

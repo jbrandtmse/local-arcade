@@ -354,16 +354,24 @@ export function buildRoomScene(
   // Story 1.4: the authored stand-up shells (cabinets.ts placements). The
   // body box already stands from the volume-list extrusion above (kind
   // "cabinet" takes the Wall Panel material — the mockup's cabinet body);
-  // this loop adds the six part meshes per shell (SHELL_PART_MESHES) and
-  // the two glow lights, every coord derived from the placement record —
-  // never retyped (one-geometry-source law). The coin door poses start
-  // CLOSED; the frame side re-poses from coinDoorPose every frame.
+  // this loop adds SHELL_PART_MESHES part meshes per shell (1.4's six +
+  // 1.10 DW-29's five contour mounts) and the two glow lights, every coord
+  // derived from the placement record — never retyped (one-geometry-source
+  // law). The coin door poses start CLOSED; the frame side re-poses from
+  // coinDoorPose every frame.
   const screens: ScreenHandle[] = [];
   const doors: DoorHandle[] = [];
   const marqueeBarMat = THREE.standardMaterial({ color: ROOM_BLACK, roughness: 1 });
   const bezelMat = THREE.standardMaterial({ color: CARD_INK, roughness: 0.9 });
   const doorMat = THREE.standardMaterial({ color: WALL_WARM, roughness: 0.85 }); // mockup .coindoor bg
   const slotMat = THREE.standardMaterial({ color: SIGN_CHALK, roughness: 0.6 }); // mockup .slot bg
+  // 1.10 DW-29 contour materials — tokens.ts tokens only (the hue-home guard):
+  // the deck slab and side wings share the body's Wall Panel woodwork, the
+  // kick plate and hood lip share the bezel's Card Ink.
+  const deckMat = THREE.standardMaterial({ color: WALL_PANEL, roughness: 0.85 });
+  const kickMat = THREE.standardMaterial({ color: CARD_INK, roughness: 0.9 });
+  const hoodMat = THREE.standardMaterial({ color: CARD_INK, roughness: 0.9 });
+  const wingMat = THREE.standardMaterial({ color: WALL_PANEL, roughness: 0.85 });
   for (const p of cabinetPlacements) {
     const g = placementGeometry(p.slotId);
     const facesX = g.facing.x !== 0;
@@ -466,6 +474,35 @@ export function buildRoomScene(
     apply(slotMesh, pose.slot);
     scene.add(slotMesh);
     doors.push({ id: p.volumeId, mesh: panel, slot: slotMesh });
+
+    // Story 1.10 (DW-29): the upright contours. The deck slab and the hood
+    // lip sit at their record's `proud` face offset from the body front
+    // plane (box centre at proud - depth/2); the kick plate rides the body
+    // centre line (its face offset derives from the SHELL depth difference);
+    // the two side wings ride the body sides at lateralOffset. Dims come
+    // only from the SHELL record (one-geometry-source law) — every part
+    // within 0.06m of the body AABB sides (scene.test's contour pins).
+    const deck = SHELL.deck;
+    mount(deck.width, deck.height, deck.depth, deck.centerY, deck.proud - deck.depth / 2, deckMat);
+    const kick = SHELL.kick;
+    mount(kick.width, kick.height, kick.depth, kick.centerY, -SHELL.body.depth / 2, kickMat);
+    const hood = SHELL.hood;
+    mount(hood.width, hood.height, hood.depth, hood.centerY, hood.proud - hood.depth / 2, hoodMat);
+    const wings = SHELL.sidePanels;
+    const wingD = dims(wings.thickness, wings.depth);
+    for (const side of [-1, 1]) {
+      addBox(
+        THREE,
+        scene,
+        wingMat,
+        wingD.x,
+        wings.height,
+        wingD.z,
+        g.center.x + g.right.x * wings.lateralOffset * side,
+        wings.centerY,
+        g.center.z + g.right.z * wings.lateralOffset * side,
+      );
+    }
 
     // Cabinet glow: marquee spill in the marquee family + screen halo in
     // the machine's family, in front of the face at each part's height
