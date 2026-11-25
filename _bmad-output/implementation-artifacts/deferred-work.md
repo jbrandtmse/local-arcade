@@ -190,3 +190,8 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: spec-1-8-the-room-knows-you-without-an-account.md | severity: high | fix-risk: high | footprint: in-story
 - evidence: QA suite is node --test headless; the intent fixes the verification tiers itself (main-glue source pins, real-painter chain test) and the Chrome/Edge matrix row assigns browser evidence to the lead's post-review smoke gate; a browser harness would need tooling the Never-list bars
 - 2026-11-24T21:58:14Z status=by-design owner=1-8-the-room-knows-you-without-an-account by=cr note=spec-bound (Rule 15): intent-pinned tier + lead smoke gate; closes by-design at emission, smoke gate lands the browser evidence
+
+### DW-35: a renderer.render throw AFTER the first successful frame is uncontained: a post-first-frame wedge (context loss, driver hiccup) throws every rAF with a frozen camera and no workbench — settle with a render-fault flip in the 1.7 drawFaulted idiom or a context-loss handler
+- source: 1-9-the-street-door-beat-loading-as-fiction-s-first-shot | severity: medium | fix-risk: low | footprint: core
+- evidence: core/main.ts frame(): the renderer.render leg unwrapped since 1.1 (1.7 supervisor hook draw wraps the game draw legs); core/entry.ts stall arms only while framesRendered===0 so any rendered frame cancels the self-heal — pre-existing posture surfaced by the 1.9 review pass
+- 2026-11-25T06:52:46Z status=routed owner=3-14-liveness-tiers-the-room-scales-while-the-law-holds by=lead note=harvested from spec 1-9 frontmatter deferred; pre-existing since 1.1 not a 1.9 regression; underpowered-device tiers are 3-14's own ground; adjudicate at that story's smoke tier
