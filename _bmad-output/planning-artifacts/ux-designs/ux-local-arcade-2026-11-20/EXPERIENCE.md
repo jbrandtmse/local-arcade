@@ -5,7 +5,7 @@ type: experience
 purpose: behavior-contract
 status: final
 created: 2026-11-20
-updated: 2026-11-20
+updated: 2026-11-26
 sources:
   - '_bmad-output/brainstorming/brainstorm-local-llm-arcade-2026-11-18/'
   - '_bmad-output/planning-artifacts/ux-designs/ux-local-arcade-2026-11-20/imports/arcade-floor-plan.html'
@@ -69,7 +69,7 @@ Behavioral. Visual specs live in `DESIGN.md.Components`.
 | Component | Use | Behavioral rules |
 |---|---|---|
 | Cabinet | Every placed Cabinet | Modes: attract / Auto-play session (Patron) / play (Visitor) / replay — mutually exclusive. A faulted Cabinet keeps performing via kernel fallback (marquee + screen motion); a Dead Machine is a defect, never a state. **Learn-by-watch law:** every Game's rules must be learnable by watching its attract/Auto-play loop — a registration-gate requirement (the gate is green or registration refuses). |
-| Busy/queue/NEXT | Patron-playing cabinets | Busy = a real Auto-play session. Visitor may **wait, take over at the next round break, or walk away** — busy is never a lock. Takeover precedence: present Visitor > queue head. Patron→Patron handoffs resolve diegetically at breaks. NEXT renders at the marquee's authored minimum size — rung 2 of the pull ladder works without audio. |
+| Busy/queue/NEXT | Patron-playing cabinets | Busy = a real Auto-play session. Visitor may **wait, take over at the next round break, or walk away** — busy is never a lock. Takeover precedence: present Visitor > queue head. Patron→Patron handoffs resolve diegetically at breaks. NEXT renders at its own authored minimum (0.18m cap, independent of the marquee cap) — rung 2 of the pull ladder works without audio. |
 | Sit / stand | Sit-down cabinets; stand-ups | Seated play does not pause the room; standing returns the Visitor to their position and the room continues (FR-6 continuity). |
 | Coin door → Instruction Card | Any cabinet | Opening reveals rules + attribution (the only in-room attribution surface besides nameplates). Every Card matches a plan in the Workshop drawer (card↔drawer pairing). |
 | Cabinet screen | Play, attract, scores, replay | Score table = Visitor's Personal Bests + Patron Auto-play runs — no fake strangers; first visit shows Patron runs only, until a Personal Best exists. Recordings play back **on the cabinet's own screen**; playback entered only by a visitor, runs to the sealed end, then the cabinet returns to attract. |
