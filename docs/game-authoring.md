@@ -68,7 +68,7 @@ If you roll a custom generator, make its state a plain array of numbers and rest
 
 ### Deterministic math (AD-4)
 
-Engine-variable transcendentals — `Math.sin/cos/tan/asin/acos/atan2/pow/exp/log` — are **lint-red in the sim half** (browsers and Node are free to differ, and your run must replay bit-identically in CI). Use the Core deterministic math module instead. Basic `+ - * /` are fine. Physics-looking math belongs inside `tick()` with a **fixed substep count** you control.
+Engine-variable transcendentals — `Math.sin/cos/tan/asin/acos/atan2/pow/exp/log` — are **lint-red in the sim half** (browsers and Node are free to differ, and your run must replay bit-identically in CI). Use the Core deterministic math module instead — the wrapper injects it as `ctx.math` at instantiation, the same seam as the rng; your sim never imports from `core/contract/`. Basic `+ - * /` are fine. Physics-looking math belongs inside `tick()` with a **fixed substep count** you control.
 
 ## 3. Controls: declared schemes, never devices
 

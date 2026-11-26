@@ -1,0 +1,28 @@
+Story 1.2 smoke — Edge leg (headless Edge, CDP driver C:/tools/edge-smoke-driver-12.mjs, 2026-11-22)
+Primary parity run (fresh page load; scripted: spawn -> W-walk 8s -> drag-look 3x(150,40) -> E x2 press -> S-walk + blur).
+
+{
+ "dom": { "tags": ["SCRIPT", "CANVAS"], "count": 2 },
+ "spawnZ": 3.5,
+ "midZ": 2.076666666666661,
+ "bobMid": 0.04,
+ "stubZ": -5.4,
+ "target": "cabinet-2",
+ "bobAgainstStub": 0,
+ "yawAfterDrag": -1.125,
+ "pitchAfterDrag": -0.3,
+ "eNoop": true,
+ "driftAfterBlur": 0,
+ "faults": 0,
+ "consoleErrors": []
+}
+
+Chrome leg (chrome-devtools-mcp, same script surface): identical values —
+midZ 2.076666666666661, stubZ -5.4 / target cabinet-2 / bobAgainstStub 0,
+drag-look yaw -1.125 / pitch -0.3, canvas click -> pointer lock granted silently,
+locked-path look + turn (yaw 2.025), E x2 (auto-repeat) no-op, blur mid-walk -> drift 0,
+supervisor faults 0, console: only [vite] connecting/connected debug lines.
+Screenshot: story-1-2-smoke-chrome.png (Room Black envelope, canvas-only DOM).
+Second Edge run (persisted page state): wall-back stop exact at z=-6.0 (= wall face -6.25 + radius 0.25), faults 0 — also pass.
+
+AC7 Chrome/Edge parity: transcripts bit-identical (midZ equal to every float digit) — engine-parity by construction, observed on both evergreen engines.

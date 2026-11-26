@@ -7,7 +7,7 @@ paradigm: 'microkernel (plugin architecture)'
 scope: 'Local Arcade v1 (M0-M6): Arcade Core, Games, Game Factory, deployment envelope'
 status: final
 created: 2026-11-19
-updated: 2026-11-20
+updated: 2026-11-25
 binds: []
 sources:
   - '_bmad-output/planning-artifacts/prds/prd-local-arcade-2026-11-19/prd.md'
@@ -240,6 +240,12 @@ flowchart TD
 - **Prevents:** dozens of always-running 60Hz sims collapsing the room loop; audio nodes attached to sleeping sims; culling that quietly breaks determinism, replay, or the no-dead-machines law
 - **Rule:** sim advance is tiered by an **awake set**, recomputed each tick: (a) every visitor-occupied instance — always awake; (b) every instance within a near radius or inside the camera frustum plus an authored margin — *visible ⇒ awake*, so the no-dead-machines law is never traded for framerate; (c) everything else sleeps at an **idle pulse**: a fixed shared cadence (each pulse advances the sim one tick — dilated time), so Patron autoplay and busy/queue resolution never starve unobserved. Wake/sleep is a **pure function of tick state** (camera, positions, occupancy) — never wall-clock, never view-count heuristics from outside the tick — so a replay reproduces the identical wake schedule and stateHashes (AD-26). Audible ⇒ awake: the Audio Manager's distance-cull + nearest-N budget (AD-7) operates inside the awake set. Headless L1/L2 runs disable culling entirely (**audit mode**): determinism gates and room audits always see the unculled room. All numbers — near radius, frustum margin, pulse cadence, audio N — set at M2 (Deferred).
 
+### AD-28 — Fallback-face score-row fit law: the attract block yields to score rows [ADOPTED 2026-11-24, story 1.8, unattended ruling (veto)]
+
+- **Binds:** FR-7 (the Cabinet's score table renders read-only), 1.4's screen law, 1.7's fallback-face law
+- **Prevents:** the score zone 1.4 reserved for 1.8 being un-paintable — measured: on the authored 0.44x0.52m B0 fallback face the row-0 baseline (399) collides with the NEXT row's top (330) the moment ANY row exists, so every paint step of a faulted Cabinet's face would throw and flood the fault ring; and quiet layout hacks that break the 1.4 pins or the 0.18m NEXT floor
+- **Rule:** when a Core-painted fallback face's score zone carries rows, `drawScreen` omits the attract title block and paints the rows below the live scan band: at most **2** rows on the authored B0 face at the 0.08m cap (baselines 177/309; a 3rd collides with the 0.18m NEXT floor — the collision law stays the loud guard). The Core table service caps its view at 2 rows (Personal Best + best Patron run; Patron-only view keeps best 1). With an empty zone the face paints byte-unchanged (CAP-8 honesty, 1.4 pins byte-unchanged). The scan band, NEXT floor, composite-face law, placements, collision volumes and all authored constants are untouched. Measured, not inferred: executed probe of the real painter against authored B0 data, 2026-11-24.
+
 ## Consistency Conventions
 
 | Concern | Convention |
@@ -256,6 +262,7 @@ flowchart TD
 | Faults | Core supervisor catches sim faults → Dead-Machine defect logged; Cabinet keeps performing via kernel fallback (AD-15) |
 | Identity & storage | Visitor id = UUIDv4 in `localStorage` under `arcade.*`; Personal Best keyed (gameId, visitorId) with initials + score; games use the Core storage service only |
 | Attribution flow | Manifest `attribution` is the single source; build generates Instruction Cards and nameplates from it (AD-24) |
+| Room geometry & collision | `core/room/` owns the room as authored data: one AABB volume list (ids stable, `{id, min, max, blocksMovement, targetable, kind}`) is the single source for movement blocking (1.2 placeholders → 1.3 authored room), the occluder set for audio raycasts, and visual extrusion — collision/render code never hardcodes geometry; the resolver is code, the volumes are data, and 1.3 rewrites the data in place |
 | Auth | None anywhere |
 
 ## Stack
@@ -362,7 +369,7 @@ flowchart LR
 - **Thicker backend API** — the minimal report-ingest endpoint (AD-26) is **v1, not deferred**; anything beyond it returns only for (a) donation-completion polling (BMC supporter feed) → its own later epic; (b) leaderboards / multiplayer → post-M6. Report triage stays manual (pull + replay) until an epic says otherwise.
 - **Soft multi-ray audio occlusion** — single-ray first (AD-7); revisit when occlusion quality/perf demands it.
 - **Numeric thresholds** — framerate floor (FR-15/SM-C2), audio channel budget (distance-cull/nearest-N), seated focus-mix duck levels, wake-set near radius / frustum margin / idle-pulse cadence (AD-27), Patron reaction window: set at M2 when the health-check skill is built. Not deferred: attract liveness is enforceable now via stateHash-delta (AD-8 L1); only the pixel/fps/reaction-window numbers wait for M2. Until they land, the full no-dead-machines law is not CI-enforceable; M2 acceptance is incomplete without them.
-- **Time-to-playable budget** — FR-1's ≤60s is a guardrail ceiling, not the target; the real budget is set when the shell is first measured.
+- **Time-to-playable budget** — **CLOSED at story 1.9's smoke (2026-11-25, lead Rule-20 write).** FR-1's ≤60s stays the guardrail ceiling, not a target: the shell's first measurement is ~4.9 s to control on dev-serve desktop Chrome (`timeToPlayableMs` 4948.5) and ~16.8 s on headless SwiftShader Edge (16775) — one-canvas page, zero markup, entry beat included. No tighter M0 number is set; the framerate-floor numbers remain deferred to M2 (this row's other half).
 - **Marquee name of the arcade** (OQ-9) — revisit at launch prep. Not to be confused with per-cabinet marquees, which display `Manifest.title` from M0 (AD-24).
 - **Cabinet relocation** — no moves in v1 (FR-16); any relocation is a future epic.
 - **Room growth** — its own epic when Wall Slots run out (FR-10).

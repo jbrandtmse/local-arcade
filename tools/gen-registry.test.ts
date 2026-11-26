@@ -1,0 +1,262 @@
+// AC6 pinning: the registry generator emits deterministically from the
+// provisional list (sorted, byte-identical re-emit), re-exports only sim
+// halves, and exits nonzero with a message on invalid entries.
+import test from "node:test";
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+
+const GENERATOR = path.resolve(import.meta.dirname, "gen-registry.mjs");
+
+function fixtureRoot(): string {
+  // Story 1.10 (DW-5): sim fixtures sit where the law requires,
+  // games/<id>/sim/; presentation fixtures stay put on purpose — the
+  // untouched presPath is the signal that the law binds simPath only.
+  const dir = mkdtempSync(path.join(tmpdir(), "gen-registry-"));
+  for (const id of ["beta-game", "alpha"]) {
+    mkdirSync(path.join(dir, "games", id, "sim"), { recursive: true });
+    mkdirSync(path.join(dir, "sims", id), { recursive: true });
+    writeFileSync(
+      path.join(dir, "games", id, "sim", "sim.js"),
+      "export function createSim() { return { tick() {}, events() { return []; }, snapshot() { return {}; } }; }\n",
+    );
+    writeFileSync(
+      path.join(dir, "sims", id, "pres.js"),
+      "export function createPresentation() { return { canvas: { width: 0, height: 0, getContext: () => null }, drawFrame() {} }; }\n",
+    );
+  }
+  return dir;
+}
+
+function runGenerator(cwd: string, listName = "list.json", outName = "out/game-registry.ts"): string {
+  return execFileSync(process.execPath, [GENERATOR, "--cwd", cwd, "--list", listName, "--out", outName], {
+    encoding: "utf8",
+  });
+}
+
+function expectFailure(cwd: string, expected: string): string {
+  try {
+    runGenerator(cwd);
+  } catch (err) {
+    const e = err as { status?: number; stderr?: string };
+    assert.equal(e.status, 1, "generator must exit nonzero");
+    assert.ok(e.stderr.includes(expected), `stderr must cite ${expected}: ${e.stderr}`);
+    return e.stderr as string;
+  }
+  assert.fail("generator should have exited nonzero");
+}
+
+test("two fixture entries: sorted deterministic registry re-exporting sim halves", () => {
+  const dir = fixtureRoot();
+  writeFileSync(
+    path.join(dir, "list.json"),
+    JSON.stringify([
+      { id: "beta-game", simPath: "games/beta-game/sim/sim.js", seed: 7 },
+      { id: "alpha", simPath: "games/alpha/sim/sim.js" },
+    ]),
+  );
+  runGenerator(dir);
+  const first = readFileSync(path.join(dir, "out", "game-registry.ts"), "utf8");
+  assert.ok(first.includes('import { createSim as gAlpha } from "../games/alpha/sim/sim.js";'));
+  assert.ok(first.includes('import { createSim as gBetaGame } from "../games/beta-game/sim/sim.js";'));
+  assert.ok(first.indexOf("gAlpha") < first.indexOf("gBetaGame"), "entries sorted by id");
+  assert.ok(first.includes('{ id: "alpha", createSim: gAlpha },'));
+  assert.ok(first.includes('{ id: "beta-game", seed: 7, createSim: gBetaGame },'));
+  assert.ok(!first.includes("createPresentation"), "an entry without presPath emits the sim half only (no presentation binding)");
+  assert.ok(!first.includes("controls:"), "an entry without controls emits no vocab");
+
+  runGenerator(dir);
+  const second = readFileSync(path.join(dir, "out", "game-registry.ts"), "utf8");
+  assert.equal(second, first); // byte-identical across runs
+});
+
+// Story 1.5: the presentation half and the declared control vocab travel the
+// same deterministic path as the sim half.
+test("presPath + controls emit; the vocab keys are fixed-order regardless of list order; bad legs die loudly", () => {
+  const dir = fixtureRoot();
+  writeFileSync(
+    path.join(dir, "list.json"),
+    JSON.stringify([
+      { id: "alpha", simPath: "games/alpha/sim/sim.js", presPath: "sims/alpha/pres.js", controls: { aim: [], buttons: ["fire"], axes: ["move"], vocab: 1 } },
+    ]),
+  );
+  runGenerator(dir);
+  const text = readFileSync(path.join(dir, "out", "game-registry.ts"), "utf8");
+  assert.ok(text.includes('import { createPresentation as pAlpha } from "../sims/alpha/pres.js";'), "presentation half imported beside the sim half");
+  assert.ok(
+    text.includes('{ id: "alpha", createSim: gAlpha, createPresentation: pAlpha, controls: {"vocab":1,"axes":["move"],"buttons":["fire"],"aim":[]} },'),
+    "entry carries both halves plus the declared vocab in fixed key order (byte-identical re-emits)",
+  );
+
+  writeFileSync(path.join(dir, "list.json"), JSON.stringify([{ id: "alpha", simPath: "games/alpha/sim/sim.js", presPath: "sims/alpha/gone.js" }]));
+  expectFailure(dir, "presentation source not found");
+
+  writeFileSync(
+    path.join(dir, "list.json"),
+    JSON.stringify([{ id: "alpha", simPath: "games/alpha/sim/sim.js", controls: { vocab: 1, axes: "move", buttons: [], aim: [] } }]),
+  );
+  expectFailure(dir, "controls.axes must be an array of strings");
+
+  writeFileSync(
+    path.join(dir, "list.json"),
+    JSON.stringify([{ id: "alpha", simPath: "games/alpha/sim/sim.js", controls: { vocab: true, axes: [], buttons: [], aim: [] } }]),
+  );
+  expectFailure(dir, "controls.vocab must be a finite number");
+
+  writeFileSync(
+    path.join(dir, "list.json"),
+    JSON.stringify([{ id: "alpha", simPath: "games/alpha/sim/sim.js", controls: { vocab: 1, axes: ["move"], buttons: ["fire"], aim: [], butons: ["fire"] } }]),
+  );
+  expectFailure(dir, "unknown controls field"); // a "butons" typo must not silently drop the buttons leg
+});
+
+// Story 1.6 (AC6 gate; AD-11/AD-18 data side): the authored impulse mapping
+// is validated at BUILD time (never fetched at runtime — the bundle stays
+// sealed) and embedded into the entry as parsed data in fixed (sorted) key
+// order. (AC3 is this story's NEXT-lettering pin, not this carrier.)
+test("impulsePath: parsed mapping embedded sorted; a bad reaction name, a missing file, and a non-object mapping die loudly", () => {
+  const dir = fixtureRoot();
+  writeFileSync(path.join(dir, "impulses.json"), JSON.stringify({ gameover: "slam", jump: "jump", hit: "flinch", explode: "flinch" }));
+  writeFileSync(
+    path.join(dir, "list.json"),
+    JSON.stringify([{ id: "alpha", simPath: "games/alpha/sim/sim.js", impulsePath: "impulses.json" }]),
+  );
+  runGenerator(dir);
+  const first = readFileSync(path.join(dir, "out", "game-registry.ts"), "utf8");
+  assert.ok(
+    first.includes('{ id: "alpha", createSim: gAlpha, impulses: {"explode":"flinch","gameover":"slam","hit":"flinch","jump":"jump"} },'),
+    "the entry embeds the parsed mapping, keys sorted (the asset's key order never leaks into bytes)",
+  );
+  runGenerator(dir);
+  assert.equal(readFileSync(path.join(dir, "out", "game-registry.ts"), "utf8"), first, "byte-identical re-emit with a mapping present");
+
+  writeFileSync(path.join(dir, "impulses.json"), JSON.stringify({ jump: "shrug" }));
+  expectFailure(dir, "is not a kernel reaction"); // a name outside the reaction library is a build error
+
+  writeFileSync(path.join(dir, "impulses.json"), JSON.stringify({ jump: "jump" }));
+  writeFileSync(
+    path.join(dir, "list.json"),
+    JSON.stringify([{ id: "alpha", simPath: "games/alpha/sim/sim.js", impulsePath: "gone.json" }]),
+  );
+  expectFailure(dir, "impulse mapping source not found");
+
+  writeFileSync(path.join(dir, "impulses.json"), "[]");
+  writeFileSync(
+    path.join(dir, "list.json"),
+    JSON.stringify([{ id: "alpha", simPath: "games/alpha/sim/sim.js", impulsePath: "impulses.json" }]),
+  );
+  expectFailure(dir, "impulse mapping must be an object");
+});
+
+test("empty provisional list emits an empty registry", () => {
+  const dir = fixtureRoot();
+  writeFileSync(path.join(dir, "list.json"), "[]");
+  runGenerator(dir);
+  const text = readFileSync(path.join(dir, "out", "game-registry.ts"), "utf8");
+  assert.ok(text.includes("export const gameRegistry: GameRegistryEntry[] = ["));
+  assert.equal(text.match(/import \{ createSim/g), null);
+});
+
+test("invalid entries fail nonzero with a message", () => {
+  const dir = fixtureRoot();
+  writeFileSync(path.join(dir, "list.json"), JSON.stringify([{ id: "Bad Id", simPath: "games/alpha/sim/sim.js" }]));
+  expectFailure(dir, "kebab-case");
+
+  writeFileSync(path.join(dir, "list.json"), JSON.stringify([{ id: "gone", simPath: "sims/gone/sim.js" }]));
+  expectFailure(dir, "not found");
+
+  writeFileSync(
+    path.join(dir, "list.json"),
+    JSON.stringify([
+      { id: "alpha", simPath: "games/alpha/sim/sim.js" },
+      { id: "alpha", simPath: "games/alpha/sim/sim.js" },
+    ]),
+  );
+  expectFailure(dir, "duplicate"); // law-conforming homes so the duplicate leg is what trips
+
+  writeFileSync(path.join(dir, "list.json"), JSON.stringify([{ simPath: "games/alpha/sim/sim.js" }]));
+  expectFailure(dir, "kebab-case"); // missing id
+
+  for (const cid of ["a1", "a-1"]) {
+    mkdirSync(path.join(dir, "games", cid, "sim"), { recursive: true });
+    writeFileSync(
+      path.join(dir, "games", cid, "sim", "sim.js"),
+      "export function createSim() { return { tick() {}, events() { return []; }, snapshot() { return {}; } }; }\n",
+    );
+  }
+  writeFileSync(
+    path.join(dir, "list.json"),
+    JSON.stringify([
+      { id: "a1", simPath: "games/a1/sim/sim.js" },
+      { id: "a-1", simPath: "games/a-1/sim/sim.js" },
+    ]),
+  );
+  expectFailure(dir, "collision"); // a1 and a-1 both map to gA1
+
+  writeFileSync(
+    path.join(dir, "list.json"),
+    JSON.stringify([{ id: "alpha", simPath: "games/alpha/sim/sim.js", seeds: 7 }]),
+  );
+  expectFailure(dir, "unknown field"); // a "seeds" typo must not silently drop the seed
+
+  writeFileSync(
+    path.join(dir, "list.json"),
+    JSON.stringify([{ id: "alpha", simPath: "games/alpha/sim/sim.js", seed: 2.5 }]),
+  );
+  expectFailure(dir, "seed must be an integer"); // the kernel track() gate rejects non-integer seeds; the build gate must not emit one
+});
+
+// Story 1.10 (DW-5, AC2; AD-1/AD-2/AD-13): the sim half's location is a
+// build-step law — a wrong home or a `..` relocation dies naming the law,
+// and nothing is emitted.
+test("simPath law: a wrong home and a '..' traversal fail nonzero naming the law", () => {
+  const dir = fixtureRoot();
+  writeFileSync(path.join(dir, "sims", "alpha", "loose-sim.js"), "export function createSim() { return { tick() {}, events() { return []; }, snapshot() { return {}; } }; }\n");
+  writeFileSync(path.join(dir, "list.json"), JSON.stringify([{ id: "alpha", simPath: "sims/alpha/loose-sim.js" }]));
+  expectFailure(dir, "must resolve strictly under games/alpha/sim/");
+
+  // the '..' collapses lexically at resolve time (games/core/evil.js) —
+  // the file exists where the normalized path lands, and the law still
+  // names the sim home, proving the relocation cannot smuggle a sim in
+  mkdirSync(path.join(dir, "games", "core"), { recursive: true });
+  writeFileSync(path.join(dir, "games", "core", "evil.js"), "export const evil = 1;\n");
+  writeFileSync(
+    path.join(dir, "list.json"),
+    JSON.stringify([{ id: "moon-patrol", simPath: "games/moon-patrol/../core/evil.js" }]),
+  );
+  expectFailure(dir, "must resolve strictly under games/moon-patrol/sim/"); // the relative check normalizes; .. is dead
+  assert.ok(!existsSync(path.join(dir, "out", "game-registry.ts")), "a failing entry emits nothing");
+});
+
+// QA (Story 1.10, DW-5 gap): the law's empty-relative leg. A simPath that
+// names the games/<id>/sim/ DIRECTORY itself passes existsSync, and the
+// relative path is empty — the generator must die on the law, not emit an
+// import of a directory.
+test("simPath law: naming the games/<id>/sim/ directory itself dies naming the law and emits nothing", () => {
+  const dir = fixtureRoot();
+  writeFileSync(path.join(dir, "list.json"), JSON.stringify([{ id: "alpha", simPath: "games/alpha/sim" }]));
+  expectFailure(dir, "must resolve strictly under games/alpha/sim/");
+  assert.ok(!existsSync(path.join(dir, "out", "game-registry.ts")), "a directory-as-simPath entry emits nothing");
+});
+
+test("the repo's own list regenerates the committed registry byte-identically", () => {
+  const repo = path.resolve(import.meta.dirname, "..");
+  const committedPath = path.join(repo, "generated", "game-registry.ts");
+  const before = readFileSync(committedPath, "utf8");
+  const out = execFileSync(process.execPath, [GENERATOR], { cwd: repo, encoding: "utf8" });
+  assert.ok(out.includes("gen-registry:"));
+  let after: string;
+  try {
+    after = readFileSync(committedPath, "utf8");
+  } catch {
+    writeFileSync(committedPath, before);
+    assert.fail("generated/game-registry.ts missing after regeneration");
+    return;
+  }
+  if (after !== before) {
+    writeFileSync(committedPath, before); // leave the tree as found; the pin still fails
+    assert.fail("registry regeneration is not byte-identical to the committed module");
+  }
+});

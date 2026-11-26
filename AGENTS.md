@@ -18,7 +18,7 @@ First-person walk-in 3D arcade for the browser: visitors enter a room, find cabi
 
 ## Running and verifying
 
-- No commands exist yet — no `package.json`, no CI, no `ci/` gates. When code lands, `package.json` scripts on Vite + Node are the entry point; re-verify this line at the next refresh.
+- Code exists as of Story 1.1. Loop commands: `npm install` (fresh clone; `engines` pins Node 26), `npm run typecheck`, `npm test` (`node --test` over co-located `*.test.ts`), `node ci/depcheck.mjs` (AD-1 import direction), `node ci/lint-bans.mjs` (sim-path banned APIs), `node tools/gen-registry.mjs && git diff --exit-code -- generated/` (registry drift). Once per story: `npm run build`. Dev serve: `npm run dev`. Still no CI workflow (lands Epic 3, stories 3.2/3.15) — the local suite plus smoke is the gate.
 - Take stack versions from the spine's §Stack table, never from the current environment — `@types/three` must match `three` exactly, since three ships no bundled types.
 
 ## Conventions that differ from defaults

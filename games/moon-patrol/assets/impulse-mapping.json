@@ -1,0 +1,6 @@
+{
+  "jump": "jump",
+  "explode": "flinch",
+  "hit": "flinch",
+  "gameover": "slam"
+}
