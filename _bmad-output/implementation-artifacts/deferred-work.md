@@ -150,6 +150,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - evidence: Owner-observed while using the game: after dragging the mouse far left or right the view becomes the floor. Repro not yet confirmed by the lead; smoke drags never exceeded ~2.5 rad so the path is untested.
 - 2026-11-23T14:51:13Z status=routed owner=burndown by=owner note=owner said: do not fix now; address in the next pass over the backlog
 - 2026-11-25T10:57:00Z status=decision-pending owner=burndown by=burndown note=to_x0:schedule_the_mouse-look_yaw-wrap/pitch-clamp_pass_at_Epic-2_X.0_per_owner_ruling_2026-11-23_do-not-fix-during-stories
+- 2026-11-26T03:01:24Z status=routed owner=2-0-epic-1-deferred-cleanup by=x0 note=default-include: minor + small fix-risk; owner ruling 2026-11-23 (do-not-fix-during-stories) now applied - this is the next-pass-over-backlog; repro beyond smoke-tested ~2.5 rad drags
 
 ### DW-25: Moon Patrol respawn pad-clear filter never removes minefields (x/w vs x1/x2 NaN predicate) — buggy can respawn onto a mine
 - source: story 1.5 implement review B3+E4 (shared root cause); spec-1-5 frontmatter deferred | severity: medium | fix-risk: small | footprint: games/moon-patrol/sim/world.js:106 respawn predicate; data shape sim/course.js:100; vendored law kept world.js unmodified below seam edits (AC1)

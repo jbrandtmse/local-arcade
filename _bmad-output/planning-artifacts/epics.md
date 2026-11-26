@@ -412,6 +412,16 @@ So that Epic 1 merges with no burndown debt: two CI/tooling gaps, one test-law g
 
 The full pull ladder with zero UI hints — occluded spatial sound → attract graphics → Patron intensity — so a Visitor drifts toward a sound around a pillar, catches the attract glow, and sits down. Both SM-1 variants (normal audio AND master-muted) pass the M1 human walk, with Deaf/HoH and low-vision testers as mandatory participants.
 
+### Story 2.0: Epic 1 Deferred Cleanup
+
+As the owner (the lead opening Epic 2),
+I want the items that Epic 1's retrospective review and the Epic-2 X.0 triage place inside this epic's footprint closed in one bounded pass,
+So that Epic 2 starts with the prior epic's cleanup debt closed: the owner-reported mouse-look camera flip at extreme yaw, deferred by the owner's 2026-11-23 ruling to exactly this pass over the backlog.
+
+**Acceptance Criteria:**
+
+- DW-24: mouse-look: mousing far left/right makes the view become the floor (view flips/slams to floor at extreme yaw after big horizontal drags) — reproduced at extreme yaw beyond the ~2.5 rad drags the Epic-1 smokes used, then fixed in the Core player look math (yaw wrap / pitch clamp) with a falsifiable extreme-yaw test pinning the law (ledger; owner report 2026-11-23; X.0 triage 2026-11-26)
+
 ### Story 2.1: Core Audio Manager — attract sound that occludes and swells
 
 As a Visitor,
