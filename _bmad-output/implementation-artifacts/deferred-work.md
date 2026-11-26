@@ -258,3 +258,13 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - evidence: QA observation at story 1.10 qa_complete, confirmed valid by CR: core/room/cabinets.ts SHELL loop multiplies by cabinetPlacements.length; only one authored placement; no seam to plant two
 - 2026-11-26T00:46:06Z status=routed owner=3-4-the-layout-system-placement-is-a-pure-build-time-function by=lead note=adjudicated at story 1-10 ledger gate (not a 1.10 fix: 1.10 shipped the law for the authored single placement); the placement seam is 3.4's own ground — pin contour repetition at that story
 - 2026-11-26T06:12:28Z by=correct-course note=law unchanged; part names superseded by the Story 2.0 profile rebuild (3-4 AC bullet reworded to name SIDE_PROFILE/INNER_PROFILE panels + assemblies)
+
+### DW-44: main.ts renderer posture (ACES, exposure 1.0, sRGB/anisotropy, cap-arg switch) has only a source-text-pin executed tier; a posture change or three.js version bump keeping the source text intact ships visually wrong with the suite green
+- source: story 2.0 implement self-review (verification-gap layer) deferred: | severity: low | fix-risk: med | footprint: cross-cutting
+- evidence: spec-2-0 frontmatter deferred: #1; core/main-glue.test.ts:126-140 pins + executed-tier-waits note; same tier as DW-15/DW-12
+- 2026-11-26T15:34:55Z status=routed owner=3-2-the-gate-goes-deterministic-l0-l1-scripts-contract-test-skil by=harvest note=same browser-harness tier as DW-15; Epic-3 3.2/3.15 harness closes it; pre-existing posture, not caused by 2.0
+
+### DW-45: Owner-authored contradiction: screen-brightest law cannot hold literally against the brief's fixed emissive pair - marquee 1.2 tone-maps to 0.804 above screen 1.0 at 0.763 under the measured ACES curve; literal screen-brightest needs a brief amendment
+- source: story 2.0 implement deferred: | severity: low | fix-risk: low | footprint: small
+- evidence: spec-2-0 frontmatter deferred: #2; core/room/cabinets.ts emissive pair + scene.test.ts exposure law; measured ACES anchors 1.0 to 0.763, 1.2 to 0.804
+- 2026-11-26T15:35:41Z status=decision-pending owner=burndown by=harvest note=inbox=U-9; in-story disposition by-design (law re-expressed, ceiling 1.18 to 0.80); owner decides which source binds
