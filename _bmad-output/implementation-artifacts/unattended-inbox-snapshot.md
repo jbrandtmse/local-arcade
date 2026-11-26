@@ -2,6 +2,8 @@
 
 Answer an item with `bash _bmad/scripts/unattended-inbox.sh <this directory> answer U-<n> "<answer>" --by owner`, or run `/epic-cycle --review`. This file is generated: a hand edit is saved aside and never applied.
 
+**Hold requested 2026-11-26T04:26:21Z: owner: review Epic 1 before Epic 2 plan spawn**
+
 ## Parked
 
 ### U-3 | parked | DW-8 | 2026-11-26T02:35:25Z
@@ -25,6 +27,15 @@ recommendation: leave as-is until the Game-factory epic passes; the vendored cop
 blocks: nothing in-run
 answer: (none yet -- answer with the script or --review)
 
+## Veto window
+
+### U-7 | veto | Epic 2 | 2026-11-26T03:02:40Z
+question: readiness re-check at Epic 2 start: CONCERNS carried from launch - Story 2.6 (M1 human walk: SM-1 both variants, mandatory Deaf/HoH + low-vision participants, non-sighted spike, vestibular report) cannot be executed by the unattended run - it needs human participants only the owner can recruit; milestones=[] so any AC move is owner-only
+options: proceed: 2.0-2.5 build unattended, 2.6 stops as a human-participant need when reached (you get an inbox item then) | recruit testers mid-run while 2.0-2.5 build | move the automatable 2.6 checks (color-blind 6m geometry, random-frame posture) into earlier stories
+recommendation: proceed as-is - 2.0-2.5 are unblocked; recruit participants in parallel so 2.6 has the best chance to run in-epic
+blocks: Story 2.6 only; nothing before it
+answer: (none yet -- answer with the script or --review)
+
 ## Holds
 
 ### U-1 | hold | Story 1.3 | 2026-11-22T18:55:49Z
@@ -34,7 +45,16 @@ recommendation: restart the server and re-invoke; nothing else needed
 blocks: Story 1.3 close-out and all later stories
 answer: (none yet -- answer with the script or --review)
 
+## Retrospectives to review
+
+### U-6 | retro | Epic 1 | 2026-11-26T02:57:07Z
+question: headless retro verdict accepted-with-open-items (doc epic-1-retro-2026-11-26.md): 10/10 merged, suite 365, 1 cross-seam LOW folded into DW-30 (owner 3-15); 3 new action items open in tracker: (1) falsifiable-pin convention into _bmad/custom/skill-rules.md [owner-only file], (2) raise API_TIMEOUT_MS / inference-server slots for 4-layer CR [owner launch env], (3) tracker no-touch clause in every spawn prompt [lead, in practice since 1.8]
+options: keep all three; drop individual items; answer per-item in --review
+recommendation: keep all three - 1 and 2 cost real pipeline capacity this epic
+blocks: nothing in-run
+answer: (none yet -- answer with the script or --review)
+
 ## Resolved
 - U-2 | veto | Story 1.8: Score rows on the fallback cabinet face were un-paintable (authored 0.52m face fits 0 rows under the attract block; the spec's cap-4 geometry was wrong). Lead ruled option B: AD-28 — when score rows exist, the attract title yields to them (exactly 2 rows: PB + best Patron run), keeping the Epic-1 AC 'the Cabinet's score table renders read-only' satisfied in Epic 1. -> keep B, proceed (by josh, 2026-11-25T01:38:45Z#9; quoting the owner: "keep B, proceed"); resolved by lead, 2026-11-25T02:19:59Z -- 971fc93 veto kept: AD-28 attract-yield law stands; story 1.8 closed done
 
-<!-- journal: 13 lines -->
+<!-- journal: 16 lines -->
