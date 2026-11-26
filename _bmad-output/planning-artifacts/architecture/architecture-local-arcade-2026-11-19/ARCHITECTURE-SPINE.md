@@ -7,7 +7,7 @@ paradigm: 'microkernel (plugin architecture)'
 scope: 'Local Arcade v1 (M0-M6): Arcade Core, Games, Game Factory, deployment envelope'
 status: final
 created: 2026-11-19
-updated: 2026-11-25
+updated: 2026-11-26
 binds: []
 sources:
   - '_bmad-output/planning-artifacts/prds/prd-local-arcade-2026-11-19/prd.md'
@@ -262,7 +262,7 @@ flowchart TD
 | Faults | Core supervisor catches sim faults → Dead-Machine defect logged; Cabinet keeps performing via kernel fallback (AD-15) |
 | Identity & storage | Visitor id = UUIDv4 in `localStorage` under `arcade.*`; Personal Best keyed (gameId, visitorId) with initials + score; games use the Core storage service only |
 | Attribution flow | Manifest `attribution` is the single source; build generates Instruction Cards and nameplates from it (AD-24) |
-| Room geometry & collision | `core/room/` owns the room as authored data: one AABB volume list (ids stable, `{id, min, max, blocksMovement, targetable, kind}`) is the single source for movement blocking (1.2 placeholders → 1.3 authored room), the occluder set for audio raycasts, and visual extrusion — collision/render code never hardcodes geometry; the resolver is code, the volumes are data, and 1.3 rewrites the data in place |
+| Room geometry & collision | `core/room/` owns the room as authored data: one AABB volume list (ids stable, `{id, min, max, blocksMovement, targetable, kind}`) is the single source for movement blocking (1.2 placeholders → 1.3 authored room), targeting, and the audio/sightline occluder set, and for visual extrusion of **room** volumes (wall, pillar, door, street) only; `kind: 'cabinet'` volumes are collision/targeting/occlusion data and are never extruded. A Cabinet's visual is authored shell data in `core/room` (SHELL records + profiled extruded assemblies in a per-cabinet group); its silhouette stays inside the volume AABB except the open coin door and side-art decals — collision/render code never hardcodes geometry; the resolver is code, the volumes are data, shell data is authored data, and 1.3/2.0 rewrite the data in place (row amended by the 2026-11-26 sprint change, DW-29 reopen) |
 | Auth | None anywhere |
 
 ## Stack
