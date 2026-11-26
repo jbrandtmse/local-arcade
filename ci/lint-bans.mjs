@@ -14,8 +14,10 @@
 // (typescript/unstable/ast; comments are trivia and never match), zero LLM.
 // The unstable scanner lexes `/` as a plain slash and tokenizes a regex
 // body as code, so the scan recognizes regex literals positionally and
-// re-anchors after them: pattern text naming a banned API never matches,
-// while division operands stay in the stream and stay banned.
+// re-anchors after them: text inside a literal recognized in regex
+// position becomes one opaque token and never matches. A slash after a
+// value-ish token reads as division — it stays in the stream, and
+// division operands of banned globals stay banned uses.
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
@@ -170,6 +172,29 @@ const isMemberLink = (t) => t !== undefined && (t.kind === SyntaxKind.DotToken |
 // hit the wall-clock-use rules; globalThis./window. + Math stays green —
 // the Math-as-value form is sanctioned. Renaming or re-spelling the
 // access does not launder the banned member.
+// Does the identifier at `i` head a banned-member access (chain or
+// bracket), i.e. is the chain/bracket rule its sole owner?
+function headsBannedAccess(toks, i) {
+  const t = toks[i];
+  const off = isMemberLink(toks[i + 1]) ? 1 : 0; // `?.[` subscript
+  const open = toks[i + 1 + off];
+  const str = toks[i + 2 + off];
+  const close = toks[i + 3 + off];
+  if (
+    open?.kind === SyntaxKind.OpenBracketToken &&
+    (str?.kind === SyntaxKind.StringLiteral || str?.kind === SyntaxKind.NoSubstitutionTemplateLiteral) &&
+    close?.kind === SyntaxKind.CloseBracketToken
+  ) {
+    return BAN_LOOKUP.has(`${t.value}.${str.value}`);
+  }
+  const nx = toks[i + 1];
+  const prop = toks[i + 2];
+  if (isMemberLink(nx) && prop?.kind === SyntaxKind.Identifier) {
+    return BAN_LOOKUP.has(`${t.value}.${prop.value}`);
+  }
+  return false;
+}
+
 function accessHits(toks) {
   const hits = [];
   let receiver = "";
@@ -185,7 +210,10 @@ function accessHits(toks) {
       if (sawMemberLink && receiver) {
         const key = `${receiver}.${t.value}`;
         const rule = BAN_LOOKUP.get(key) ?? GLOBAL_CLOCK.get(key);
-        if (rule) hits.push({ rule, pos: receiverPos });
+        // L4 sole-owner posture, mirrored on the value receivers:
+        // `globalThis.Date.now()` is ONE no-date-now hit (the chain leg);
+        // `globalThis.Date` on its own is the wall-clock-use hit.
+        if (rule && !(GLOBAL_CLOCK.has(key) && headsBannedAccess(toks, i))) hits.push({ rule, pos: receiverPos });
       }
       const off = isMemberLink(toks[i + 1]) ? 1 : 0; // `?.[` subscript
       const open = toks[i + 1 + off];

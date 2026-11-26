@@ -95,6 +95,29 @@ deferred: []
 
 **AC 5 — No prior law regresses.** The whole existing suite (351 tests at HEAD 723fa3f + new) stays green; typecheck, depcheck, lint-bans over the real repo, and the registry drift check are green; `npm run build` once at finalize succeeds; zero new deps, zero outbound calls, zero new markup; no vendored `games/**` file, `core/main.ts`, or collision volume changed; boot-eager and two-rAF pins untouched.
 
+### Review Findings
+
+Code-review stage (whole-story diff 723fa3f..c745c5b; three layers run — blind-hunter, verification-gap, acceptance-auditor; the edge-case-hunter layer failed mid-run on an API timeout and is recorded as a failed layer). 13 raw rows triaged: 6 patched in-pass (VG-1 med + five lows), 4 ledgered (`by=cr`: DW-39 escalated, DW-40 decision-pending, DW-41/DW-42 by-design), 3 rejected, no unresolved blocking HIGH/MED.
+
+**Patched in-pass (each mutation applied, observed red, reverted byte-identical — lines under Verification):**
+- [x] BH-2 (low) — `globalThis.Date.now()` / `window.performance.now()` double-hit (no-date-use at the receiver AND no-date-now at the member): the wall-clock-use rule double-reported a use the chain rule owns. Fixed: a `headsBannedAccess` sole-owner guard mirroring the L4 posture; the globalclock fixture now pins six uses to exactly six hits.
+- [x] BH-3 (low) — the `.sort((a,b)=>a.pos-b.pos)` in `bannedChains` was removable with the whole suite green: the merged-stream position contract ("like the single-pass scanner it replaces") had no pin. Fixed: the `games/hitorder` order fixture pins `[11: no-date-use, 27: no-date-now]`.
+- [x] BH-4 (low) — the kick-plate doc comment claimed a front protrusion derived from the SHELL depth difference; the 0.58m kick depth body-centres the plate with its front face 0.01m INSIDE the body front plane — the 0.64m width (H1's render lever) is what makes it render. Comment corrected; no dim moved.
+- [x] BH-6 (low) — the scanner header overclaimed the regex posture ("text inside a literal … never matches"): a slash after a value-ish token reads as division and stays in the stream, so `if (x) /Date.now/.test(s)` reddens by design (a division operand of a banned global is a banned use). Header qualified to the real posture.
+- [x] BH-7 (low) — the camera-blind leg scanned `core/room` flat (`readdirSync`) while the camHost walk is recursive: a future `core/room/<sub>/` module naming `camera` would escape. Widened to the file's recursive `walk` (matrix row 9's law is per-module; the spec's `core/room/*.ts` glob lists today's files, not the law's extent).
+- [x] VG-1 (med) — DW-29's marquee raise (centerY 1.87) and depth (0.09) have no independent pin: every marquee pin derives from the SHELL constants, so nudging the constants keeps the suite green (the QA coinSlot IS-pin already proves derived pins cannot see a nudge). Fixed: two continuity IS-pins in `scene.test.ts` — marquee centerY IS 1.87 (AC4's box-top 2.12m under the 3.0m wall; the spill pin rides it by formula) and depth IS 0.09 (the 0.0939 exposure cap's floor-side neighbour).
+
+**Ledgered via the tool (`by=cr`):**
+- [x] BH-1 (med) — `Date.parse`, `Date.UTC`, `performance.timeOrigin` walk the gate green (planted-fixture probe). Closing them moves the banned SET (new members of the AD-3 pair); the spec binds FORMS of already-banned APIs "never new API families" and the SET question is DW-8's owner-only posture. → DW-39 `escalated owner=burndown` — decision-sheet alongside DW-8; distinct family (wall-clock members, not transcendentals).
+- [x] BH-5 (low) — the cycle-log 1.10 `qa_complete` row swaps `ts` and `spawn_at` (ts=21:18:28Z is the spawn instant; spawn_at=21:59:41Z the completion). Cycle-log rows are the lead's artifact. → DW-40 `decision-pending owner=burndown note=human=lead`.
+- [x] AA-1 (low) — the comment-strip idiom hoisted to module scope in `no-ui-dom.test.ts`: the spec's "do not hoist a shared helper" and "do not add another [strip site]" cannot both hold literally; module-scope reuse is the only reading keeping DW-33's site count at 3 (DOM-half pins byte-unchanged, sites still 3 repo-wide). → DW-41 `by-design owner=1-10-epic-1-burn-down`.
+- [x] AA-2 (low) — the deck slab (centerY 0.75, h 0.08, proud 0.06) bottoms at 0.71 and covers the top 0.02m band of the coin door (top 0.73, proud 0.02). No law violated — the coin door is byte-unchanged and the 0.75 dim is the Decided-in-stage-5 smoke-tuned value recorded in the claim-check. → DW-42 `by-design owner=1-10-epic-1-burn-down`; flagged for the lead's Chrome+Edge smoke.
+
+**Rejected (with refutation):**
+- AA-3 — AC4 says "five new contour meshes" but lists six records: not a finding — the marquee box is the repositioned 1.4 part (the Review Triage Log's first reject records exactly this), the five NEW parts are deck, kick, hood, two wings, and `SHELL_PART_MESHES = 11 = 6 + 5`; the only fix would edit the spec under review.
+- AA-4 — `cabinets.test.ts` missing from the spec's Execution list: the Shared surfaces section already covers it (SHELL's records drive its pins); fix would edit the spec under review.
+- AA-5 — tracker churn inside the diff range violates the tracker never-clause: false — the in-range `sprint-status.yaml` changes sit in lead-authored chore commits; the story's stages never touched it (the tracker is lead-owned).
+
 ## Spec Change Log
 
 ## Review Triage Log
@@ -167,6 +190,12 @@ Implement-stage review (four layers: adversary, edge-case, verify-BDD, verificat
 - `mutation: drop the simHome === "" leg of the DW-5 law -> the simPath naming the games/alpha/sim DIRECTORY itself emits (exit 0); the QA directory-law test reds; revert.`
 - `mutation: SHELL.coinSlot.centerY 0.67 -> 0.68 -> only the QA continuity IS-pin test reds — all 21 cabinets tests and every derived face/AABB pin stay green, proving the pre-existing pins cannot see a constant nudge (the byte-to-HEAD matrix row was structurally unfalsifiable); revert byte-identical.`
 - Also renamed the stale real-repo witness test ("the repo tree (no games yet)" -> "the REAL repo tree stays green under the extended rules") — comment/name only, assertion unchanged. Judged already-covered (no new test): lint-bans real-repo exit-0 witness, gen-registry e2e under the temp repo's games/ layout, template-literal subscript, camera attach/?.-add/dotted-prefix forms (regex + segment allowlist), the multi-placement formula (single placement in data; formula already carries `x placements`, per-placement behavior untestable without editing cabinets.ts — recorded as observation, not a gap this stage can close).
+
+**Code-review patches (Rule 19 — each mutation applied, observed red, reverted byte-identical):**
+- `mutation: SHELL.marquee.centerY 1.87 -> 1.55 -> exactly one red (the new marquee IS-pin; 14 pass/1 fail in scene.test.ts) — every derived marquee/exposure/spill pin stays green, proving the IS-pin is the sole witness of the raise; revert byte-identical.` `mutation: SHELL.marquee.depth 0.09 -> 0.08 -> exactly one red (the depth IS-pin; 14 pass/1 fail); revert byte-identical.`
+- `mutation: remove the .sort((a,b)=>a.pos-b.pos) in bannedChains -> the hitorder order-pin reports [27: no-date-now, 11: no-date-use]; red; restore -> green.`
+- `mutation: remove the headsBannedAccess sole-owner guard in accessHits -> globalThis.Date.now() and window.performance.now() double-hit (bare receiver + chain member), the globalclock summary pin 8 != 6 fails; revert -> green.`
+- `mutation: plant core/room/_probe/pose.ts naming camera in code -> the recursive blind leg reds (the pre-patch flat readdirSync scan stayed green over the plant — the witness that the recursion is load-bearing); remove the plant; tree clean.`
 
 **Lead's manual smoke (DW-12 tier — Chrome AND Edge, after review):** fresh `npm run dev`: cabinet B0 reads as an upright arcade cabinet from 2m and 6m — marquee box on top with the title lit and legible across the room, hooded screen, control-deck silhouette, shaped side panels, kick base; the screen's attract/NEXT faces paint byte-identical to 1.9; walking into the cabinet presses against the same body box (no new invisible wall); body = script + ONE canvas at all times. The owner's realism verdict on DW-29's verbatim closes the entry at the lead's gate.
 

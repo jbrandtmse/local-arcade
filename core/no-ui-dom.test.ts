@@ -206,9 +206,9 @@ test("the camera never hosts content: main.ts camera refs ride the allowlist, ca
     assert.ok(!bad, `${path.relative(REPO, file)} must not host content on the camera (${bad?.[0]}) — a camera-parented mesh would ride the view (AD-24)`);
   }
 
-  const blind: string[] = readdirSync(path.join(REPO, "core", "room"))
-    .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"))
-    .map((f) => path.join(REPO, "core", "room", f));
+  // Recursive (like the camHost walk above): a room module placed in a
+  // subdirectory must not escape the camera-blind law.
+  const blind: string[] = walk(path.join(REPO, "core", "room"), ".ts");
   blind.push(path.join(REPO, "core", "entry.ts"), path.join(REPO, "core", "player.ts"));
   for (const file of blind) {
     assert.ok(!cameraRef.test(strip(readFileSync(file, "utf8"))), `${path.relative(REPO, file)} must stay camera-blind — pose and room data never name the camera (DW-11)`);

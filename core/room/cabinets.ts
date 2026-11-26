@@ -36,9 +36,9 @@ export interface CabinetShellSpec {
   /** DW-29 contour records. `proud` is how far the part's front face sits
    * (metres) out from the body front plane — the scene mounts the box centre
    * at `proud - depth/2`, keeping the face exactly at `proud`. The kick
-   * plate is body-centred instead (its front protrusion derives from the
-   * SHELL depth difference, and its 0.64m width stands it outside the body
-   * sides so the plate actually renders). */
+   * plate is body-centred instead: its 0.58m depth leaves its front face
+   * 0.01m BEHIND the body front plane (no protrusion), and the 0.64m width
+   * standing 0.02m outside the body sides is what makes the plate render. */
   deck: { width: number; height: number; depth: number; proud: number; centerY: number };
   kick: { width: number; height: number; depth: number; centerY: number };
   hood: { width: number; height: number; depth: number; proud: number; centerY: number };

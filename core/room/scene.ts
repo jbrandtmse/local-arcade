@@ -478,8 +478,9 @@ export function buildRoomScene(
     // Story 1.10 (DW-29): the upright contours. The deck slab and the hood
     // lip sit at their record's `proud` face offset from the body front
     // plane (box centre at proud - depth/2); the kick plate rides the body
-    // centre line (its face offset derives from the SHELL depth difference);
-    // the two side wings ride the body sides at lateralOffset. Dims come
+    // centre line (centre at -body.depth/2, so its 0.58m depth tucks its
+    // front face just inside the body front plane); the two side wings ride
+    // the body sides at lateralOffset. Dims come
     // only from the SHELL record (one-geometry-source law) — every part
     // within 0.06m of the body AABB sides (scene.test's contour pins).
     const deck = SHELL.deck;

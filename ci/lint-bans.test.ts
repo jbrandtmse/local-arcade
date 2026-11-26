@@ -122,14 +122,23 @@ test("wall-clock forms go red: new Date(), bare Date(), aliased Date, bare perfo
 test("wall-clock reached through globalThis/window members goes red (dotted, bracket, destructure)", () => {
   const dir = fixtureGames({
     "games/globalclock/sim/g.js":
-      'const d = globalThis.Date; const p = window.performance; const e = globalThis["Date"]; const { random } = window.Math; export { d, p, e, random };\n',
+      'const d = globalThis.Date; const p = window.performance; const e = globalThis["Date"]; const { random } = window.Math; const q = globalThis.Date.now(); const w = window.performance.now(); export { d, p, e, random, q, w };\n',
   });
   const result = run(dir);
   assert.equal(result.ok, false);
   assert.ok(result.stderr.includes("no-date-use"), 'globalThis.Date and globalThis["Date"]');
   assert.ok(result.stderr.includes("no-performance-use"), "window.performance");
   assert.ok(result.stderr.includes("no-math-random"), "{ random } = window.Math");
+  assert.ok(result.stderr.includes("no-date-now"), "globalThis.Date.now()");
+  assert.ok(result.stderr.includes("no-performance-now"), "window.performance.now()");
   assert.match(result.stderr, /games[/\\]globalclock[/\\]sim[/\\]g\.js:1:/);
+  const summaries = [...result.stderr.matchAll(/lint-bans: (\d+) banned-API use\(s\)/g)];
+  assert.equal(summaries.length, 1, "exactly one summary line");
+  assert.equal(
+    Number(summaries[0]![1]),
+    6,
+    "six uses, six hits — the value-receiver CHAIN forms (globalThis.Date.now(), window.performance.now()) are single-owner like L4: the wall-clock-use rule does not double-report them",
+  );
 });
 
 // QA (Story 1.10, DW-1 gap): the patched legs — positional regex masking,
@@ -184,6 +193,28 @@ test("destructured wall-clock members: renamed binding, globalThis/window source
   assert.match(result.stderr, /games[/\\]destglobal[/\\]sim[/\\]c\.js:/); // destructure-leg-only witness
   assert.match(result.stderr, /games[/\\]destglobalperf[/\\]sim[/\\]d\.js:/); // destructure-leg-only witness
   assert.match(result.stderr, /games[/\\]destbracket[/\\]sim[/\\]e\.js:/);
+});
+
+// Review (Story 1.10): the three rule streams merge into ONE per-file
+// stream sorted by source position (the merged-stream contract — "every
+// file's stream stays sorted by source position, like the single-pass
+// scanner it replaces"). A line where the bare rule fires EARLIER than a
+// chain hit is the only shape that can see the sort: the plain
+// accessHits-then-bareWallclockHits concatenation would report the chain
+// hit first.
+test("merged hits report in source order: the earlier bare hit is named before the later chain hit", () => {
+  const dir = fixtureGames({
+    "games/hitorder/sim/h.js": "const b = Date; const a = Date.now(); export { a, b };\n",
+  });
+  const result = run(dir);
+  assert.equal(result.ok, false);
+  const cols = [...result.stderr.matchAll(/games[/\\]hitorder[/\\]sim[/\\]h\.js:1:(\d+): (no-[\w-]+)/g)]
+    .map((m) => [Number(m[1]), m[2]] as const);
+  assert.deepEqual(
+    cols,
+    [[11, "no-date-use"], [27, "no-date-now"]],
+    "the bare Date (col 11) is reported before the later Date.now chain (col 27) — the position sort owns the order, not the rule-leg order",
+  );
 });
 
 test("sanctioned forms stay green: Math-as-value, Math.floor, regex literals and comments", () => {

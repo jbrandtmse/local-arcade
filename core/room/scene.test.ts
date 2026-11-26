@@ -664,13 +664,19 @@ test("1.10 DW-29 upright contours: deck slab, kick plate, screen hood, and two s
 // pin and subject together — no existing test can see it. These ARE-value
 // pins are the drift cure for the matrix row "byte-identical to HEAD": the
 // constants are their 723fa3f values, and the B0 collision volume sits at
-// the exact HEAD box (the contours added no invisible wall).
+// the exact HEAD box (the contours added no invisible wall). The one record
+// DW-29 DID change — the marquee box's raise (centerY/depth) — gets the same
+// IS-pin for AC4's "raised box" claim: the bar/face/spill pins derive from
+// the constant, so only this pin can see an un-raise (a smoke re-tune
+// re-pins here, precedent CABINET_LIGHT_STANDOFF_M).
 test("1.10 QA continuity: the untouched shell records and the B0 collision AABB ARE their HEAD values (DW-29 byte-unchanged drift pins)", () => {
   assert.equal(SHELL.body.width, 0.6, "body width IS 0.60m — room-layout's stand-up contract");
   assert.equal(SHELL.body.depth, 0.6, "body depth IS 0.60m (the AABB x/z pins ride it)");
   assert.equal(SHELL.body.height, 1.8, "body height IS 1.80m (the AABB y-max rides it)");
   assert.equal(SHELL.marquee.width, 0.58, "the marquee FACE width IS 0.58 (1.4's face law never re-ran at DW-29's raised box)");
   assert.equal(SHELL.marquee.height, 0.5, "the marquee FACE height IS 0.50 (paintMarquee's fit dims byte-unchanged)");
+  assert.equal(SHELL.marquee.centerY, 1.87, "the marquee box IS raised to centerY 1.87 (AC4: box top 2.12m under the 3.0m wall; the spill-light pin rides it by formula)");
+  assert.equal(SHELL.marquee.depth, 0.09, "the marquee box depth IS 0.09 (the 0.0939 exposure cap's floor-side neighbour; the spill ceiling pin rides it)");
   assert.equal(SHELL.screen.width, 0.44, "the screen face width IS 0.44");
   assert.equal(SHELL.screen.height, 0.52, "the screen face height IS 0.52");
   assert.equal(SHELL.screen.centerY, 1.05, "the screen face centerY IS 1.05");

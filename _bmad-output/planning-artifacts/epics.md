@@ -566,6 +566,7 @@ So that the newest machine always lands beside the unfilled stretch, the same hi
 **And** if no remaining deterministic placement passes the ≥1.20m aisle lint, Registration refuses — the room never enters lint-red; an empty slot pool yields a deterministic "room full" L0 refusal (room growth is its own future epic)
 **And** the Zone-bound path exists: `presentationOnly` pinball Manifests bind to pre-declared Pinball Corner Zone slots, exempt from fill but still deterministic (used in Epic 4)
 **And** machines never move: the function never rearranges existing placements (FR-10, FR-16's "never move")
+**And** the shell contour repeats per machine: with two or more placements, the cabinet shell contours added in Story 1.10 (marquee box, deck slab, kick plate, screen hood, side wings) extrude per placement and the repetition is testable through the placement seam (DW-43)
 
 ### Story 3.5: Instruction Cards from the Manifest — and the character lint
 

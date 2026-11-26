@@ -8,6 +8,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - 2026-11-21T12:01:42Z status=routed owner=burndown by=harvest note=depth forms deferred to the Epic 3 L0 gate
 - 2026-11-21T23:06:38Z occurrence=1-1-project-bootstrap-and-the-deterministic-kernel-core by=cr note=Math["random"], Math?.random and new Date() re-sighted in ci/lint-bans self-test probe
 - 2026-11-25T10:56:57Z owner=1-10-epic-1-burn-down by=burndown note=chartered_into_Story_1.10_closes_now_in-Epic-1-footprint
+- 2026-11-26T00:37:19Z status=resolved-by:1-10-epic-1-burn-down by=adjudication note=bracket/optional-chain/destructure/bare-wallclock forms red in ci/lint-bans.test.ts(12/12);lead Layer-1 bracket-leg-kill mutation red;real repo green incl sanctioned helpers.js:15
 
 ### DW-2: core/main.ts boot: a throwing createSim factory is unguarded - one faulty game kills the whole room at page load (AD-15)
 - source: _bmad-output/implementation-artifacts/spec-1-1-project-bootstrap-and-the-deterministic-kernel-core.md | severity: med | fix-risk: low | footprint: core/
@@ -34,6 +35,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - evidence: review G26/edge-20; manifest + L0 land Epic 3
 - 2026-11-21T12:01:43Z status=routed owner=burndown by=harvest note=
 - 2026-11-25T10:56:58Z owner=1-10-epic-1-burn-down by=burndown note=chartered_into_Story_1.10_low_fix-risk_build-step_validation
+- 2026-11-26T00:37:19Z status=resolved-by:1-10-epic-1-burn-down by=adjudication note=simPath law in gen-registry.mjs:64-67;bad-path+traversal+directory expectFailure pins;shipped list byte-identical drift;Layer-1 simHome-always-ok mutation red
 
 ### DW-6: matrix Out-of-tick-write row has no composable fault-chain test surface (gate throws to caller; supervisor wraps kernel sites - two disjoint surfaces)
 - source: _bmad-output/implementation-artifacts/spec-1-1-project-bootstrap-and-the-deterministic-kernel-core.md | severity: med | fix-risk: med | footprint: core/contract/
@@ -68,6 +70,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - 2026-11-22T03:30:17Z status=routed owner=burndown by=harvest note=routed from spec-1-2 deferred 2026-11-22; Epic 3 owns the machine lint (3.1/3.2 L0, 3.7 L2 audit) - route-to-story or own at the Epic 1 burn-down gate; also fixes the AC5 numbering drift (epics AC5 folded into spec AC1 bullet)
 - 2026-11-22T06:53:55Z occurrence=1-2-first-person-walk-look-and-move-no-prompts
 - 2026-11-25T10:56:58Z owner=1-10-epic-1-burn-down by=burndown note=chartered_into_Story_1.10_in-view_no-UI_law_pin_test_closes_now_no_new_dep
+- 2026-11-26T00:37:20Z status=resolved-by:1-10-epic-1-burn-down by=adjudication note=in-view law pinned: segment allowlist+camera.add/attach ban+recursive camera-blind leg;Layer-1 planted camera.add at main.ts:121 red (main.ts byte-identical after);QA forms coverage;DW-41 by-design records the strip-hoist deviation
 
 ### DW-12: core/main.ts glue has no executed test host: addSystem takeView wiring, device listeners, silent-denial path pinned only by source-text and dev-serve text asserts
 - source: _bmad-output/implementation-artifacts/spec-1-2-first-person-walk-look-and-move-no-prompts.md | severity: med | fix-risk: high | footprint: in-story
@@ -174,6 +177,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - evidence: owner verbatim: 'it looks like a vending machine now... hoping for something more like a real arcade cabinet, with a marquee on top and contours like a real cabinet'; current stand-up shell is a flat slab with a lit marquee band (1.4 geometry)
 - 2026-11-24T14:24:52Z status=routed owner=burndown by=lead note=owner-initiated; NOT an AC miss for 1-4 (marquee-lit law met) - enhancement beyond current ACs; priority-rank at the Epic 1 burndown gate, candidate new story (visual polish) on the decision sheet; geometry lives in core/room/cabinets.ts + collision volumes + screen surface mapping
 - 2026-11-25T10:56:58Z owner=1-10-epic-1-burn-down by=burndown note=chartered_into_Story_1.10_owner-prioritized_cabinet_realism_pass
+- 2026-11-26T00:37:20Z status=resolved-by:1-10-epic-1-burn-down by=adjudication note=contours shipped (marquee box,deck,kick,hood,wings;SHELL_PART_MESHES 11);QA IS-value drift pins + VG-1 continuity pins falsify the byte-identical law (AABB/faces/canvases/lights);realism verdict adjudicates at the smoke immediately following - a failed smoke reopens through the rework loop
 
 ### DW-30: boot identity uses crypto.randomUUID outside any supervisor: a runtime without Web Crypto (insecure-context http origin) throws at boot instead of degrading — settle with the deploy origin's scheme (droplet https vs plain http)
 - source: 1-8-the-room-knows-you-without-an-account | severity: medium | fix-risk: low | footprint: core
@@ -219,3 +223,29 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: spec-1-9-the-street-door-beat-loading-as-fiction-s-first-shot.md | severity: low | fix-risk: med | footprint: in-story
 - evidence: no consumer reads mount.reason today (review pass 1 blind 3 kept the option for the caller); deriving true provenance needs an entry-side path source the API does not expose
 - 2026-11-25T09:53:03Z status=wontfix-accepted owner=1-9-the-street-door-beat-loading-as-fiction-s-first-shot by=cr note=reopen_if=first consumer of mount.reason attributes a fault from it (console/telemetry) and sees a wrong label
+
+### DW-39: ci/lint-bans wall-clock rules bind the .now member only: Date.parse, Date.UTC, and performance.timeOrigin walk the sim-path gate green (probe-verified)
+- source: spec-1-10-epic-1-burn-down | severity: med | fix-risk: med | footprint: in-story
+- evidence: ci/lint-bans.mjs BAN_LOOKUP/GLOBAL_CLOCK key exact receiver.member pairs (Date.now, Date.perf now, globalThis.Date family); a planted sim file using Date.parse / Date.UTC / performance.timeOrigin exits 0. Closing this moves the banned SET - owner-only posture per DW-8 precedent; the 1.10 spec binds FORMS of already-banned APIs, never new API families
+- 2026-11-26T00:25:25Z status=escalated owner=burndown by=cr note=decision-sheet alongside DW-8; distinct family (wall-clock members, not transcendentals)
+
+### DW-40: cycle-log 1.10 qa_complete row has ts and spawn_at swapped: ts=21:18:28Z is the spawn time, spawn_at=21:59:41Z is the completion (inverted vs the log schema)
+- source: spec-1-10-epic-1-burn-down | severity: low | fix-risk: low | footprint: out-of-story
+- evidence: _bmad-output/implementation-artifacts/cycle-log-epic-1.md qa_complete row (2026-11-25): the ts column carries the stage-spawn timestamp while spawn_at carries the completion timestamp - reversed reading of the schema's row
+- 2026-11-26T00:25:39Z status=decision-pending owner=burndown by=cr note=human=lead - cycle-log rows are the lead's artifact; reported for the lead's bookkeeping fix, nothing closable by a story stage
+- 2026-11-26T00:37:19Z status=resolved-by:1-10-epic-1-burn-down by=lead note=row_ts_and_spawn_at_swapped_back_in_place_at_cr_close(lead-owned cycle log)
+
+### DW-41: no-ui-dom.test.ts comment-strip idiom hoisted to module scope - the spec sentence do-not-hoist-a-shared-helper and the sentence do-not-add-another-strip-site cannot both hold literally; module-scope reuse is the only reading that keeps DW-33's strip-site count at 3
+- source: spec-1-10-epic-1-burn-down | severity: low | fix-risk: low | footprint: in-story
+- evidence: core/no-ui-dom.test.ts module-scope strip()/walk() feed the new DW-11 camera scans; DW-33's reopen_if counts independent strip SITES repo-wide (main-glue:381, no-ui-dom, storage:690 stay 3); the DOM-half pins (:37-47, :60-70) are byte-unchanged
+- 2026-11-26T00:26:01Z status=by-design owner=1-10-epic-1-burn-down by=cr note=reading that satisfies both spec clauses; DW-33's fourth-site unify trigger untouched
+
+### DW-42: DW-29 deck slab bottoms at 0.71m and rides proud 0.06 - it covers the top 0.02m band of the coin door (door top 0.73, proud 0.02); decor overlap, realism-tier only
+- source: spec-1-10-epic-1-burn-down | severity: low | fix-risk: low | footprint: in-story
+- evidence: core/room/cabinets.ts SHELL.deck centerY 0.75 height 0.08 (bottom 0.71, top 0.79) vs coin-door record top 0.73; scene.ts deck mount proud 0.06 exceeds the door's 0.02; no binding law violated (the coin door itself is byte-unchanged); the 0.75 dim is the Decided-in-stage-5 smoke-tuned value recorded in the spec claim-check
+- 2026-11-26T00:26:01Z status=by-design owner=1-10-epic-1-burn-down by=cr note=flag for the lead's Chrome+Edge smoke: if the covered band reads wrong at 2m/6m, smoke-tune SHELL.deck centerY/proud there
+
+### DW-43: Cabinet-shell contour extrusion is single-placement-only: the SHELL formula scales parts by cabinetPlacements.length but authored data holds one placement and there is no injection seam — per-placement contour repetition untestable once 3.4 makes placement a pure function
+- source: 1-10-epic-1-burn-down | severity: low | fix-risk: low | footprint: core
+- evidence: QA observation at story 1.10 qa_complete, confirmed valid by CR: core/room/cabinets.ts SHELL loop multiplies by cabinetPlacements.length; only one authored placement; no seam to plant two
+- 2026-11-26T00:46:06Z status=routed owner=3-4-the-layout-system-placement-is-a-pure-build-time-function by=lead note=adjudicated at story 1-10 ledger gate (not a 1.10 fix: 1.10 shipped the law for the authored single placement); the placement seam is 3.4's own ground — pin contour repetition at that story
