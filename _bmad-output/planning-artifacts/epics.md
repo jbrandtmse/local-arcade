@@ -129,7 +129,7 @@ NFR-12: Counter-metrics (do not optimize) — cabinet count (SM-C1) and raw visu
 
 UX-DR1: Implement the color token system as authored: room envelope (Room Black `#15110E`, Wall Warm `#2E241D`, Wall Panel `#4A3628`, Carpet Base/Pattern `#221B27`/`#3E3046` low-contrast octagon/weave); eight glow anchors (`glow-marquee #FFC46B`, `glow-pink #FF4FA3`, `glow-cyan #5BC8FF`, `glow-green #57E6A3`, `glow-violet #B07CFF`, `glow-orange #FF9A5C`, `glow-red #FF6B5E`, `glow-steel #7FB0C9`) used only as light/material identity from machines and zone fixtures — never painted on walls; in-world paper surfaces (Paper Card `#F2E8D4` / Card Ink `#2A241C`, Nameplate Brass `#D8C48F`, Sign Chalk `#E8E4DD`); outside-fiction UI trio (`ui-surface #191919`, `ui-text #EDEDED`, `ui-muted #9A9A9A` hint/disabled only, `ui-accent` = cyan glow, `ui-border`, `ui-focus`). No pure white or pure black fills; no chromatic color in the room that isn't light-from-a-machine.
 
-UX-DR2: Implement the world-scale typography system, enforced by a legibility lint (size table × distance × lux): Chakra Petch marquee-title (cap 0.18m, legible ~15m; provisional face — swap candidate Saira Condensed must pass the table); Archivo Narrow instruction-heading (x-height ≥20mm) / Archivo instruction-body (x-height ≥12mm at 0.5m, era operators'-sheet voice); Archivo Narrow caps room-sign (cap ≥60mm at 3m); Spectral nameplate (cap ≥30mm at 2m, museum voice); IBM Plex Sans (24px/600 heading, 16px/1.6 body) outside-fiction pages only. Marquees carry `Manifest.title` only.
+UX-DR2: Implement the world-scale typography system, enforced by a legibility lint (size table × distance × lux): Chakra Petch marquee-title (cap 0.09m, ONE line, emissive-lit from the in-body marquee face centred ~1.71m; legible ~8m lit; provisional face — swap candidate Saira Condensed must pass the table); Archivo Narrow instruction-heading (x-height ≥20mm) / Archivo instruction-body (x-height ≥12mm at 0.5m, era operators'-sheet voice); Archivo Narrow caps room-sign (cap ≥60mm at 3m); Spectral nameplate (cap ≥30mm at 2m, museum voice); IBM Plex Sans (24px/600 heading, 16px/1.6 body) outside-fiction pages only. Marquees carry `Manifest.title` only.
 
 UX-DR3: Implement spacing/scale anchors as world units: eye height 1.60m; walk speed 1.4 m/s with head bob ±0.04m; stand-up cabinet width ~0.60m; Wall Slot pitch 1.40m; aisles never narrower than 1.20m; room interior ~19m × 12.5m (too big to take in at once, sized for 50-cabinet honesty); outside-fiction gutter 24px and spacing scale 4/8/16/32px.
 
@@ -137,7 +137,7 @@ UX-DR4: Implement the shape language: 0px radius for cabinet shells/screens/beze
 
 UX-DR5: Marquee component — glow-marquee (or the game's art-lit variant) lettering of `Manifest.title` on a dark cabinet-top bar, lit from within, never below the authored cap height; game name only.
 
-UX-DR6: Cabinet screen surface treatment (Core-owned): attract / score table / NEXT / replay playback all render here; score table in era-CRT voice at instruction-heading scale rules; NEXT signal at the marquee's authored minimum, legible from across the room (rung-2 of the pull ladder works without audio); fault fallback keeps marquee + screen motion alive; screen glows in the machine's own hue family.
+UX-DR6: Cabinet screen surface treatment (Core-owned): attract / score table / NEXT / replay playback all render here; score table in era-CRT voice at instruction-heading scale rules; NEXT signal at its own authored minimum (0.18m cap, independent of the marquee cap), legible from across the room (rung-2 of the pull ladder works without audio); fault fallback keeps marquee + screen motion alive; screen glows in the machine's own hue family.
 
 UX-DR7: Instruction Card — generated from Manifest attribution + rules text; Paper Card stock behind the coin door; heading + rules + attribution; print budget: one rule per line, capped length; card↔Workshop-drawer pairing.
 
@@ -421,6 +421,13 @@ So that Epic 2 starts with the prior epic's cleanup debt closed: the owner-repor
 **Acceptance Criteria:**
 
 - DW-24: mouse-look: mousing far left/right makes the view become the floor (view flips/slams to floor at extreme yaw after big horizontal drags) — reproduced at extreme yaw beyond the ~2.5 rad drags the Epic-1 smokes used, then fixed in the Core player look math (yaw wrap / pitch clamp) with a falsifiable extreme-yaw test pinning the law (ledger; owner report 2026-11-23; X.0 triage 2026-11-26)
+- DW-29 (reopened): the stand-up cabinet reads as a real 1980s upright, not a vending machine — the shell is rebuilt from the owner-authored SIDE_PROFILE/INNER_PROFILE polygons extruded via ExtrudeGeometry (room stays box-only), assembled in a per-cabinet local-frame group placed by placementGeometry + exported closedYaw, with screen/control-panel/marquee/speaker-grille/coin-door-frame/contact-shadow assemblies (ledger; owner corrective task 2026-11-26)
+  - byte-identical: cabinetAABB, collisionVolumes, the 0.60×0.60 footprint, SHELL.body, SHELL.screen.width/height (0.44/0.52), coinDoorPose/toggleCoinDoor/SHELL.coinDoor/SHELL.coinSlot world-space meshes, cabinetPlacements, attract phase law, paintScreen/repaintScreen/compositeScreen/drawScreen, games/, core/contract/, kernel tick
+  - kind 'cabinet' volumes stay in the list but draw no mesh; the shell silhouette stays inside the volume AABB except the open coin door and side-art decals
+  - emissive on exactly 2 materials per cabinet (screen face, marquee face); one-line marquee at cap 0.09 m keeping the fit law (throw below −0.5 em spacing, cap never shrunk); NEXT row keeps its own 0.18 m floor (AD-28 untouched)
+  - new colour tokens live in tokens.ts only (hex-outside-tokens scan stays green); sRGB + anisotropy + ACES tone mapping land in main.ts — DW-23 reopen_if fires: exposure bounds and CABINET_LIGHT_INTENSITY are re-derived under the tone curve with the screen the brightest face, then re-pinned
+  - budgets: ≤1500 triangles and ≤30 meshes per cabinet; geometries/materials shared across cabinets; per-cabinet textures only for screen/marquee/side-art/overlay; part counts computed from the part list, never typed
+  - test laws narrowed, never deleted; 8 new verification tests run in Node against real three.js; full local loop green (typecheck, test, depcheck, lint-bans, registry drift, build); 4 evidence screenshots to implementation-artifacts/evidence/; the task's 9-question acceptance checklist answered yes in the story report
 
 ### Story 2.1: Core Audio Manager — attract sound that occludes and swells
 
@@ -576,7 +583,7 @@ So that the newest machine always lands beside the unfilled stretch, the same hi
 **And** if no remaining deterministic placement passes the ≥1.20m aisle lint, Registration refuses — the room never enters lint-red; an empty slot pool yields a deterministic "room full" L0 refusal (room growth is its own future epic)
 **And** the Zone-bound path exists: `presentationOnly` pinball Manifests bind to pre-declared Pinball Corner Zone slots, exempt from fill but still deterministic (used in Epic 4)
 **And** machines never move: the function never rearranges existing placements (FR-10, FR-16's "never move")
-**And** the shell contour repeats per machine: with two or more placements, the cabinet shell contours added in Story 1.10 (marquee box, deck slab, kick plate, screen hood, side wings) extrude per placement and the repetition is testable through the placement seam (DW-43)
+**And** the shell repeats per machine: with two or more placements, the cabinet shell added in the Story 2.0 profile rebuild (SIDE_PROFILE/INNER_PROFILE panels, front panel, and the screen/control-panel/marquee/grille/shadow assemblies, each one group per cabinet) repeats per placement and the repetition is testable through the placement seam (DW-43)
 
 ### Story 3.5: Instruction Cards from the Manifest — and the character lint
 
