@@ -171,6 +171,21 @@ test("1.4 cabinet wiring: the phase advances as a kernel system, coin doors togg
     "the composed zones spread the authored record and replace ONLY the score leg with the table's rows (mutation: paint the raw zones and the score zone stays empty forever — red here)",
   );
   assert.match(body, /repaintScreen\(\s*s\.canvas,\s*zones,/, "the repaint consumes the composed zone records");
+  // 2.0 cap split (AD-28): the NEXT leg at the SHIPPED page must ride the
+  // 0.18 m SCREEN_NEXT_CAP_M floor, never the 0.09 m marquee cap. The
+  // containment/storage/scheduler/cabinets-qa mirrors call surfaces.ts with
+  // their own constants, so only these pins observe main.ts's own argument
+  // pairing (the executed tier still waits for the 3.2 harness, DW-44).
+  assert.match(
+    body,
+    /repaintScreen\(\s*s\.canvas,[\s\S]*?SCREEN_ATTRACT_CAP_M,\s*SCREEN_NEXT_CAP_M,/,
+    "the shipped repaint pairs the attract cap with the AD-28 NEXT cap, in order (mutation: swap these two args — red here)",
+  );
+  assert.match(
+    body,
+    /compositeScreen\(\s*s\.canvas,[\s\S]*?SCREEN_NEXT_CAP_M,/,
+    "the shipped composite feeds the busy-screen face the AD-28 NEXT cap (the NEXT row paints at 0.18 m on the live page)",
+  );
   assert.ok(body.includes("paintStep,"), "the repaint receives the tick-derived paint step (liveness source)");
   assert.ok(body.includes("three.markTextureUpdated(s.texture)"), "a repaint marks the SAME texture dirty (no second canvas)");
   // 1.9 moved pin: the arcadeDebug line gains the entry sequence (phase +

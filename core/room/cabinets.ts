@@ -110,9 +110,9 @@ export const INNER_PROFILE: readonly ProfilePoint[] = [
 // structural meshes, the front panel, the two side-art decals, the contact
 // shadow, the screen sub-group, the control-panel sub-group (overlay +
 // joystick + two play buttons with rings + start button), the marquee face
-// and retainers, the three grille slats, the coin-door frame + reject
-// button, and the two coin-door parts that stay WORLD-space posed meshes
-// (the brief's one exception to the group). The scene mesh-count formula
+// and retainers, the three grille slats, then the two coin-door parts that
+// stay WORLD-space posed meshes (the brief's one exception to the group)
+// and the frame + reject button mounted beside them. The scene mesh-count formula
 // multiplies this count by the placements — formula, never magic.
 export const SHELL_PART_LABELS: readonly string[] = [
   "side-panel-left",
@@ -139,10 +139,10 @@ export const SHELL_PART_LABELS: readonly string[] = [
   "grille-slat-1",
   "grille-slat-2",
   "grille-slat-3",
-  "coin-door-frame",
-  "coin-reject-button",
   "coin-door-panel",
   "coin-slot",
+  "coin-door-frame",
+  "coin-reject-button",
 ];
 
 export const SHELL_PART_MESHES = SHELL_PART_LABELS.length;

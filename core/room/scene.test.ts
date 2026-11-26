@@ -20,6 +20,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { ShaderChunk } from "three";
 import { AMBIENT_INTENSITY, buildRoomScene, DOOR_GLOW_INTENSITY, DOOR_GLOW_REACH, type Placed, type RoomScene, type Three } from "./scene.ts";
 import { DOOR_TOP, INTERIOR, WALL_T, WALL_TOP, collisionVolumes } from "./collision-volumes.ts";
 import { EMPTY_BASEPLATE, wallSlots } from "./slot-config.ts";
@@ -325,9 +326,13 @@ function fakeWorld(): {
   objects: object[];
   factory: (w: number, h: number) => PaintSurface;
   canvasTexts: string[][];
+  canvases: PaintSurface[];
+  canvasArcs: { x: number; y: number; r: number }[][];
 } {
   const objects: object[] = [];
   const canvasTexts: string[][] = [];
+  const canvases: PaintSurface[] = [];
+  const canvasArcs: { x: number; y: number; r: number }[][] = [];
   const scene: RoomScene = {
     add(o) {
       objects.push(o);
@@ -337,6 +342,8 @@ function fakeWorld(): {
   const factory = (w: number, h: number): PaintSurface => {
     const texts: string[] = [];
     canvasTexts.push(texts);
+    const arcs: { x: number; y: number; r: number }[] = [];
+    canvasArcs.push(arcs);
     const ctx: PaintContext = {
       fillStyle: "#000000",
       font: "",
@@ -360,16 +367,20 @@ function fakeWorld(): {
       translate() {},
       rotate() {},
       beginPath() {},
-      arc() {},
+      arc(x, y, radius) {
+        arcs.push({ x, y, r: radius });
+      },
       stroke() {},
       lineWidth: 0,
       createRadialGradient() {
         return { addColorStop() {} };
       },
     };
-    return { width: w, height: h, getContext: (kind) => (kind === "2d" ? ctx : null) };
+    const canvas: PaintSurface = { width: w, height: h, getContext: (kind) => (kind === "2d" ? ctx : null) };
+    canvases.push(canvas);
+    return canvas;
   };
-  return { scene, objects, factory, canvasTexts };
+  return { scene, objects, factory, canvasTexts, canvases, canvasArcs };
 }
 
 const built = (() => {
@@ -695,6 +706,51 @@ test("cabinet glow exposure law (DW-23, re-measured under ACES): each light's ow
   assert.equal(CABINET_FACE_ILLUMINANCE_FLOOR, 0.17, "the face-illuminance floor constant IS 0.17 \u2014 the measured pre-tonemap value that maps to 0.20 output (DW-23)");
 });
 
+// Story 2.0 QA (DW-23 substrate, made executable): the measured table the
+// exposure law's literals come from (screen sheet 1.0 -> 0.763, marquee
+// sheet 1.2 -> 0.804, the old bound's peak 2.0 -> 0.888, ceiling inverse
+// 1.18 -> 0.80, floor inverse 0.17 -> 0.20) is re-evaluated against the
+// ACES fit constants as three 0.187.0 SHIPS them, parsed straight out of
+// the ShaderChunk source — never retyped here. If a three upgrade moves the
+// curve, reddens the parse, or breaks the gray-preservation premise, this
+// test fails and forces the DW-23 re-derivation Story 2.3 rides on, instead
+// of leaving comments describing a dead curve. Anchor tolerances absorb
+// only the 3-decimal rounding of the table, not a curve shift.
+test("DW-23 substrate is executable: three's shipped ACES fit maps the exposure law's constants as the measured table (QA)", () => {
+  const glsl = ShaderChunk.tonemapping_pars_fragment;
+  const fa = glsl.match(/vec3 a = v \* \( v \+ ([\d.]+) \) - ([\d.eE-]+);/);
+  const fb = glsl.match(/vec3 b = v \* \( ([\d.]+) \* v \+ ([\d.]+) \) \+ ([\d.]+);/);
+  const ex = glsl.match(/color \*= toneMappingExposure \/ ([\d.]+);/);
+  assert.ok(fa && fb && ex, "three's shipped ACES fit is still parseable (a re-formatted tone-mapping source reds HERE and forces re-derivation — never silently)");
+  const [A, B, C, D, E, DIV] = [fa[1], fa[2], fb[1], fb[2], fb[3], ex[1]].map(Number);
+  assert.equal(DIV, 0.6, "the exposure scale is the /0.6 factor the table was measured with");
+  // The scalar-illuminance shortcut is legal only because the ACES in/out
+  // matrices are gray-preserving — check the premise from the SHIPPED
+  // matrices (column sums = 1 per component), not from prose.
+  const columns = (name: string): number[][] => {
+    const m = glsl.match(new RegExp(`${name} = mat3\\(([\\s\\S]*?)\\);`));
+    assert.ok(m, `three ships ${name}`);
+    const cols = [...m[1]!.matchAll(/vec3\(\s*(-?[\d.]+),\s*(-?[\d.]+),\s*(-?[\d.]+)\s*\)/g)].map((c) => [Number(c[1]), Number(c[2]), Number(c[3])]);
+    assert.equal(cols.length, 3, `${name} is three columns`);
+    return cols;
+  };
+  for (const name of ["ACESInputMat", "ACESOutputMat"]) {
+    for (const comp of [0, 1, 2]) {
+      const sum = columns(name).reduce((s, col) => s + col[comp]!, 0);
+      assert.ok(Math.abs(sum - 1) < 2e-4, `${name} preserves gray on component ${String(comp)} (column sum ${String(sum)} — the scalar fit premise the exposure table rests on)`);
+    }
+  }
+  const aces = (x: number): number => {
+    const v = x / DIV;
+    return (v * (v + A) - B) / (v * (C * v + D) + E);
+  };
+  assert.ok(Math.abs(aces(1.0) - 0.763) < 1e-3, `the screen sheet at intensity 1.0 tone-maps to 0.763 (got ${aces(1.0).toFixed(4)})`);
+  assert.ok(Math.abs(aces(1.2) - 0.804) < 1e-3, `the marquee sheet at 1.2 tone-maps to 0.804 — the machine's brightest face (got ${aces(1.2).toFixed(4)})`);
+  assert.ok(Math.abs(aces(2.0) - 0.888) < 1e-3, `the pre-2.0 bound's peak 2.0 tone-maps to 0.888, above both sheets — why the old ceiling failed the smoke (got ${aces(2.0).toFixed(4)})`);
+  assert.ok(Math.abs(aces(CABINET_FACE_ILLUMINANCE_CEILING) - 0.8) < 5e-3, `the pinned ceiling ${String(CABINET_FACE_ILLUMINANCE_CEILING)} IS the measured pre-tonemap value mapping to 0.80 output (got ${aces(CABINET_FACE_ILLUMINANCE_CEILING).toFixed(4)})`);
+  assert.ok(Math.abs(aces(CABINET_FACE_ILLUMINANCE_FLOOR) - 0.2) < 5e-3, `the pinned floor ${String(CABINET_FACE_ILLUMINANCE_FLOOR)} IS the measured pre-tonemap value mapping to 0.20 output — below it a face reads dead (got ${aces(CABINET_FACE_ILLUMINANCE_FLOOR).toFixed(4)})`);
+});
+
 function rootMeshByDims(w: number, h: number, d: number): MeshRec {
   const found = built.meshes.filter((m) => m.parent === null && m.geo.w === w && m.geo.h === h && m.geo.d === d);
   assert.equal(found.length, 1, `exactly one world mesh with dims ${w}x${h}x${d}`);
@@ -762,6 +818,9 @@ test("2.0 shell build: profiled side panels + core, front panel, tilted screen s
     const shadow = one(0.6, 0.002, 0.6);
     assert.ok(Math.abs(shadow.y - 0.022) < 1e-12 && Math.abs(shadow.x) < 1e-12 && Math.abs(shadow.z) < 1e-12, "the contact shadow hugs the floor under the body centre");
     assert.equal(shadow.mat.params["transparent"], true, "the shadow sheet is transparent + depthWrite off (a painted pool, not geometry)");
+    // QA (Story 2.0): the depthWrite half of that message was never asserted
+    // — with depthWrite on, the sheet occludes the carpet it paints on.
+    assert.equal(shadow.mat.params["depthWrite"], false, "the shadow sheet writes no depth (brief 4f: transparent + depthWrite false — it must not hide what it grounds)");
 
     // 4a screen sub-assembly: the group carries the -9.8 deg lean.
     const screenGroup = subs.find((sg) => Math.abs(sg.rx + 0.1707) < 1e-12);
@@ -776,7 +835,7 @@ test("2.0 shell build: profiled side panels + core, front panel, tilted screen s
     assert.equal(screenFace.mat.params["emissiveIntensity"], 1.0, "the screen face carries the brief's 1.0 intensity");
     // Exact proud law (the exposure law's -0.2831 literal reads this):
     const sProud = (world(screenFace).x - g.front.x) * g.facing.x + (world(screenFace).z - g.front.z) * g.facing.z;
-    assert.ok(Math.abs(sProud - (0.01 + Math.cos(0.1707) * 0.0055 - SHELL.body.depth / 2)) < 1e-12, "the screen face CENTRE sits exactly 0.01 + cos(lean)*0.0055 forward \u2014 0.2831 m behind the body front plane");
+    assert.ok(Math.abs(sProud - (0.01 + Math.cos(0.1707) * 0.0055 - SHELL.body.depth / 2)) < 1e-12, "the screen face CENTRE sits exactly 0.01 + cos(lean)*0.0055 forward \u2014 0.2846 m behind the body front plane; the 0.003-thick face's FRONT edge (locator-pinned at m.geo.d === 0.003) carries the exposure law's 0.2831 m figure");
 
     // 4b control sub-assembly: +21 deg lean, overlay + full hardware.
     const controlGroup = subs.find((cg) => Math.abs(cg.rx - 0.3709) < 1e-12);
@@ -792,6 +851,29 @@ test("2.0 shell build: profiled side panels + core, front panel, tilted screen s
     assert.ok(cyls.some((m) => m.geo.h === 0.008 && m.mat.params["color"] === BUTTON_RED), "play button 1 is BUTTON_RED");
     assert.ok(cyls.some((m) => m.geo.h === 0.008 && m.mat.params["color"] === BUTTON_YELLOW), "play button 2 is BUTTON_YELLOW");
     assert.ok(cyls.some((m) => m.geo.h === 0.006 && m.mat.params["color"] === BUTTON_WHITE), "the start button is BUTTON_WHITE");
+    // One-source law (scene.ts's CONTROL_RINGS comment: "the same control
+    // positions the hardware mounts at"): the overlay's PRINTED target
+    // rings must sit under the hardware this sub-assembly mounts. The
+    // shipped CONTROL_RINGS run through the build's own paintControlOverlay
+    // call here — a drift on either side (ring moved, hardware moved)
+    // reddens this pin.
+    const overlaySrc = (overlay.mat.params["map"] as { source: PaintSurface }).source;
+    assert.deepEqual(
+      [overlaySrc.width, overlaySrc.height],
+      [562, 190],
+      "the overlay canvas measures the 0.562 x 0.19 m plank at 1000 px/m",
+    );
+    const ringArcs = built.canvasArcs[built.canvases.indexOf(overlaySrc)]!;
+    assert.equal(ringArcs.length, 4, "one printed ring per control position");
+    const mountPts = new Map<string, { x: number; z: number }>();
+    for (const m of cyls) mountPts.set(`${m.x.toFixed(4)}|${m.z.toFixed(4)}`, { x: m.x, z: m.z });
+    assert.equal(mountPts.size, 4, "the seven cylinders ride exactly four control positions");
+    for (const pt of mountPts.values()) {
+      assert.ok(
+        ringArcs.some((a) => Math.abs(a.x - (562 / 2 + pt.x * 1000)) < 1e-9 && Math.abs(a.y - (190 / 2 + pt.z * 1000)) < 1e-9),
+        `a printed ring centre sits under the hardware at (${String(pt.x)}, ${String(pt.z)})`,
+      );
+    }
 
     // 4c marquee: the emissive one-liner + two black retainers, exact
     // mounts (the exposure law's -0.045 literal reads these).
@@ -852,14 +934,15 @@ test("2.0 shell build: profiled side panels + core, front panel, tilted screen s
     }
     // Centring law: the exposure model puts each light's nearest point
     // directly under it; the lateral centring stays EXACT, and the screen
-    // face's lean lifts its centre 0.9 mm off the halo axis by law — inside
-    // a 1e-3 window (the tilt is pinned by the tilt test below, this pin
-    // guards only against drift).
+    // face's lean lifts its centre exactly 0.0055*sin(0.1707) (0.9 mm)
+    // above the halo axis — pinned to the lean, not to a 1 mm window
+    // (the rebuild pass's 1e-3 window let a lean shift of up to a
+    // millimetre pass silently).
     const lat = (q: { x: number; z: number }): number => (q.x - g.front.x) * g.right.x + (q.z - g.front.z) * g.right.z;
     const mWorld = world(marquee);
     const sWorld = world(screenFace);
     assert.ok(Math.abs(lat(mWorld) - lat(spill)) < 1e-12 && Math.abs(mWorld.y - spill.y) < 1e-12, "the marquee face sits centred under its spill light (the exposure law's nearest-point + symmetric-corner model)");
-    assert.ok(Math.abs(lat(sWorld) - lat(halo)) < 1e-12 && Math.abs(sWorld.y - halo.y) < 1e-3, "the screen face sits centred under its halo light, within the lean's 1 mm lift");
+    assert.ok(Math.abs(lat(sWorld) - lat(halo)) < 1e-12 && Math.abs(sWorld.y - (halo.y + 0.0055 * Math.sin(0.1707))) < 1e-12, "the screen face sits centred under its halo light, exactly the lean's lift (0.0055*sin(0.1707)) above the halo axis");
 
     // Handles the entry animates every frame.
     const door = built.handles.doors.find((d) => d.id === p.volumeId);
@@ -876,6 +959,23 @@ test("2.0 shell build: profiled side panels + core, front panel, tilted screen s
     assert.ok(built.canvasTexts.some((t) => t.includes(p.screenZones.next.toUpperCase())), "the screen canvas is lettered with the NEXT zone at build (step 0)");
     assert.ok(built.textureUpdateCount() === 0, "the BUILD itself never marks textures updated (repaint is frame-side)");
   }
+});
+
+// Story 2.0 QA: the brief's material law for the metal parts ("roughness
+// 0.4, metalness 0.3. Do not go above 0.3; there is no environment map and
+// higher metalness renders black") had no pin — a re-tune could send every
+// metal part pitch black with the whole suite green.
+test("no material in the build asks metalness above the brief's 0.3 ceiling; the metal parts ride exactly 0.3 (QA)", () => {
+  let metalMats = 0;
+  for (const m of built.mats) {
+    const v = Number(m.params["metalness"] ?? 0);
+    assert.ok(v <= 0.3, `a material carries metalness ${String(v)} — with no env map above 0.3 renders black (brief section 5)`);
+    if (m.params["color"] === CABINET_METAL) {
+      metalMats += 1;
+      assert.equal(v, 0.3, "the metal parts (shaft, coin-door frame) ride the authored 0.3 exactly");
+    }
+  }
+  assert.ok(metalMats >= 1, "the metal material exists (joystick shaft + coin-door frame share it)");
 });
 
 // Story 2.0 (DW-29 law, re-expressed for the rebuild): the DW-29 contour

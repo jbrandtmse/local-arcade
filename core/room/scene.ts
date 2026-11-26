@@ -209,14 +209,20 @@ function addLight(THREE: Three, scene: RoomScene, light: ZoneLight): void {
 // --- Story 2.0 cabinet assembly constants (brief numbers, single source) ----
 /** Contact-shadow sheet width/depth, metres. The brief's 4f says 0.80 m,
  * but the brief's own verification test 1 bounds every group child at
- * z +/-0.30 — an 0.80 m sheet contradicts it. Smallest compliant value:
- * 0.60 m (exactly the footprint; the gradient fades to transparent well
- * before the edge, so the grounding still reads). Listed in the story
- * report as a smallest-number overlap adjustment. */
+ * z +/-0.30 — an 0.80 m sheet contradicts it. Smallest value that still
+ * fully covers the 0.60 m footprint: 0.60 m (the band would allow up to
+ * 0.604; the footprint is the floor; the gradient fades to transparent
+ * well before the edge, so the grounding still reads). Listed in the
+ * story report as a smallest-number overlap adjustment. */
 const CONTACT_SHADOW_M = 0.6;
 /** Grille slat slope: the tilt of the INNER_PROFILE underside between
- * profile points 7 (-0.04, 1.57) and 8 (0.25, 1.63) — dz 0.29, dy 0.06. */
-const GRILLE_SLOPE = math.atan2(0.06, 0.29);
+ * profile points 7 (-0.04, 1.57) and 8 (0.25, 1.63) — DERIVED from the
+ * authored profile (one-geometry-source law; an edit to those points
+ * moves the slats with the panel, never silently off it). */
+const GRILLE_SLOPE = math.atan2(
+  INNER_PROFILE[8]!.y - INNER_PROFILE[7]!.y,
+  INNER_PROFILE[8]!.x - INNER_PROFILE[7]!.x,
+);
 /** Control rings painted on the overlay (OverlayRing.y runs along the
  * overlay's local z) — the same control positions the hardware mounts at
  * (one source for hardware placement). */

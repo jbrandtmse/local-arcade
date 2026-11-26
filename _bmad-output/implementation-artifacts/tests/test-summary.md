@@ -1,3 +1,28 @@
+# Test Automation Summary — Story 2.0 (QA stage, 2026-11-26)
+
+Target: the implemented deliverable of Story 2.0 (`git diff --name-only fbe9ce2..HEAD` — the DW-29 cabinet rebuild in `core/room/` (profiles, per-cabinet group assembly, seam extension, tokens, three new painters), the DW-24 yaw-wrap law in `core/player.ts`, the DW-23 exposure re-derivation + ACES posture in `core/main.ts`, the cap split, and the story's own pins). Acceptance criteria: the spec's Tasks & Acceptance + I/O & Edge-Case Matrix. Framework: the project's existing convention — `node --test` over co-located `*.test.ts` (`npm test`); no new dependency; no browser harness (DW-15 precedent — the executed renderer-posture tier lands Epic 3, the source-pin tier stands).
+
+## Generated Tests
+
+### Scene-suite QA extensions (existing file, in place)
+- [x] `core/room/scene.test.ts` (QA additions) — (1) the contact shadow's `depthWrite === false` half of brief 4f (the pre-QA message claimed the pair; only `transparent` was asserted — with depth on, the pool occludes the carpet it grounds); (2) the metalness ceiling law (no material exceeds the brief's 0.3; the metal parts ride exactly 0.3 — unpinned, a re-tune to 0.9 renders every metal part black with the suite green); (3) the DW-23 measurement made executable — three 0.187.0's shipped ACES fit constants, /0.6 exposure scale and gray-preserving matrices parsed from `ShaderChunk` at test time, re-evaluating the measured table (1.0→0.763, 1.2→0.804, 2.0→0.888, CEILING 1.18→0.80, FLOOR 0.17→0.20) — a three upgrade now reddens the curve anchor and forces re-derivation instead of leaving the literals orphaned on a moved curve (Story 2.3 integration seam).
+
+## Gap-hunt result
+Every AC and every matrix row already had an executed, falsifiable pin (the eight brief verification tests on real three geometry, the DW-24 reproduction, the exposure inequality + IS drift pins, the six narrowed laws, the posture source-pins, the NEXT-cap mirrors). The three additions above are the only unpinned binding laws found. The Auto Run Result's named follow-up risk ("confirm the 0x204659 literal matches the shipped darkenHex(GLOW_CYAN, 0.35)") is verified: 0x5bc8ff → 32/70/89 = 0x204659; no derived re-pin added (the spec's literal-value law forbids it). The triage-authored tests reviewed for vacuity — the fake `rotation.y` setter + `ry: NaN` initial reddens on a dropped group-yaw assignment, the painter tests assert observed canvas ops, the material-colour pins key on token values — none found passing vacuously.
+
+## Verification run (post-QA)
+- `npm test`: 381/381 pass (379 pre-QA + 2 QA tests; the depthWrite assertion rides an existing test).
+- `npm run typecheck`: 0. `node ci/depcheck.mjs`: 0. `node ci/lint-bans.mjs`: 0.
+- `node tools/gen-registry.mjs && git diff --exit-code -- generated/`: byte-identical.
+- Hermeticity: the story's nine changed test files run in REVERSE order in one process: 121/121 green.
+- Rule 19: 6 QA-pass mutation demonstrations — yaw-wrap delete (AC2: DW-24 + accumulation pin red), depth 0.020 (AC1: verification 2 red), CEILING 1.30 (AC3: IS pin + new curve-anchor red), third emissive (AC4: emissive-scan + verification 6 red), depthWrite true (QA pin red), metalness 0.9 (QA pin red). Each red observed, reverted, `git diff | sha256sum` byte-identical to the pre-mutation baseline, suite re-green 381/381. Recorded in the spec's `## Verification` QA block.
+- `npm run build` not re-run (test-only change; not in the dispatch's loop list). :5173 untouched; no browser instance started.
+
+## Next Steps
+- Lead commits `core/room/scene.test.ts` + the spec Verification block + this summary (this stage forbids committing), then runs the fresh-environment forward/reverse check and the per-story smoke (the brief's by-eye light retune stays with that smoke per the brief's order).
+
+---
+
 # Test Automation Summary — Story 1.7 (QA stage, 2026-11-24)
 
 Target: the implemented deliverable of Story 1.7 (`git diff --name-only 131ad25..e214182` on ARC-1-epic1 — the new `core/containment.ts` seam (boot guard, guardInstance quarantine, stall watcher, injectFault), the widened supervisor (ring cap + HookName), the optional `faultedFor` legs in seat/scheduler, and the main.ts rewiring + moved pins). Acceptance criteria: the spec's Tasks & Acceptance + I/O & Edge-Case Matrix. Framework: the project's existing convention — `node --test` over co-located `*.test.ts` (`npm test`); no new dependency; no browser harness this epic (DW-12/DW-15 precedent — the `arcadeDebug.containment.injectFault` flow and the Chrome+Edge row stay the lead's smoke).
