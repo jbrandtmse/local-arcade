@@ -27,8 +27,8 @@ import {
 } from "./contract/index.ts";
 import {
   CABINET_PHASE_CYCLE_TICKS,
-  MARQUEE_CAP_M,
   SCREEN_ATTRACT_CAP_M,
+  SCREEN_NEXT_CAP_M,
   SCREEN_PAINT_STEP_TICKS,
   SHELL,
   cabinetPlacements,
@@ -632,7 +632,7 @@ test("the fallback face keeps moving across 720 ticks (AC5's paint half): the ca
     if (paintStep !== lastPaintStep) {
       lastPaintStep = paintStep;
       ops.length = 0;
-      repaintScreen(surface, p.screenZones, paintStep, "#15110e", "#5bc8ff", "#ffc46b", SCREEN_ATTRACT_CAP_M, MARQUEE_CAP_M, SHELL.screen.height);
+      repaintScreen(surface, p.screenZones, paintStep, "#15110e", "#5bc8ff", "#ffc46b", SCREEN_ATTRACT_CAP_M, SCREEN_NEXT_CAP_M, SHELL.screen.height);
       bandFrames.push(ops.filter((o) => o.startsWith("#5bc8ff|")).map((o) => Number(o.split("|")[1]!.split(",")[1])));
     }
   }

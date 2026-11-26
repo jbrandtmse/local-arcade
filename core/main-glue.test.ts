@@ -121,9 +121,23 @@ test("the authored room reaches the page once: buildRoomScene through the real T
     "new THREE.PointLight(color, intensity, distance)",
     "new THREE.AmbientLight(color, intensity)",
     "new THREE.CanvasTexture(source",
+    // Story 2.0 (DW-29 rebuild): the extended seam — profile extrusion, the
+    // round primitives, and the local-frame group all map through.
+    "new THREE.Shape()",
+    "new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false })",
+    "new THREE.CylinderGeometry(radiusTop, radiusBottom, height, radialSegments)",
+    "new THREE.SphereGeometry(radius, widthSegments, heightSegments)",
+    "new THREE.Group()",
   ]) {
     assert.ok(MAIN.includes(fwd), `Three seam maps through: ${fwd}`);
   }
+  // 2.0 (DW-23 substrate + brief section 5): the renderer posture — the
+  // curve the scene.test.ts exposure literals were MEASURED against, and
+  // the sRGB/anisotropy legs every painted canvas texture gets.
+  assert.ok(MAIN.includes("renderer.toneMapping = THREE.ACESFilmicToneMapping;"), "ACES filmic tone mapping is live (the DW-23 law's substrate)");
+  assert.ok(MAIN.includes("renderer.toneMappingExposure = 1.0;"), "exposure 1.0 \u2014 the measured curve assumes it");
+  assert.ok(MAIN.includes("texture.colorSpace = THREE.SRGBColorSpace;"), "every CanvasTexture is sRGB (the washed-out-colour fix)");
+  assert.ok(MAIN.includes("texture.anisotropy = renderer.capabilities.getMaxAnisotropy();"), "every CanvasTexture gets max anisotropy (sharp at grazing angles)");
   assert.ok(MAIN.includes("new OffscreenCanvas(width, height)"), "painters get OffscreenCanvas factories (the page still grows one DOM node)");
   assert.ok(MAIN.includes("createPlayerController(collisionVolumes, ENTRY_SPAWN)"), "the visitor spawns at the authored door spawn on the authored volume list");
   assert.ok(MAIN.includes("renderer.setClearColor(ROOM_BLACK, 1)"), "clear colour comes from tokens.ts, never a retyped hex");

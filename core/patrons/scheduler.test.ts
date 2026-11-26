@@ -23,7 +23,7 @@ import { ATTRACT_DWELL_TICKS, createPatronScheduler, derivedSeed, type PatronSch
 import { REACTIONS, createFigurePresenter, type FigurePresenter, type ReactionKind } from "./presenter.ts";
 import { createGameInstance, math, type GameInstance, type TickInput } from "../contract/index.ts";
 import { ENTRY_SPAWN, collisionVolumes } from "../room/collision-volumes.ts";
-import { MARQUEE_CAP_M, SHELL, cabinetPlacements, createCabinetRuntime, placementGeometry, type CabinetRuntime } from "../room/cabinets.ts";
+import { SCREEN_NEXT_CAP_M, SHELL, cabinetPlacements, createCabinetRuntime, placementGeometry, type CabinetRuntime } from "../room/cabinets.ts";
 import { SCREEN_EDGE_RATIO, SURFACE_PX_PER_M, compositeScreen, type PaintContext, type PaintSurface } from "../room/surfaces.ts";
 import { gameRegistry } from "../../generated/game-registry.ts";
 
@@ -563,7 +563,10 @@ test("impulse scope: mapped canonical breaks never fire the reaction library (br
 
 test("AC3: on busy B0's composite the game frame blits under the Core NEXT row, still lettered at the 0.18 m authored minimum (compositeScreen untouched by the busy wiring)", () => {
   const p = cabinetPlacements.find((c) => c.busy === true)!;
-  assert.ok(Math.abs(MARQUEE_CAP_M - 0.18) < 1e-12, "NEXT's authored minimum is 0.18 m (DESIGN contract)");
+  // Story 2.0 cap split (AD-28 survives verbatim): the NEXT floor travels
+  // to its own SCREEN_NEXT_CAP_M constant; the marquee cap became 0.09 one
+  // line. The 0.18 m DESIGN minimum itself is untouched.
+  assert.ok(Math.abs(SCREEN_NEXT_CAP_M - 0.18) < 1e-12, "NEXT's authored minimum is 0.18 m (DESIGN contract)");
   const texts: { text: string; y: number; fontPx: number; style: string }[] = [];
   const draws: unknown[] = [];
   const ctx: PaintContext = {
@@ -590,12 +593,12 @@ test("AC3: on busy B0's composite the game frame blits under the Core NEXT row, 
     getContext: (kind) => (kind === "2d" ? ctx : null),
   };
   const game = { width: 640, height: 360 }; // the live game canvas stand-in
-  compositeScreen(surface, p.screenZones, game, "#15110e", "#ffc46b", MARQUEE_CAP_M, SHELL.screen.height);
+  compositeScreen(surface, p.screenZones, game, "#15110e", "#ffc46b", SCREEN_NEXT_CAP_M, SHELL.screen.height);
   assert.equal(draws.length, 1, "the busy machine's live frame composites under the Core row");
   const next = texts.filter((t) => t.text === p.screenZones.next.toUpperCase());
   assert.equal(next.length, 1, "the Core still letters exactly the NEXT zone over the busy frame");
   const pxPerM = surface.height / SHELL.screen.height;
-  assert.equal(next[0]!.fontPx, Math.round(MARQUEE_CAP_M * pxPerM), "NEXT paints at the 0.18 m cap on the busy screen (the fit law untouched — mutation dropping the NEXT fillText is red here)");
+  assert.equal(next[0]!.fontPx, Math.round(SCREEN_NEXT_CAP_M * pxPerM), "NEXT paints at the 0.18 m cap on the busy screen (the fit law untouched \u2014 mutation dropping the NEXT fillText is red here)");
   assert.equal(next[0]!.y, surface.height - Math.round(surface.height * SCREEN_EDGE_RATIO), "NEXT sits on the bottom-band baseline");
   assert.equal(next[0]!.style, "#ffc46b", "the injected marquee hue, as always");
 });

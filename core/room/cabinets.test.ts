@@ -9,18 +9,29 @@
 // ticks drifts the band), repaint-into-the-same-canvas, and the Rule-1
 // integration row: scripted walk from ENTRY_SPAWN -> target cabinet-B0 -> E
 // flips the coin door the SAME tick, closed again, two runs identical.
+// Story 2.0 (DW-29 rebuild): the marquee letters the title on ONE line at
+// the 0.09 m cap (contract change 4); the screen's 0.18 m NEXT cap lives in
+// its own SCREEN_NEXT_CAP_M constant; and the brief's eight verification
+// tests run against REAL three geometry at the foot of this file (the
+// local-frame containment, the exact side-panel bbox, the two tilts, the
+// setback, the emissive pair, the no-body-mesh law, the triangle budget).
 import test from "node:test";
 import assert from "node:assert/strict";
+import * as THREE from "three";
+import { buildRoomScene, type RoomScene, type Three } from "./scene.ts";
 import {
   CABINET_PHASE_CYCLE_TICKS,
   MARQUEE_CAP_M,
   MARQUEE_LETTER_SPACING_EM_FLOOR,
   SCREEN_ATTRACT_CAP_M,
+  SCREEN_NEXT_CAP_M,
   SHELL,
   SHELL_PART_MESHES,
+  SIDE_PROFILE,
   SCREEN_PAINT_STEP_TICKS,
   cabinetAABB,
   cabinetPlacements,
+  closedYaw,
   coinDoorOpen,
   coinDoorPose,
   createCabinetRuntime,
@@ -52,8 +63,11 @@ import {
   SCREEN_SCAN_THICK_PX,
   SURFACE_PX_PER_M,
   compositeScreen,
+  paintContactShadow,
+  paintControlOverlay,
   paintMarquee,
   paintScreen,
+  paintSideArt,
   repaintScreen,
   type PaintContext,
   type PaintSurface,
@@ -78,7 +92,7 @@ test("exactly one placement record: Moon Patrol's shell in slot B0 with title + 
   assert.equal(p.hue, GLOW_CYAN, "attract title + halo carry the machine's glow family (mockup .attract)");
   assert.equal(p.marqueeHue, GLOW_MARQUEE, "marquee + NEXT carry DESIGN's amber (the token name is the fiction)");
   assert.ok(wallSlots.some((s) => s.id === p.slotId), "the shell stands on an authored Wall Slot; slot config stays unchanged");
-  assert.equal(SHELL_PART_MESHES, 11, "eleven part meshes per shell (bar, face, bezel, screen, door, slot + the 1.10 DW-29 contours: deck, kick, hood, two wings)");
+  assert.equal(SHELL_PART_MESHES, 28, "28 part meshes per shell (2.0 rebuild: 3 profiled structural meshes, front panel, 2 side-art decals, contact shadow, bezel + live face, overlay + 8 joystick/button/start hardware pieces, marquee face + 2 retainers, 3 grille slats, coin-door frame + reject, and the 2 world-posed coin-door parts \u2014 24 in the group + 4 world)");
 });
 
 test("the collision list derives its cabinet entry from the placement record — exact AABB, kind grammar, never hand-copied (AC1, one geometry source)", () => {
@@ -261,26 +275,155 @@ function fakePainter() {
   return { factory, sizes, rects, texts, draws, reset: () => { rects.length = 0; texts.length = 0; draws.length = 0; } };
 }
 
-const CAP_PX = Math.round(MARQUEE_CAP_M * SURFACE_PX_PER_M);
+// Story 2.0 review patch: the brief's three art painters must be OBSERVED,
+// not just executed — DW-29 is exactly the realism class a rig full of
+// no-op legs lets through. This recorder keeps every fill, arc, transform
+// count and gradient stop the painters produce.
+function artRecorder(): {
+  factory: (w: number, h: number) => PaintSurface;
+  sizes: [number, number][];
+  rects: { style: string; x: number; y: number; w: number; h: number }[];
+  arcs: { x: number; y: number; r: number }[];
+  legs: { save: number; restore: number; rotate: number[]; beginPath: number; stroke: number };
+  gradStops: [number, string][] | null;
+  strokeStyleAtStroke: string | null;
+  lineWidthAtStroke: number | null;
+} {
+  const sizes: [number, number][] = [];
+  const rects: { style: string; x: number; y: number; w: number; h: number }[] = [];
+  const arcs: { x: number; y: number; r: number }[] = [];
+  const legs = { save: 0, restore: 0, rotate: [] as number[], beginPath: 0, stroke: 0 };
+  let gradStops: [number, string][] | null = null;
+  let strokeStyleAtStroke: string | null = null;
+  let lineWidthAtStroke: number | null = null;
+  const factory = (width: number, height: number): PaintSurface => {
+    sizes.push([width, height]);
+    const ctx = {
+      fillStyle: "",
+      strokeStyle: "",
+      lineWidth: 0,
+      fillRect(x: number, y: number, w: number, h: number) {
+        rects.push({ style: String(ctx.fillStyle), x, y, w, h });
+      },
+      save() { legs.save++; },
+      restore() { legs.restore++; },
+      translate() {},
+      rotate(a: number) { legs.rotate.push(a); },
+      beginPath() { legs.beginPath++; },
+      arc(x: number, y: number, r: number) { arcs.push({ x, y, r }); },
+      stroke() { legs.stroke++; strokeStyleAtStroke = String(ctx.strokeStyle); lineWidthAtStroke = ctx.lineWidth; },
+      createRadialGradient() {
+        const stops: [number, string][] = [];
+        gradStops = stops;
+        return { addColorStop(offset: number, color: string) { stops.push([offset, String(color)]); } };
+      },
+    } as unknown as PaintContext;
+    return { width, height, getContext: (kind) => (kind === "2d" ? ctx : null) };
+  };
+  return {
+    factory, sizes, rects, arcs, legs,
+    get gradStops() { return gradStops; },
+    get strokeStyleAtStroke() { return strokeStyleAtStroke; },
+    get lineWidthAtStroke() { return lineWidthAtStroke; },
+  };
+}
 
-// The derived cap pins above read the constant itself, so this equality is
-// the only pin against silent drift of the DESIGN contract value.
-test("the marquee cap constant IS the 0.18m contract value (AC2)", () => {
-  assert.equal(MARQUEE_CAP_M, 0.18, "DESIGN typography frontmatter: marquee cap floor 0.18m");
+const CAP_PX = Math.round(MARQUEE_CAP_M * SURFACE_PX_PER_M);
+const NEXT_PX = Math.round(SCREEN_NEXT_CAP_M * SURFACE_PX_PER_M);
+
+// The derived cap pins above read the constant itself, so these equalities
+// are the only pins against silent drift of the contract values. Story 2.0
+// splits the pair: the marquee cap moves to the brief's 0.09m one-line
+// floor, the screen's NEXT cap keeps DESIGN's 0.18m minimum by name.
+test("the cap constants ARE the contract values: marquee 0.09m (2.0 brief) and screen NEXT 0.18m (AC2)", () => {
+  assert.equal(MARQUEE_CAP_M, 0.09, "the 2.0 brief (UX-DR2/UX-DR6): the marquee cap floor on the 0.15 m bar is 0.09 m");
+  assert.equal(SCREEN_NEXT_CAP_M, 0.18, "DESIGN typography frontmatter: the screen NEXT cap floor 0.18 m (byte-unchanged by 2.0)");
 });
 
-test("marquee painter: exactly the title's words stacked at the 0.18m CONTRACT cap, tightened only by the pre-authorized letter-spacing floor, never shrunk (AC2)", () => {
+test("closedYaw is the exact yaw law for all four axis-aligned facings and dies on a non-axis facing (2.0 one-source yaw: group placement and the coin-door pose share it)", () => {
+  assert.equal(closedYaw({ x: 0, z: 1 }), 0, "back-slot facing yaws 0");
+  assert.equal(closedYaw({ x: 1, z: 0 }), Math.PI / 2, "right-wall facing yaws +pi/2");
+  assert.equal(closedYaw({ x: 0, z: -1 }), Math.PI, "street-facing yaw pi");
+  assert.equal(closedYaw({ x: -1, z: 0 }), -Math.PI / 2, "left-wall facing yaws -pi/2");
+  assert.throws(() => closedYaw({ x: 1, z: 1 }), /axis-aligned/, "a non-axis facing is authored-slot grammar broken, never guessed");
+});
+
+test("paintSideArt paints the brief's flank art: full ground fill, three diagonal stripes of DIFFERENT widths in the hue pair, one tilted square in the machine hue (brief 4; the DW-29 realism class now has a tripwire)", () => {
+  const r = artRecorder();
+  const surface = paintSideArt(r.factory, "#gr", "#hue", "#mq", 0.5, 0.7);
+  assert.ok(surface.width === 500 && surface.height === 700, "the decal surface is 0.50 x 0.70 m at 1000 px/m");
+  assert.equal(r.rects.length, 5, "ground + three stripes + one tilted square, nothing more");
+  assert.deepEqual(r.rects[0], { style: "#gr", x: 0, y: 0, w: 500, h: 700 }, "the ground fills the whole panel in the darkened side colour");
+  const stripe = (i: number) => r.rects[1 + i]!;
+  assert.deepEqual([stripe(0).style, stripe(1).style, stripe(2).style], ["#mq", "#hue", "#mq"], "the stripes alternate marquee hue, machine hue, marquee hue (placement hue families)");
+  const stripeH = [stripe(0).h, stripe(1).h, stripe(2).h];
+  assert.deepEqual(stripeH, [42, 91, 35], "three stripes of DIFFERENT widths: the authored 0.06 / 0.13 / 0.05 fractions of the 700 px panel");
+  assert.ok(stripe(0).w === 1500 && stripe(1).w === 1500 && stripe(2).w === 1500, "each stripe sweeps the whole panel width (one diagonal sweep, 3 x 500 px)");
+  const square = r.rects[4]!;
+  assert.equal(square.style, "#hue", "the large simple shape rides in the machine hue");
+  assert.equal(square.w, 210, "the tilted square is the authored 0.3-of-height side (210 px)");
+  assert.equal(square.h, 210, "square, not smeared");
+  assert.deepEqual(r.legs.rotate, [0.6, -0.5], "exactly the two authored fixed diagonals, deterministic");
+  assert.deepEqual([r.legs.save, r.legs.restore], [2, 2], "transform scopes balance");
+});
+
+test("paintControlOverlay paints the dark ground, the four-rect border in the marquee hue, and one stroked ring per control position at the scaled centre (overlay one-source law)", () => {
+  const r = artRecorder();
+  const rings = [
+    { x: -0.13, y: 0, r: 0.035 },
+    { x: 0.07, y: 0, r: 0.03 },
+    { x: 0.13, y: 0, r: 0.03 },
+    { x: 0, y: -0.06, r: 0.025 },
+  ];
+  paintControlOverlay(r.factory, "#gr", "#bd", rings, 0.562, 0.19);
+  assert.deepEqual(r.sizes[0], [562, 190], "the overlay canvas is 0.562 x 0.19 m at 1000 px/m");
+  assert.deepEqual(r.rects[0], { style: "#gr", x: 0, y: 0, w: 562, h: 190 }, "dark ground first, the whole sheet");
+  const borders = r.rects.slice(1);
+  assert.equal(borders.length, 4, "the border is the four-edge rectangle idiom (stroke-free where it can)");
+  for (const b of borders) assert.equal(b.style, "#bd", "the border rides the placement marquee hue");
+  assert.equal(r.arcs.length, rings.length, "one ring per control position (the scene's CONTROL_RINGS is the one source)");
+  for (let i = 0; i < rings.length; i++) {
+    const want = { x: 562 / 2 + rings[i]!.x * 1000, y: 190 / 2 + rings[i]!.y * 1000, r: rings[i]!.r * 1000 };
+    assert.ok(Math.abs(r.arcs[i]!.x - want.x) < 1e-9 && Math.abs(r.arcs[i]!.y - want.y) < 1e-9 && Math.abs(r.arcs[i]!.r - want.r) < 1e-9, `ring ${String(i)} sits at its metres-scaled centre`);
+  }
+  assert.deepEqual([r.legs.beginPath, r.legs.stroke], [rings.length, rings.length], "every ring is begun, arc'd and stroked");
+  assert.equal(r.strokeStyleAtStroke, "#bd", "the rings stroke in the border hue");
+  assert.equal(r.lineWidthAtStroke, 3, "the ring line is the authored 3 px");
+});
+
+test("paintContactShadow paints the grounding pool: square sheet, one radial gradient holding ink to 0.55 then fully transparent at the rim (brief 4f alpha law)", () => {
+  const r = artRecorder();
+  paintContactShadow(r.factory, "#ink", 0.6);
+  assert.deepEqual(r.sizes[0], [600, 600], "the shadow sheet is the 0.6 m square at 1000 px/m");
+  assert.deepEqual(r.rects.length, 1, "exactly one fill: the gradient over the whole sheet");
+  assert.equal(r.rects[0]!.w, 600, "the fill spans the sheet width");
+  assert.equal(r.rects[0]!.h, 600, "the fill spans the sheet height");
+  assert.deepEqual(r.gradStops, [[0, "#ink"], [0.55, "#ink"], [1, "transparent"]], "ink holds to 0.55, then fades to fully transparent at the rim (the material carries the transparency)");
+});
+
+test("the three art painters die loudly on a missing paint-context leg (needLeg guard; the no-drawImage sibling's idiom)", () => {
+  const legless = (width: number, height: number): PaintSurface => {
+    const ctx = { fillStyle: "", fillRect() {} } as unknown as PaintContext;
+    return { width, height, getContext: (kind) => (kind === "2d" ? ctx : null) };
+  };
+  assert.throws(() => paintSideArt(legless, "#a", "#b", "#c", 0.5, 0.7), /paintSideArt: paint context has no save/);
+  assert.throws(() => paintControlOverlay(legless, "#a", "#b", [], 0.562, 0.19), /paintControlOverlay: paint context has no beginPath/);
+  assert.throws(() => paintContactShadow(legless, "#a", 0.6), /paintContactShadow: paint context has no createRadialGradient/);
+});
+
+test("marquee painter: the title on ONE line at the 0.09m CONTRACT cap, tightened only by the pre-authorized letter-spacing floor, never shrunk (AC2, 2.0 contract change 4)", () => {
   const f = fakePainter();
   const p = cabinetPlacements[0]!;
   paintMarquee(f.factory, p.title, "#15110e", "#ffc46b", MARQUEE_CAP_M, SHELL.marquee.width, SHELL.marquee.height);
   assert.deepEqual(f.sizes[0], [Math.round(SHELL.marquee.width * SURFACE_PX_PER_M), Math.round(SHELL.marquee.height * SURFACE_PX_PER_M)], "canvas follows the bar metres (mesh aspect == texture aspect)");
-  assert.deepEqual(f.texts.map((t) => t.text), ["MOON", "PATROL"], "lettering is exactly the title record's words");
+  assert.deepEqual(f.texts.map((t) => t.text), ["MOON PATROL"], "one line carrying the whole uppercased title record \u2014 stacked words are gone (contract change 4)");
   for (const t of f.texts) {
     assert.ok(t.style === "#ffc46b", "lettering uses the injected marquee-hue colour");
     assert.equal(t.fontPx, CAP_PX, "the line paints AT the cap-floor font size (never shrunk to fit)");
-    assert.ok(t.w >= CAP_PX, "cap height stays at the 0.18m floor (never shrunk)");
-    // The fit law: whatever spacing was set sits inside [floor, 0], and the
-    // SPACED width (natural + gaps x ls x cap) fits the usable canvas width.
+    assert.ok(t.w >= CAP_PX, "cap height stays at the 0.09 m floor (never shrunk)");
+    // The fit law (one-line form): whatever spacing was set sits inside
+    // [floor, 0], and the SPACED width (natural + gaps x ls x cap) fits the
+    // usable canvas width — the throw law, not a clip.
     assert.ok(t.lsEm <= 0 && t.lsEm >= MARQUEE_LETTER_SPACING_EM_FLOOR, `letter-spacing ${t.lsEm}em within the pre-authorized floor`);
     const spaced = t.w + (t.text.length - 1) * t.lsEm * CAP_PX;
     assert.ok(spaced <= f.sizes[0]![0] - 2 * MARQUEE_MARGIN_PX + 1e-9, `spaced line "${t.text}" (${spaced}px) fits the bar minus margins`);
@@ -288,27 +431,36 @@ test("marquee painter: exactly the title's words stacked at the 0.18m CONTRACT c
   assert.ok(f.rects.length === 1 && f.rects[0]!.style === "#15110e", "the ground is the injected background colour");
 });
 
-test("marquee/screen fit laws die loudly: an over-long title past the spacing floor, an empty title, and an over-tall stack all throw instead of clipping (AC2, paintFlyer sibling)", () => {
+test("marquee/screen fit laws die loudly: a one-line title that needs spacing past the floor, an empty title, and a cap taller than the face all throw instead of clipping (AC2, paintFlyer sibling; 2.0 one-line form)", () => {
   const f = fakePainter();
   assert.throws(
     () => paintMarquee(f.factory, "SUPERMONSTERMASH", "#15110e", "#ffc46b", MARQUEE_CAP_M, SHELL.marquee.width, SHELL.marquee.height),
     /past the .*floor/,
-    "a 16-char word at the 0.18m cap cannot fit the body-width bar even at the floor",
+    "a 16-char title at the 0.09 m cap cannot fit the 0.56 m bar even at the floor",
+  );
+  assert.throws(
+    () => paintMarquee(f.factory, "MOON PATROL STAR", "#15110e", "#ffc46b", MARQUEE_CAP_M, SHELL.marquee.width, SHELL.marquee.height),
+    /past the .*floor/,
+    "three words joined to one line: the width law, not the old stack-height law, is what kills it now",
   );
   assert.throws(() => paintMarquee(f.factory, "   ", "#15110e", "#ffc46b", MARQUEE_CAP_M, SHELL.marquee.width, SHELL.marquee.height), /no words/);
-  assert.throws(() => paintMarquee(f.factory, "MOON PATROL STAR", "#15110e", "#ffc46b", MARQUEE_CAP_M, SHELL.marquee.width, SHELL.marquee.height), /do not fit the/);
+  assert.throws(
+    () => paintMarquee(f.factory, "MOON PATROL", "#15110e", "#ffc46b", 0.2, SHELL.marquee.width, SHELL.marquee.height),
+    /does not fit the .*face/,
+    "a cap above the face height is a cap bug and dies loudly \u2014 the cap is never shrunk to fit the face",
+  );
 });
 
 test("screen painter: attract block, scan band, NEXT at the 0.18m minimum; the band drift is a pure function of the paint step (equal steps identical, +3 steps shifted), score zone renders nothing while empty (AC5)", () => {
   const f = fakePainter();
   const p = cabinetPlacements[0]!;
-  paintScreen(f.factory, p.screenZones, 0, "#15110e", "#5bc8ff", "#ffc46b", SCREEN_ATTRACT_CAP_M, MARQUEE_CAP_M, SHELL.screen.width, SHELL.screen.height);
+  paintScreen(f.factory, p.screenZones, 0, "#15110e", "#5bc8ff", "#ffc46b", SCREEN_ATTRACT_CAP_M, SCREEN_NEXT_CAP_M, SHELL.screen.width, SHELL.screen.height);
   assert.deepEqual(f.sizes[0], [Math.round(SHELL.screen.width * SURFACE_PX_PER_M), Math.round(SHELL.screen.height * SURFACE_PX_PER_M)], "screen canvas at the face metres");
   assert.deepEqual(f.texts.map((t) => t.text), ["MOON", "PATROL", "NEXT"], "attract words then NEXT — the score zone paints nothing while empty");
   const nextText = f.texts.find((t) => t.text === "NEXT")!;
   assert.ok(nextText.style === "#ffc46b", "NEXT carries the marquee-amber family (mockup .next)");
-  assert.equal(nextText.fontPx, CAP_PX, "NEXT paints AT the 0.18m authored minimum font size");
-  assert.ok(nextText.w >= CAP_PX, "NEXT paints at the 0.18m authored minimum");
+  assert.equal(nextText.fontPx, NEXT_PX, "NEXT paints AT the 0.18m authored minimum font size");
+  assert.ok(nextText.w >= NEXT_PX, "NEXT paints at the 0.18m authored minimum");
   const attractPx = Math.round(SCREEN_ATTRACT_CAP_M * SURFACE_PX_PER_M);
   for (const t of f.texts.filter((t2) => t2.text !== "NEXT")) {
     assert.equal(t.fontPx, attractPx, "attract words paint AT the authored attract cap");
@@ -324,7 +476,7 @@ test("screen painter: attract block, scan band, NEXT at the 0.18m minimum; the b
   // text placement fails this while the band pins below stay green.
   const textsAtStep = (step: number): { text: string; y: number }[] => {
     const g2 = fakePainter();
-    paintScreen(g2.factory, p.screenZones, step, "#15110e", "#5bc8ff", "#ffc46b", SCREEN_ATTRACT_CAP_M, MARQUEE_CAP_M, SHELL.screen.width, SHELL.screen.height);
+    paintScreen(g2.factory, p.screenZones, step, "#15110e", "#5bc8ff", "#ffc46b", SCREEN_ATTRACT_CAP_M, SCREEN_NEXT_CAP_M, SHELL.screen.width, SHELL.screen.height);
     return g2.texts.map((t2) => ({ text: t2.text, y: t2.y }));
   };
   assert.deepEqual(textsAtStep(24), textsAtStep(0), "the cycle-wrap step 24 letters identically to step 0 (steady attract law)");
@@ -336,7 +488,7 @@ test("screen painter: attract block, scan band, NEXT at the 0.18m minimum; the b
   for (const r of band) assert.equal(r.w, Math.round(faceWpx * SCREEN_BAND_WIDTH_RATIO), "band rows carry the authored band width");
   const bandAtStep = (step: number): number[] => {
     const g = fakePainter();
-    paintScreen(g.factory, p.screenZones, step, "#15110e", "#5bc8ff", "#ffc46b", SCREEN_ATTRACT_CAP_M, MARQUEE_CAP_M, SHELL.screen.width, SHELL.screen.height);
+    paintScreen(g.factory, p.screenZones, step, "#15110e", "#5bc8ff", "#ffc46b", SCREEN_ATTRACT_CAP_M, SCREEN_NEXT_CAP_M, SHELL.screen.width, SHELL.screen.height);
     return g.rects.filter((r) => r.style === "#5bc8ff").map((r) => r.y);
   };
   assert.deepEqual(bandAtStep(3), bandAtStep(3), "equal steps paint pixel-identical bands (determinism)");
@@ -368,7 +520,7 @@ test("AD-28: score rows present -> the attract block yields, the scan band lives
   const rows = ["AAA 12345", "BBB 6789"];
   const zones = { ...p.screenZones, score: rows };
   const f = fakePainter();
-  paintScreen(f.factory, zones, 0, "#15110e", "#5bc8ff", "#ffc46b", SCREEN_ATTRACT_CAP_M, MARQUEE_CAP_M, SHELL.screen.width, SHELL.screen.height);
+  paintScreen(f.factory, zones, 0, "#15110e", "#5bc8ff", "#ffc46b", SCREEN_ATTRACT_CAP_M, SCREEN_NEXT_CAP_M, SHELL.screen.width, SHELL.screen.height);
   assert.deepEqual(f.texts.map((t) => t.text), [...rows, p.screenZones.next.toUpperCase()], "rows then NEXT — no MOON/PATROL: the attract title block yields to the table (mutation: keep painting attract over rows and this reds)");
 
   const faceHpx = Math.round(SHELL.screen.height * SURFACE_PX_PER_M);
@@ -380,7 +532,7 @@ test("AD-28: score rows present -> the attract block yields, the scan band lives
   const rowTexts = f.texts.filter((t) => rows.includes(t.text));
   assert.deepEqual(rowTexts.map((t) => t.y), [baselineOf(0), baselineOf(1)], "row baselines follow the yielded layout formula (derived from the painter's own constants)");
   assert.deepEqual(rowTexts.map((t) => t.y), [177, 309], "the ruling's MEASURED baselines on the B0 face — 177/309");
-  const nextTop = faceHpx - edge - Math.round(MARQUEE_CAP_M * SURFACE_PX_PER_M);
+  const nextTop = faceHpx - edge - Math.round(SCREEN_NEXT_CAP_M * SURFACE_PX_PER_M);
   assert.ok(baselineOf(1) <= nextTop, "row 1 clears the NEXT cap block");
   assert.ok(baselineOf(2) > nextTop, "the 3rd baseline would collide with the 0.18m NEXT floor — the measured cap-2 fit law");
   for (const t of rowTexts) {
@@ -398,7 +550,7 @@ test("AD-28: score rows present -> the attract block yields, the scan band lives
   // are identical across paint steps — only the band drifts.
   const atStep = (step: number): { texts: { text: string; y: number }[]; bandY: number[] } => {
     const g = fakePainter();
-    paintScreen(g.factory, zones, step, "#15110e", "#5bc8ff", "#ffc46b", SCREEN_ATTRACT_CAP_M, MARQUEE_CAP_M, SHELL.screen.width, SHELL.screen.height);
+    paintScreen(g.factory, zones, step, "#15110e", "#5bc8ff", "#ffc46b", SCREEN_ATTRACT_CAP_M, SCREEN_NEXT_CAP_M, SHELL.screen.width, SHELL.screen.height);
     return {
       texts: g.texts.map((t) => ({ text: t.text, y: t.y })),
       bandY: g.rects.filter((r) => r.style === "#5bc8ff").map((r) => r.y),
@@ -412,7 +564,7 @@ test("AD-28: score rows present -> the attract block yields, the scan band lives
   // on the 3rd row, exactly where the fit law measured it.
   const g = fakePainter();
   assert.throws(
-    () => paintScreen(g.factory, { ...p.screenZones, score: [...rows, "CCC 1"] }, 0, "#15110e", "#5bc8ff", "#ffc46b", SCREEN_ATTRACT_CAP_M, MARQUEE_CAP_M, SHELL.screen.width, SHELL.screen.height),
+    () => paintScreen(g.factory, { ...p.screenZones, score: [...rows, "CCC 1"] }, 0, "#15110e", "#5bc8ff", "#ffc46b", SCREEN_ATTRACT_CAP_M, SCREEN_NEXT_CAP_M, SHELL.screen.width, SHELL.screen.height),
     /score row 2 collides with the NEXT row/,
     "the row/NEXT collision guard is the enforcement behind the table's cap — cap bugs surface, they do not clip (mutation: relax this throw and a 3-row table paints over NEXT)",
   );
@@ -421,10 +573,10 @@ test("AD-28: score rows present -> the attract block yields, the scan band lives
 test("repaint rewrites the SAME canvas — a live screen never grows a second canvas (and the texture-update marker rides that identity in main.ts) (AC5)", () => {
   const f = fakePainter();
   const p = cabinetPlacements[0]!;
-  const s = paintScreen(f.factory, p.screenZones, 0, "#15110e", "#5bc8ff", "#ffc46b", SCREEN_ATTRACT_CAP_M, MARQUEE_CAP_M, SHELL.screen.width, SHELL.screen.height);
+  const s = paintScreen(f.factory, p.screenZones, 0, "#15110e", "#5bc8ff", "#ffc46b", SCREEN_ATTRACT_CAP_M, SCREEN_NEXT_CAP_M, SHELL.screen.width, SHELL.screen.height);
   assert.equal(f.sizes.length, 1, "one canvas from the factory");
-  repaintScreen(s, p.screenZones, 3, "#15110e", "#5bc8ff", "#ffc46b", SCREEN_ATTRACT_CAP_M, MARQUEE_CAP_M, SHELL.screen.height);
-  repaintScreen(s, p.screenZones, 6, "#15110e", "#5bc8ff", "#ffc46b", SCREEN_ATTRACT_CAP_M, MARQUEE_CAP_M, SHELL.screen.height);
+  repaintScreen(s, p.screenZones, 3, "#15110e", "#5bc8ff", "#ffc46b", SCREEN_ATTRACT_CAP_M, SCREEN_NEXT_CAP_M, SHELL.screen.height);
+  repaintScreen(s, p.screenZones, 6, "#15110e", "#5bc8ff", "#ffc46b", SCREEN_ATTRACT_CAP_M, SCREEN_NEXT_CAP_M, SHELL.screen.height);
   assert.equal(f.sizes.length, 1, "repaints never call the factory again");
   assert.ok(f.rects.length >= 1 + SCREEN_SCAN_ROWS * 2, "the canvas was repainted at the new steps");
 });
@@ -442,12 +594,12 @@ test("compositeScreen: game frame letterboxed (min-fit, centered, equal bars, as
     Math.round(SHELL.screen.width * SURFACE_PX_PER_M),
     Math.round(SHELL.screen.height * SURFACE_PX_PER_M),
   );
-  compositeScreen(surface, p.screenZones, game, "#15110e", "#ffc46b", MARQUEE_CAP_M, SHELL.screen.height);
+  compositeScreen(surface, p.screenZones, game, "#15110e", "#ffc46b", SCREEN_NEXT_CAP_M, SHELL.screen.height);
   const w = surface.width;
   const h = surface.height;
   const pxPerM = h / SHELL.screen.height;
   const edge = Math.round(h * SCREEN_EDGE_RATIO);
-  const nextCap = Math.round(MARQUEE_CAP_M * pxPerM);
+  const nextCap = Math.round(SCREEN_NEXT_CAP_M * pxPerM);
   const nextBaseline = h - edge;
   const areaW = w - 2 * edge;
   const areaH = nextBaseline - nextCap - edge;
@@ -484,7 +636,7 @@ test("compositeScreen dies loudly when the injected context has no drawImage (th
         : null,
   };
   assert.throws(
-    () => compositeScreen(bare, p.screenZones, { width: 640, height: 360 }, "#15110e", "#ffc46b", MARQUEE_CAP_M, SHELL.screen.height),
+    () => compositeScreen(bare, p.screenZones, { width: 640, height: 360 }, "#15110e", "#ffc46b", SCREEN_NEXT_CAP_M, SHELL.screen.height),
     /no drawImage/,
   );
 });
@@ -607,4 +759,274 @@ test("Rule 1 integration: scripted visit on the REAL volumes + REAL controller +
   assert.equal(a.ticksAtOpen, b.ticksAtOpen);
   assert.equal(a.modeAfterSit, "play");
   assert.deepEqual(a.playPoseAfterSit, b.playPoseAfterSit, "the authored play pose is exact and deterministic");
+});
+
+// --- Story 2.0, brief section 8: the eight verification tests ---------------
+// The brief demands these run against REAL three geometry — the headless
+// scene.test.ts fakes pin the mount arithmetic; only real ExtrudeGeometry /
+// SphereGeometry / Box3 can prove the local-frame containment band, the
+// exact side-panel bbox, the two tilt laws, the screen setback, the
+// emissive-pair count, the no-body-mesh law and the triangle budget. The
+// adapter below mirrors the forwards main.ts's real adapter (its exact
+// strings are pinned byte-identically in main-glue.test.ts); the CANVASES
+// stay fake — headless, deterministic, zero DOM.
+
+function buildThree(): Three {
+  return {
+    boxGeometry: (w, h, d) => new THREE.BoxGeometry(w, h, d),
+    extrudeGeometry: (points, depth) => {
+      const shape = new THREE.Shape();
+      shape.moveTo(points[0]!.x, points[0]!.y);
+      for (const pt of points.slice(1)) shape.lineTo(pt.x, pt.y);
+      shape.closePath();
+      return new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false });
+    },
+    cylinderGeometry: (radiusTop, radiusBottom, height, radialSegments) => new THREE.CylinderGeometry(radiusTop, radiusBottom, height, radialSegments),
+    sphereGeometry: (radius, widthSegments, heightSegments) => new THREE.SphereGeometry(radius, widthSegments, heightSegments),
+    standardMaterial: (params) => new THREE.MeshStandardMaterial(params as THREE.MeshStandardMaterialParameters),
+    mesh: (geometry, material) => new THREE.Mesh(geometry as THREE.BufferGeometry, material as THREE.Material | THREE.Material[]),
+    group: () => new THREE.Group(),
+    pointLight: (color, intensity, distance) => new THREE.PointLight(color, intensity, distance),
+    ambientLight: (color, intensity) => new THREE.AmbientLight(color, intensity),
+    canvasTexture: (source) => new THREE.CanvasTexture(source as CanvasImageSource),
+    markTextureUpdated: () => {},
+  };
+}
+
+// fakePainter's recorders plus the Story-2.0 transform/path legs the art
+// painters demand (surfaces.ts needLeg throws loudly on a missing one).
+function richPainterFactory(): (w: number, h: number) => PaintSurface {
+  return (width, height) => {
+    const ctx: PaintContext = {
+      fillStyle: "",
+      font: "",
+      textAlign: "",
+      letterSpacing: "",
+      fillRect() {},
+      fillText() {},
+      drawImage() {},
+      measureText(text) {
+        const m = /(\d+(?:\.\d+)?)px/.exec(ctx.font);
+        if (!m) throw new Error("fake measureText: font string carries no px size");
+        return { width: text.length * 0.92 * Number(m[1]) };
+      },
+      save() {},
+      restore() {},
+      translate() {},
+      rotate() {},
+      beginPath() {},
+      arc() {},
+      stroke() {},
+      lineWidth: 0,
+      createRadialGradient() {
+        return { addColorStop() {} };
+      },
+    };
+    return { width, height, getContext: (kind) => (kind === "2d" ? ctx : null) };
+  };
+}
+
+const world3d = (() => {
+  const scene = new THREE.Scene();
+  buildRoomScene(buildThree(), scene as unknown as RoomScene, richPainterFactory());
+  scene.updateMatrixWorld(true);
+  return scene;
+})();
+
+const cabinetGroups = world3d.children.filter((c): c is THREE.Group => (c as THREE.Group).isGroup);
+
+function descendantMeshes(root: THREE.Object3D): THREE.Mesh[] {
+  const out: THREE.Mesh[] = [];
+  root.traverse((o) => {
+    if ((o as THREE.Mesh).isMesh) out.push(o as THREE.Mesh);
+  });
+  return out;
+}
+
+// A mesh's geometry bounding box expressed in the GROUP's local frame
+// (brief: "in the cabinet's LOCAL frame") — group^-1 x meshWorld.
+function groupBox3(group: THREE.Object3D, mesh: THREE.Mesh): THREE.Box3 {
+  mesh.geometry.computeBoundingBox();
+  const bb = mesh.geometry.boundingBox!;
+  const m = new THREE.Matrix4().multiplyMatrices(
+    new THREE.Matrix4().copy(group.matrixWorld).invert(),
+    mesh.matrixWorld,
+  );
+  const box = new THREE.Box3();
+  for (const x of [bb.min.x, bb.max.x]) {
+    for (const y of [bb.min.y, bb.max.y]) {
+      for (const z of [bb.min.z, bb.max.z]) {
+        box.expandByPoint(new THREE.Vector3(x, y, z).applyMatrix4(m));
+      }
+    }
+  }
+  return box;
+}
+
+test("verification 1 (brief 8): the bbox of EVERY child of a cabinet group lies inside x +/-0.302 m, y 0.00-1.80 m, z +/-0.30 m in the cabinet's local frame \u2014 the 1.20 m aisle law holds at eye scale as it does at collision", () => {
+  assert.equal(cabinetGroups.length, cabinetPlacements.length, "one group per placement (the law's subject exists)");
+  for (const grp of cabinetGroups) {
+    const kids = descendantMeshes(grp);
+    // The coin-door family (panel, slot, frame, reject) is the brief's ONE
+    // exception — it stays world-posed, so it is not a child to begin with.
+    assert.equal(kids.length, SHELL_PART_MESHES - 4, "24 group children; the 4 coin-door-family meshes are world-mounted");
+    // 1e-6, NOT 1e-9: real three stores every geometry vertex in a
+    // Float32Array, so the authored 0.3 profile coordinate arrives as
+    // 0.30000001192 (float32 half-ulp at metre scale ~1.2e-8). 1e-6 is still
+    // 4 orders below the smallest meaningful geometry change (a 1 mm slip
+    // reddens here) while clearing the storage floor.
+    for (const m of kids) {
+      const box = groupBox3(grp, m);
+      assert.ok(box.min.x >= -0.302 - 1e-6 && box.max.x <= 0.302 + 1e-6, `lateral extent ${box.min.x}..${box.max.x} stays inside the 0.302 m band (side art included: it rides AT the 0.302 outer limit)`);
+      assert.ok(box.min.y >= -1e-6 && box.max.y <= 1.8 + 1e-6, `height extent ${box.min.y}..${box.max.y} stays between floor and body top`);
+      assert.ok(box.min.z >= -0.3 - 1e-6 && box.max.z <= 0.3 + 1e-6, `depth extent ${box.min.z}..${box.max.z} stays inside the body depth band`);
+    }
+  }
+});
+
+test("verification 2 (brief 8): each profiled side panel's local bbox is EXACTLY 0.019 x 1.800 x 0.600 m \u2014 the extrude + -90 deg rotation law lands the plywood true", () => {
+  for (const grp of cabinetGroups) {
+    const panels = descendantMeshes(grp).filter(
+      (m) => (m.geometry as THREE.ExtrudeGeometry).parameters?.options?.depth === 0.019,
+    );
+    assert.equal(panels.length, 2, "two side-panel extrusions (depth 0.019)");
+    for (const p of panels) {
+      const box = groupBox3(grp, p);
+      const sx = box.max.x - box.min.x;
+      const sy = box.max.y - box.min.y;
+      const sz = box.max.z - box.min.z;
+      // "EXACTLY" means exactly as three can hold it: vertices are float32
+      // (the 0.019 depth and the ±0.3 profile extremes each carry up to one
+      // float32 ulp of quantization, ~2e-8 across a difference), while the
+      // cos(-90 deg) rotation residue itself is only ~1e-17. Tol 1e-6 clears
+      // the storage floor; a 0.001 m substitution would still fail.
+      assert.ok(Math.abs(sx - 0.019) < 1e-6 && Math.abs(sy - 1.8) < 1e-6 && Math.abs(sz - 0.6) < 1e-6, `side panel bbox ${sx.toFixed(4)} x ${sy.toFixed(4)} x ${sz.toFixed(4)} (tol 1e-6 \u2014 float32 vertex storage is the floor, the cos(-90 deg) residue is ~1e-17)`);
+    }
+  }
+});
+
+test("verification 3 (brief 8): the screen face's top-centre sits BEHIND its bottom-centre along +Z in the group frame \u2014 the 9.8 deg lean reads as a lean-back, not a lean-forward", () => {
+  for (const grp of cabinetGroups) {
+    const face = descendantMeshes(grp).find((m) => {
+      const mat = m.material as THREE.MeshStandardMaterial;
+      // NOT just emissiveIntensity — every standard material defaults to
+      // 1.0 with BLACK emissive; the law is a non-zero emissive hue at
+      // exactly the screen's 1.0 intensity.
+      return mat.emissive && mat.emissive.getHex() !== 0 && mat.emissiveIntensity === 1.0;
+    });
+    assert.ok(face, "the screen face (emissive FACE_TINT at intensity 1.0) is found by its material law");
+    const toGroup = new THREE.Matrix4().multiplyMatrices(
+      new THREE.Matrix4().copy(grp.matrixWorld).invert(),
+      face.matrixWorld,
+    );
+    const top = new THREE.Vector3(0, SHELL.screen.height / 2, 0.0015).applyMatrix4(toGroup);
+    const bottom = new THREE.Vector3(0, -SHELL.screen.height / 2, 0.0015).applyMatrix4(toGroup);
+    assert.ok(top.z < bottom.z, `screen top z ${top.z} must sit behind bottom z ${bottom.z} (lean-back law)`);
+    assert.ok(bottom.z - top.z >= 0.08, `the lean spans ${(bottom.z - top.z).toFixed(3)} m of depth across the 0.52 m face \u2014 a shallow fake lean reddens here`);
+  }
+});
+
+test("verification 4 (brief 8): the control panel's front edge sits LOWER than its rear edge in the group frame \u2014 the 21 deg tilt faces the standing player", () => {
+  for (const grp of cabinetGroups) {
+    const overlay = descendantMeshes(grp).find((m) => {
+      const g = m.geometry as THREE.BoxGeometry;
+      return g.parameters?.width === 0.562 && g.parameters?.depth === 0.19;
+    });
+    assert.ok(overlay, "the control overlay (0.562 x 0.19) is found");
+    const toGroup = new THREE.Matrix4().multiplyMatrices(
+      new THREE.Matrix4().copy(grp.matrixWorld).invert(),
+      overlay.matrixWorld,
+    );
+    const front = new THREE.Vector3(0, 0, 0.095).applyMatrix4(toGroup);
+    const rear = new THREE.Vector3(0, 0, -0.095).applyMatrix4(toGroup);
+    assert.ok(front.y < rear.y, `control front y ${front.y} must sit below rear y ${rear.y} (lean-front-down law)`);
+    assert.ok(rear.y - front.y >= 0.06, `the tilt drops the front edge ${(rear.y - front.y).toFixed(3)} m below the rear`);
+  }
+});
+
+test("verification 5 (brief 8): the screen face's centre sits at least 0.04 m BEHIND the side-panel edge at the same height \u2014 the screen reads recessed into the body, never pasted on its face", () => {
+  for (const grp of cabinetGroups) {
+    const face = descendantMeshes(grp).find((m) => {
+      const mat = m.material as THREE.MeshStandardMaterial;
+      return mat.emissive && mat.emissive.getHex() !== 0 && mat.emissiveIntensity === 1.0;
+    });
+    assert.ok(face);
+    const centre = new THREE.Vector3(0, 0, 0).applyMatrix4(
+      new THREE.Matrix4().multiplyMatrices(new THREE.Matrix4().copy(grp.matrixWorld).invert(), face.matrixWorld),
+    );
+    // The side-panel silhouette at the face height: the SIDE_PROFILE segment
+    // bracketing y = screen centerY (the control-rear -> opening-top slope —
+    // derived from the authored profile, never retyped).
+    const cy = SHELL.screen.centerY;
+    let edgeZ = NaN;
+    for (let i = 0; i < SIDE_PROFILE.length; i++) {
+      const a = SIDE_PROFILE[i]!;
+      const b = SIDE_PROFILE[(i + 1) % SIDE_PROFILE.length]!;
+      if (a.y <= cy && cy <= b.y) {
+        edgeZ = a.x + ((cy - a.y) / (b.y - a.y)) * (b.x - a.x);
+        break;
+      }
+    }
+    assert.ok(!Number.isNaN(edgeZ), "the profile segment bracketing the face height exists");
+    assert.ok(edgeZ - centre.z >= 0.04, `screen centre z ${centre.z.toFixed(4)} vs side edge z ${edgeZ.toFixed(4)}: recess ${(edgeZ - centre.z).toFixed(4)} m >= 0.04`);
+  }
+});
+
+test("verification 6 (brief 8): exactly two materials per cabinet carry a non-zero emissive colour \u2014 the screen face and the marquee face; no other surface glows", () => {
+  for (const grp of cabinetGroups) {
+    const glow = new Set<THREE.Material>();
+    for (const m of descendantMeshes(grp)) {
+      const mats = Array.isArray(m.material) ? m.material : [m.material];
+      for (const mat of mats) {
+        if ((mat as THREE.MeshStandardMaterial).emissive && (mat as THREE.MeshStandardMaterial).emissive.getHex() !== 0) glow.add(mat);
+      }
+    }
+    assert.equal(glow.size, 2, "exactly the screen + marquee emissive materials per cabinet");
+  }
+});
+
+test("verification 7 (brief 8): NO mesh in the built scene carries the body-sized box (0.6 x 1.8 x 0.6) \u2014 the cabinet volume is assembled from the profiles, and its collision entry keeps the old bounds untouched (DW-42: the body box and the deck slab are gone)", () => {
+  let bodySized = 0;
+  world3d.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const g = mesh.geometry as THREE.BoxGeometry;
+    if (g.type === "BoxGeometry" && g.parameters?.width === 0.6 && g.parameters?.height === 1.8 && g.parameters?.depth === 0.6) bodySized += 1;
+  });
+  assert.equal(bodySized, 0, "no body-sized mesh anywhere in the scene");
+  const p = cabinetPlacements[0]!;
+  const v = collisionVolumes.find((c) => c.id === p.volumeId)!;
+  assert.ok(near(v.min.y, 0) && near(v.max.y, 1.8) && near(v.max.x - v.min.x, 0.6) && near(v.max.z - v.min.z, 0.6), "the collision volume still carries the 0.60 x 1.80 x 0.60 bounds (decor changed; walls didn't)");
+});
+
+test("verification 8 (brief 8): the whole cabinet \u2014 group children plus the world-posed coin-door family \u2014 stays inside the 1500-triangle budget, with real margin", () => {
+  const triCount = (m: THREE.Mesh): number => {
+    const idx = m.geometry.getIndex();
+    if (idx) return idx.count / 3;
+    return (m.geometry.getAttribute("position").count ?? 0) / 3;
+  };
+  for (const p of cabinetPlacements) {
+    assert.equal(cabinetGroups.length, 1, "single-placement build: the one group is the subject");
+    const grp = cabinetGroups[0]!;
+    let tris = descendantMeshes(grp).reduce((s, m) => s + triCount(m), 0);
+    // the four world-mounted coin-door-family meshes for this placement
+    const g = placementGeometry(p.slotId);
+    for (const child of world3d.children) {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh) continue;
+      const d = mesh.geometry as THREE.BoxGeometry;
+      const dims = d.parameters;
+      const nearThisCabinet = Math.abs(mesh.position.x - g.center.x) < 0.4 && Math.abs(mesh.position.z - g.center.z) < 0.4;
+      const isCoin =
+        (dims?.width === SHELL.coinDoor.width && dims?.height === SHELL.coinDoor.height) ||
+        (dims?.width === SHELL.coinSlot.width && dims?.height === SHELL.coinSlot.height) ||
+        (dims?.width === 0.3 && dims?.height === 0.34) ||
+        (dims?.width === 0.03 && dims?.height === 0.04);
+      if (isCoin && nearThisCabinet) tris += triCount(mesh);
+    }
+    // The margin is pinned, not just claimed: the built cabinet measured
+    // 928 triangles (three 0.187.0, exact primitive counts), so a re-tune
+    // that silently inflates primitives toward the 1500 budget reddens here.
+    assert.ok(tris > 0 && tris < 1200, `the whole cabinet draws ${tris} triangles \u2014 inside the brief's 1500 budget with real margin (measured 928, pinned under 1200)`);
+  }
 });

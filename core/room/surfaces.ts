@@ -5,6 +5,7 @@
 // service): every pixel goes onto a canvas the CALLER provides, so the whole
 // layer is headless-testable and the entry's DOM append count stays one.
 
+import { math } from "../contract/index.ts";
 import { MARQUEE_LETTER_SPACING_EM_FLOOR, type ScreenZones } from "./cabinets.ts";
 
 /** The drawing surface a painter may use - the subset of the 2D canvas API
@@ -26,6 +27,27 @@ export interface PaintContext {
    * into the screen face. Optional so the cheap recorder fakes stay valid
    * for the fallback painters; compositeScreen throws loudly when missing. */
   drawImage?(source: unknown, dx: number, dy: number, dw: number, dh: number): void;
+  /** Story 2.0 cabinet-art painters only (paintSideArt stripes,
+   * paintControlOverlay rings, paintContactShadow gradient). Optional for
+   * the same reason as drawImage — the painters that need a leg throw
+   * loudly when a fake omits it. */
+  save?(): void;
+  restore?(): void;
+  translate?(x: number, y: number): void;
+  rotate?(angleRad: number): void;
+  beginPath?(): void;
+  arc?(x: number, y: number, radius: number, startAngle: number, endAngle: number): void;
+  stroke?(): void;
+  strokeStyle?: string | CanvasGradient | CanvasPattern;
+  lineWidth?: number;
+  createRadialGradient?(
+    x0: number,
+    y0: number,
+    r0: number,
+    x1: number,
+    y1: number,
+    r1: number,
+  ): CanvasGradient;
 }
 
 export interface PaintSurface {
@@ -244,14 +266,15 @@ function fitLine(ctx: PaintContext, line: string, capPx: number, maxLineWidth: n
 }
 
 /**
- * Paint a cabinet marquee bar: the game-title record lettered in the
- * placement's marquee hue on the room-black bar, stacked one word per line
- * at the MARQUEE_CAP_M cap (DESIGN contract floor — never shrunk). Fit
- * laws (paintFlyer siblings): every line must fit the bar width minus 2 x
- * MARQUEE_MARGIN_PX once the letter-spacing floor is spent, and the whole
- * stacked block must fit the bar height at MARQUEE_LINE_PITCH_RATIO
- * leading; either way the painter throws instead of clipping. A title with
- * no words throws too — an empty marquee is a data bug.
+ * Paint a cabinet marquee face (Story 2.0 contract change 4): the
+ * game-title record lettered on ONE line in the placement's marquee hue,
+ * centred on the face at the 0.09m MARQUEE_CAP_M cap (UX-DR2/UX-DR6 — the
+ * cap is never shrunk; the stacked-word form of the 1.4 law is gone). Fit
+ * law (the throw law survives in its one-line form): the line must fit the
+ * face width minus 2 x MARQUEE_MARGIN_PX once the letter-spacing floor is
+ * spent, and the cap must fit the face height — either way the painter
+ * throws instead of clipping. A title with no words throws too — an empty
+ * marquee is a data bug.
  */
 export function paintMarquee(
   makeCanvas: CanvasFactory,
@@ -269,25 +292,21 @@ export function paintMarquee(
   const ctx = need2d(canvas);
   ctx.fillStyle = backgroundCss;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  const lines = titleLines(title);
-  if (lines.length === 0) throw new Error("paintMarquee: title carries no words");
+  const line = title.toUpperCase().split(/\s+/).filter((w) => w !== "").join(" ");
+  if (line === "") throw new Error("paintMarquee: title carries no words");
   const capPx = Math.round(capMeters * SURFACE_PX_PER_M);
-  const pitch = Math.round(capPx * MARQUEE_LINE_PITCH_RATIO);
-  const blockHeight = (lines.length - 1) * pitch + capPx;
-  if (blockHeight > canvas.height) {
+  if (capPx > canvas.height) {
     throw new Error(
-      `paintMarquee: ${lines.length} lines at cap ${capPx}px do not fit the ${canvas.height}px bar at the ${MARQUEE_LINE_PITCH_RATIO}x pitch`,
+      `paintMarquee: cap ${capPx}px does not fit the ${canvas.height}px face (the cap floor is never shrunk)`,
     );
   }
   ctx.fillStyle = letteringCss;
   ctx.font = `600 ${capPx}px ${MARQUEE_FONT_STACK}`;
   ctx.textAlign = "center";
   const maxLineWidth = canvas.width - 2 * MARQUEE_MARGIN_PX;
-  const firstBaseline = Math.round((canvas.height - blockHeight) / 2) + capPx;
-  lines.forEach((line, i) => {
-    fitLine(ctx, line, capPx, maxLineWidth);
-    ctx.fillText(line, canvas.width / 2, firstBaseline + i * pitch);
-  });
+  fitLine(ctx, line, capPx, maxLineWidth);
+  const baseline = Math.round((canvas.height - capPx) / 2) + capPx;
+  ctx.fillText(line, canvas.width / 2, baseline);
   return canvas;
 }
 
@@ -509,4 +528,155 @@ export function compositeScreen(
   ctx.font = `600 ${nextCap}px ${MARQUEE_FONT_STACK}`;
   fitLine(ctx, zones.next.toUpperCase(), nextCap, maxLineWidth);
   ctx.fillText(zones.next.toUpperCase(), w / 2, nextBaseline);
+}
+
+// --- Story 2.0: cabinet-art painters (brief section 5) ---------------------
+// Original abstract art only — no artwork copied from any real cabinet, no
+// image files, no randomness: every shape is an arithmetic layout so equal
+// inputs paint byte-identical canvases (determinism law). Colours arrive as
+// token CSS from the caller, never hardcoded here.
+
+function needLeg<T extends object, K extends keyof T>(ctx: T, leg: K, painter: string): NonNullable<T[K]> {
+  if (typeof ctx[leg] !== "function") {
+    throw new Error(`${painter}: paint context has no ${String(leg)} (this painter needs it)`);
+  }
+  return ctx[leg] as NonNullable<T[K]>;
+}
+
+/**
+ * Paint one side-art decal (brief `paintSideArt`): a 0.50 x 0.70 m panel
+ * ground in the darkened side colour carrying three diagonal stripes of
+ * DIFFERENT widths plus one large simple tilted shape, in the placement's
+ * hue and marqueeHue families. Bold original abstract geometry only — the
+ * shapes are arithmetic (rotated rectangles), deterministic, and copy
+ * nothing.
+ */
+export function paintSideArt(
+  makeCanvas: CanvasFactory,
+  groundCss: string,
+  hueCss: string,
+  marqueeHueCss: string,
+  widthM: number,
+  heightM: number,
+): PaintSurface {
+  const canvas = makeCanvas(
+    Math.round(widthM * SURFACE_PX_PER_M),
+    Math.round(heightM * SURFACE_PX_PER_M),
+  );
+  const ctx = need2d(canvas);
+  const save = needLeg(ctx, "save", "paintSideArt");
+  const restore = needLeg(ctx, "restore", "paintSideArt");
+  const translate = needLeg(ctx, "translate", "paintSideArt");
+  const rotate = needLeg(ctx, "rotate", "paintSideArt");
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.fillStyle = groundCss;
+  ctx.fillRect(0, 0, w, h);
+  // Three diagonal stripes, different widths, one sweep across the panel.
+  save.call(ctx);
+  translate.call(ctx, w / 2, h / 2);
+  rotate.call(ctx, 0.6); // (inference — a fixed diagonal, never animated)
+  const long = 3 * w;
+  ctx.fillStyle = marqueeHueCss;
+  ctx.fillRect(-long / 2, -h * 0.34, long, h * 0.06);
+  ctx.fillStyle = hueCss;
+  ctx.fillRect(-long / 2, -h * 0.12, long, h * 0.13);
+  ctx.fillStyle = marqueeHueCss;
+  ctx.fillRect(-long / 2, h * 0.14, long, h * 0.05);
+  restore.call(ctx);
+  // One large simple shape: a tilted square low-centre, in the machine hue.
+  const side = Math.round(h * 0.3);
+  save.call(ctx);
+  translate.call(ctx, w / 2, h * 0.74);
+  rotate.call(ctx, -0.5);
+  ctx.fillStyle = hueCss;
+  ctx.fillRect(-side / 2, -side / 2, side, side);
+  restore.call(ctx);
+  return canvas;
+}
+
+/** A control ring centre on the overlay, in overlay-local metres
+ * (x across, y along the slope) with a radius. */
+export interface OverlayRing {
+  x: number;
+  y: number;
+  r: number;
+}
+
+/**
+ * Paint the control-panel overlay (brief `paintControlOverlay`): a 0.562 x
+ * 0.19 m dark ground, a thin border line in the placement's marquee hue,
+ * and a small stroked ring around each control position (positions come
+ * from the scene's assembly data — one source for hardware placement).
+ */
+export function paintControlOverlay(
+  makeCanvas: CanvasFactory,
+  groundCss: string,
+  borderCss: string,
+  rings: readonly OverlayRing[],
+  widthM: number,
+  heightM: number,
+): PaintSurface {
+  const canvas = makeCanvas(
+    Math.round(widthM * SURFACE_PX_PER_M),
+    Math.round(heightM * SURFACE_PX_PER_M),
+  );
+  const ctx = need2d(canvas);
+  const beginPath = needLeg(ctx, "beginPath", "paintControlOverlay");
+  const arc = needLeg(ctx, "arc", "paintControlOverlay");
+  const stroke = needLeg(ctx, "stroke", "paintControlOverlay");
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.fillStyle = groundCss;
+  ctx.fillRect(0, 0, w, h);
+  // Thin border line: four edge rectangles (the rectangle idiom stays
+  // stroke-free where it can).
+  const t = 4;
+  ctx.fillStyle = borderCss;
+  ctx.fillRect(t, t, w - 2 * t, t);
+  ctx.fillRect(t, h - 2 * t, w - 2 * t, t);
+  ctx.fillRect(t, t, t, h - 2 * t);
+  ctx.fillRect(w - 2 * t, t, t, h - 2 * t);
+  // Rings around the controls (the one arc use in this family; the era
+  // overlay prints round target rings).
+  ctx.strokeStyle = borderCss;
+  ctx.lineWidth = 3;
+  const pxPerM = SURFACE_PX_PER_M;
+  for (const ring of rings) {
+    beginPath.call(ctx);
+    arc.call(ctx, w / 2 + ring.x * pxPerM, h / 2 + ring.y * pxPerM, ring.r * pxPerM, 0, 2 * math.PI);
+    stroke.call(ctx);
+  }
+  return canvas;
+}
+
+/**
+ * Paint the contact-shadow texture (brief `paintContactShadow` / 4f): a
+ * soft dark radial gradient centred on the sheet, fading to fully
+ * transparent at the edge — the material carries transparent +
+ * depthWrite:false; the canvas supplies only alpha falloff.
+ */
+export function paintContactShadow(
+  makeCanvas: CanvasFactory,
+  inkCss: string,
+  sizeM: number,
+): PaintSurface {
+  const px = Math.round(sizeM * SURFACE_PX_PER_M);
+  const canvas = makeCanvas(px, px);
+  const ctx = need2d(canvas);
+  const grad = needLeg(ctx, "createRadialGradient", "paintContactShadow").call(
+    ctx,
+    px / 2,
+    px / 2,
+    0,
+    px / 2,
+    px / 2,
+    px / 2,
+  );
+  grad.addColorStop(0, inkCss);
+  grad.addColorStop(0.55, inkCss);
+  grad.addColorStop(1, "transparent");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, px, px);
+  return canvas;
 }

@@ -96,6 +96,67 @@ test("pitch clamps at \u00b185\u00b0 under violent mouse pulls; yaw turns with m
   assert.equal(p.state.pitch, -PITCH_LIMIT);
   p.step(1, view([0, 0], [-1 / MOUSE_SENSITIVITY, 0])); // yaw += exactly 1 rad
   assert.equal(p.state.yaw, 1);
+  // DW-24 narrowing (Story 2.0): accumulation past pi reads back modulo the
+  // wrap law — 4 rad of accumulation is 4 - 2 pi (the range boundary
+  // arithmetic is the design law, not the subject's constants).
+  stepN(p, 3, view([0, 0], [-1 / MOUSE_SENSITIVITY, 0]));
+  assert.ok(Math.abs(p.state.yaw - (4 - 2 * Math.PI)) < 1e-9, `4 accumulated rad read back wrapped: ${String(p.state.yaw)}`);
+});
+
+// DW-24 reproduction (Story 2.0), written BEFORE the fix per the ledger's
+// "repro unconfirmed": continuous mouse-x drives cumulative yaw far beyond
+// one full turn (magnitude past 8 pi) while pitch holds the +/-85 deg clamp.
+// Expected values are literals: the canonical range is the design law's
+// [-pi, pi), the clamp is the authored 85 deg, and the wrap read-backs come
+// from arithmetic on the step count and pi (the range boundary), never from
+// MOUSE_SENSITIVITY, PITCH_LIMIT, or the fix's wrap constant.
+test("DW-24: continuous yaw past one full turn at the pitch clamp holds the canonical range and the view basis (reproduction-first)", () => {
+  const p = createPlayerController(collisionVolumes, { x: 3, z: 0 });
+  // Input-side drive only: one step turns exactly 2*pi rad. 12 steps ->
+  // cumulative yaw of 24*pi rad, comfortably past the reported 8*pi.
+  const fullTurn = (2 * Math.PI) / MOUSE_SENSITIVITY;
+  for (let i = 0; i < 12; i++) {
+    p.step(1, view([0, 0], [-fullTurn, -10000]));
+    assert.ok(
+      p.state.yaw >= -Math.PI && p.state.yaw < Math.PI,
+      `yaw ${String(p.state.yaw)} left the canonical [-pi, pi) range at step ${String(i + 1)}`,
+    );
+  }
+  // Pitch holds its authored clamp (85 deg, the design-law literal) through
+  // every one of those steps — never exceeds it, never flips the floor into
+  // the ceiling.
+  assert.ok(Math.abs(p.state.pitch - (85 * Math.PI) / 180) < 1e-12, `pitch ${String(p.state.pitch)} is not the 85 deg clamp`);
+  // 12 whole turns are the identity orientation: the wrapped yaw sits on 0,
+  // and the view basis ((-sin yaw, -cos yaw) is the camera's look direction
+  // on the yaw axis) matches the unwrapped 24*pi orientation within float
+  // tolerance.
+  assert.ok(Math.abs(p.state.yaw) < 1e-9, `yaw after 12 whole turns should read 0, got ${String(p.state.yaw)}`);
+  assert.ok(
+    Math.abs(-Math.sin(p.state.yaw) - -Math.sin(24 * Math.PI)) < 1e-9 &&
+      Math.abs(-Math.cos(p.state.yaw) - -Math.cos(24 * Math.PI)) < 1e-9,
+    "the wrapped orientation matches the unwrapped 24*pi orientation (the view basis never flips)",
+  );
+  // Half-turn steps pin a non-trivial wrap read-back: from the identity,
+  // odd half-turns land on the -pi boundary of the canonical range (a +pi
+  // orientation wraps to -pi), even ones return to 0.
+  const halfTurn = Math.PI / MOUSE_SENSITIVITY;
+  for (let k = 1; k <= 5; k++) {
+    p.step(1, view([0, 0], [-halfTurn, -10000]));
+    assert.ok(
+      p.state.yaw >= -Math.PI && p.state.yaw < Math.PI,
+      `yaw ${String(p.state.yaw)} left the canonical range at half-turn step ${String(k)}`,
+    );
+    const target = k % 2 === 1 ? -Math.PI : 0;
+    assert.ok(Math.abs(p.state.yaw - target) < 1e-9, `after ${String(k)} half-turns yaw reads ${String(p.state.yaw)}, expected ${String(target)}`);
+  }
+  // Five half-turns = 5*pi: the look direction must match that orientation
+  // (reversed from home) at the wrapped value.
+  assert.ok(
+    Math.abs(-Math.sin(p.state.yaw) - -Math.sin(5 * Math.PI)) < 1e-9 &&
+      Math.abs(-Math.cos(p.state.yaw) - -Math.cos(5 * Math.PI)) < 1e-9,
+    "the wrapped orientation matches the unwrapped 5*pi orientation",
+  );
+  assert.ok(Math.abs(p.state.pitch - (85 * Math.PI) / 180) < 1e-12, "pitch is still pinned at the 85 deg clamp at the end");
 });
 
 test("wall block: stop at face minus player radius; strafing still slides", () => {

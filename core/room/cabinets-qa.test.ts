@@ -21,6 +21,7 @@ import assert from "node:assert/strict";
 import {
   MARQUEE_CAP_M,
   SCREEN_ATTRACT_CAP_M,
+  SCREEN_NEXT_CAP_M,
   SHELL,
   coinDoorPose,
   createCabinetRuntime,
@@ -35,15 +36,16 @@ import { PLAYER_RADIUS, createPlayerController } from "../player.ts";
 import { createKernelLoop, MS_PER_TICK } from "../loop.ts";
 import type { DeviceView } from "../input/index.ts";
 import { paintMarquee, paintScreen, type PaintContext, type PaintSurface } from "./surfaces.ts";
-import { FACE_T, buildRoomScene, type Placed, type RoomScene, type Three } from "./scene.ts";
+import { buildRoomScene, type Placed, type RoomScene, type Three } from "./scene.ts";
 import {
-  CARD_INK,
+  BUTTON_RED,
+  CABINET_BLACK,
+  CABINET_METAL,
   FACE_TINT,
   GLOW_CYAN,
   GLOW_MARQUEE,
   ROOM_BLACK,
   SIGN_CHALK,
-  WALL_PANEL,
   WALL_WARM,
   toCss,
 } from "./tokens.ts";
@@ -141,10 +143,10 @@ function fakeRecorder() {
 test("QA AC2: marquee and attract/NEXT lettering is uppercased by the painters, not by the authored record (a mixed-case record still prints the title's words, capitals only)", () => {
   const f = fakeRecorder();
   paintMarquee(f.factory, "Moon Patrol", toCss(ROOM_BLACK), toCss(GLOW_MARQUEE), MARQUEE_CAP_M, SHELL.marquee.width, SHELL.marquee.height);
-  assert.deepEqual(f.texts, ["MOON", "PATROL"], "a lowercase record still letters the title words in capitals (AD-24: the title record, uppercased)");
+  assert.deepEqual(f.texts, ["MOON PATROL"], "a lowercase record still letters the title uppercased \u2014 on ONE line (Story 2.0 contract change 4: the words join, never stack)");
   const f2 = fakeRecorder();
   paintMarquee(f2.factory, "  moon   PATROL ", toCss(ROOM_BLACK), toCss(GLOW_MARQUEE), MARQUEE_CAP_M, SHELL.marquee.width, SHELL.marquee.height);
-  assert.deepEqual(f2.texts, ["MOON", "PATROL"], "whitespace runs split into words, never blank lines");
+  assert.deepEqual(f2.texts, ["MOON PATROL"], "whitespace runs collapse to single spaces, never blank segments");
   const f3 = fakeRecorder();
   paintScreen(
     f3.factory,
@@ -154,11 +156,11 @@ test("QA AC2: marquee and attract/NEXT lettering is uppercased by the painters, 
     toCss(GLOW_CYAN),
     toCss(GLOW_MARQUEE),
     SCREEN_ATTRACT_CAP_M,
-    MARQUEE_CAP_M,
+    SCREEN_NEXT_CAP_M,
     SHELL.screen.width,
     SHELL.screen.height,
   );
-  assert.deepEqual(f3.texts, ["MOON", "PATROL", "NEXT"], "the screen zone words uppercase too (attract + NEXT)");
+  assert.deepEqual(f3.texts, ["MOON", "PATROL", "NEXT"], "the screen zone words uppercase too (attract + NEXT \u2014 the SCREEN painter still stacks attract words; only the marquee went one-line)");
 });
 
 // --- AC3: liveness law driven through the REAL kernel loop ---------------------
@@ -195,7 +197,7 @@ function screenOps(step: number): string {
     toCss(p.hue),
     toCss(p.marqueeHue),
     SCREEN_ATTRACT_CAP_M,
-    MARQUEE_CAP_M,
+    SCREEN_NEXT_CAP_M,
     SHELL.screen.width,
     SHELL.screen.height,
   );
@@ -284,28 +286,49 @@ test("QA AC4: the coin-door pose law keeps its visitor-left hinge fixed, rotates
 
 // --- AC5: the scene materializes every part once, in token colours ------------
 
-test("QA AC5: the built scene carries every SHELL part exactly once at its authored dims, and every cabinet-part colour is a tokens.ts hex (material leg of the token law; the demonstrated raw-hex class was a light)", () => {
-  const meshes: { geo: { w: number; h: number; d: number }; color: unknown; y: number }[] = [];
+// Story 2.0 (DW-29 rebuild): the fake speaks the EXTENDED seam (profile
+// extrusion, cylinders, sphere, group, material arrays) — the brief's
+// "every headless fake" requirement — and the PaintContext grows the legs
+// the new painters need (the needLeg guard in surfaces.ts dies loudly on a
+// missing one, so this fake must implement them, not stub them away).
+test("QA AC5: the built scene carries every rebuilt SHELL part at its authored dims in tokens.ts colours, NO mesh for the cabinet volume (DW-42's body box is gone), and the two faces carry emissive while no other cabinet material does (material leg of the token law; the demonstrated raw-hex class was a light)", () => {
+  interface MatRec {
+    params: Record<string, unknown>;
+  }
+  const meshes: { geo: { w?: number; h?: number; d?: number }; mat: MatRec }[] = [];
   const three: Three = {
     boxGeometry(w, h, d) {
       return { w, h, d };
+    },
+    extrudeGeometry(points, depth) {
+      return { points, depth };
+    },
+    cylinderGeometry(radiusTop, radiusBottom, height, radialSegments) {
+      return { radiusTop, radiusBottom, height, radialSegments };
+    },
+    sphereGeometry(radius, widthSegments, heightSegments) {
+      return { radius, widthSegments, heightSegments };
     },
     standardMaterial(params) {
       return { params };
     },
     mesh(geometry, material) {
-      const geo = geometry as { w: number; h: number; d: number };
-      const rec = { geo, color: (material as { params: Record<string, unknown> }).params["color"], y: NaN };
+      const geo = geometry as { w?: number; h?: number; d?: number };
+      const mat = (Array.isArray(material) ? material[0] : material) as MatRec;
+      const rec = { geo, mat };
       meshes.push(rec);
       const placed: Placed = {
-        position: {
-          set(_x, y, _z) {
-            rec.y = y;
-          },
-        },
+        position: { set() {} },
         rotation: { set() {} },
       };
       return placed;
+    },
+    group() {
+      return {
+        position: { set() {} },
+        rotation: { set() {}, y: 0 },
+        add() {},
+      };
     },
     pointLight() {
       return { position: { set() {} }, rotation: { set() {} } };
@@ -331,31 +354,72 @@ test("QA AC5: the built scene carries every SHELL part exactly once at its autho
         if (!m) throw new Error("fake measureText: font string carries no px size");
         return { width: text.length * 0.92 * Number(m[1]) };
       },
+      save() {},
+      restore() {},
+      translate() {},
+      rotate() {},
+      beginPath() {},
+      arc() {},
+      stroke() {},
+      lineWidth: 0,
+      createRadialGradient() {
+        return { addColorStop() {} };
+      },
     };
     return { width, height, getContext: (kind) => (kind === "2d" ? ctx : null) };
   };
   buildRoomScene(three, scene, factory);
 
-  // B0 faces +Z: part width runs along X, part depth along Z.
-  const parts: { label: string; geo: { w: number; h: number; d: number }; color: number }[] = [
-    { label: "body box (from the volume bounds)", geo: { w: SHELL.body.width, h: SHELL.body.height, d: SHELL.body.depth }, color: WALL_PANEL },
-    { label: "marquee bar", geo: { w: SHELL.marquee.width, h: SHELL.marquee.height, d: SHELL.marquee.depth }, color: ROOM_BLACK },
-    { label: "marquee face", geo: { w: SHELL.marquee.width, h: SHELL.marquee.height, d: FACE_T }, color: FACE_TINT },
-    { label: "screen bezel", geo: { w: SHELL.bezel.width, h: SHELL.bezel.height, d: SHELL.bezel.depth }, color: CARD_INK },
-    { label: "screen face", geo: { w: SHELL.screen.width, h: SHELL.screen.height, d: FACE_T }, color: FACE_TINT },
-    { label: "coin-door panel", geo: { w: SHELL.coinDoor.width, h: SHELL.coinDoor.height, d: SHELL.coinDoor.thickness }, color: WALL_WARM },
-    { label: "coin-slot detail", geo: { w: SHELL.coinSlot.width, h: SHELL.coinSlot.height, d: SHELL.coinSlot.thickness }, color: SIGN_CHALK },
+  // Box-dimension parts of the rebuilt shell (Story 2.0 numbers): every
+  // count is the brief's assembly table, every colour the token NAME.
+  const parts: { label: string; geo: { w: number; h: number; d: number }; count: number; color: number }[] = [
+    { label: "front panel", geo: { w: 0.562, h: 0.8, d: 0.02 }, count: 1, color: CABINET_BLACK },
+    { label: "side-art decal", geo: { w: 0.002, h: 0.7, d: 0.5 }, count: 2, color: FACE_TINT },
+    { label: "contact shadow", geo: { w: 0.6, h: 0.002, d: 0.6 }, count: 1, color: undefined as unknown as number },
+    { label: "screen bezel", geo: { w: SHELL.bezel.width, h: SHELL.bezel.height, d: SHELL.bezel.depth }, count: 1, color: CABINET_BLACK },
+    { label: "screen face", geo: { w: SHELL.screen.width, h: SHELL.screen.height, d: 0.003 }, count: 1, color: 0 },
+    { label: "control overlay", geo: { w: 0.562, h: 0.003, d: 0.19 }, count: 1, color: FACE_TINT },
+    { label: "marquee face", geo: { w: 0.562, h: SHELL.marquee.height, d: SHELL.marquee.depth }, count: 1, color: 0 },
+    { label: "marquee retainer", geo: { w: 0.562, h: 0.01, d: 0.008 }, count: 2, color: CABINET_BLACK },
+    { label: "grille slat", geo: { w: 0.2, h: 0.004, d: 0.012 }, count: 3, color: CABINET_BLACK },
+    { label: "coin-door frame", geo: { w: 0.3, h: 0.34, d: 0.004 }, count: 1, color: CABINET_METAL },
+    { label: "coin-reject button", geo: { w: 0.03, h: 0.04, d: 0.004 }, count: 1, color: BUTTON_RED },
+    { label: "coin-door panel", geo: { w: SHELL.coinDoor.width, h: SHELL.coinDoor.height, d: SHELL.coinDoor.thickness }, count: 1, color: WALL_WARM },
+    { label: "coin-slot detail", geo: { w: SHELL.coinSlot.width, h: SHELL.coinSlot.height, d: SHELL.coinSlot.thickness }, count: 1, color: SIGN_CHALK },
   ];
   for (const part of parts) {
     const hits = meshes.filter(
-      (m) => near(m.geo.w, part.geo.w) && near(m.geo.h, part.geo.h) && near(m.geo.d, part.geo.d),
+      (m) => near(m.geo.w ?? NaN, part.geo.w) && near(m.geo.h ?? NaN, part.geo.h) && near(m.geo.d ?? NaN, part.geo.d),
     );
-    assert.equal(hits.length, 1, `exactly one mesh carries the "${part.label}" dims`);
-    const hit = hits[0]!;
-    assert.equal(
-      hit.color,
-      part.color,
-      `"${part.label}" must carry the mockup token 0x${part.color.toString(16)} (got ${String(hit.color)}) — AC5: part colours come from tokens.ts`,
-    );
+    assert.equal(hits.length, part.count, `exactly ${part.count} mesh(es) carry the "${part.label}" dims`);
+    for (const hit of hits) {
+      assert.equal(
+        hit.mat.params["color"],
+        part.color,
+        // The message builds eagerly, so the contact shadow's `undefined`
+        // colour sentinel (its material rides on the map alone — no colour
+        // param at all) must survive the template too.
+        `"${part.label}" must carry ${part.color === undefined ? "NO colour param at all (the contact shadow rides on its map alone)" : part.color === 0 ? "the brief's black, written as the number 0" : `the token 0x${part.color.toString(16)}`} (got ${String(hit.mat.params["color"])}) \u2014 AC5: part colours come from tokens.ts`,
+      );
+    }
   }
+
+  // DW-42 + contract change 2: the 1.10 body box is GONE — no mesh carries
+  // the volume's full 0.60x0.60x1.80 dims, and no mesh carries the deleted
+  // contour records' dims (deck/kick/hood/wings left no part behind).
+  const bodySized = meshes.filter(
+    (m) => near(m.geo.w ?? NaN, SHELL.body.width) && near(m.geo.h ?? NaN, SHELL.body.height) && near(m.geo.d ?? NaN, SHELL.body.depth),
+  );
+  assert.equal(bodySized.length, 0, "no mesh is extruded from the cabinet collision volume (kind cabinet is data, not decor)");
+
+  // Contract change 3: emissive lives on exactly the two faces — the screen
+  // (intensity 1.0) and the marquee (1.2) — and on no other built material.
+  const emissive = meshes.filter((m) => "emissive" in m.mat.params);
+  assert.equal(emissive.length, 2, "exactly two cabinet-part materials carry emissive (screen face + marquee face)");
+  for (const m of emissive) {
+    assert.equal(m.mat.params["emissive"], FACE_TINT, "the emissive hue is the FACE_TINT token");
+    assert.ok(typeof m.mat.params["emissiveMap"] === "object", "the emissive rides the painted map");
+  }
+  const intensities = emissive.map((m) => m.mat.params["emissiveIntensity"]).sort();
+  assert.deepEqual(intensities, [1.0, 1.2], "the face intensities are the brief's 1.0 (screen) / 1.2 (marquee)");
 });

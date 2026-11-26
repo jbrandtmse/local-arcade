@@ -60,7 +60,7 @@ import { createFigurePresenter } from "./patrons/presenter.ts";
 import { createSeatService, type SeatKeyMap, type SeatService } from "./seat.ts";
 import { createPlayerController } from "./player.ts";
 import { ENTRY_SPAWN, collisionVolumes } from "./room/collision-volumes.ts";
-import { MARQUEE_CAP_M, SCREEN_ATTRACT_CAP_M, SHELL, cabinetPlacements, createCabinetRuntime } from "./room/cabinets.ts";
+import { SCREEN_ATTRACT_CAP_M, SCREEN_NEXT_CAP_M, SHELL, cabinetPlacements, createCabinetRuntime } from "./room/cabinets.ts";
 import { paintScreen, type PaintContext, type PaintSurface } from "./room/surfaces.ts";
 import { guardInstance, type GameGuard } from "./containment.ts";
 import {
@@ -753,7 +753,7 @@ test("QA chain (Rule 1 executed + AC5 paint half): the quarantined table's rowsF
     // authored record, replace ONLY the score leg with the table's rows.
     const zones = p.gameId != null ? { ...p.screenZones, score: r.storage.rowsFor(p.gameId) } : p.screenZones;
     const f = fakeCanvas();
-    paintScreen(f.factory, zones, r.loop.tickCount, "#15110e", "#5bc8ff", "#ffc46b", SCREEN_ATTRACT_CAP_M, MARQUEE_CAP_M, SHELL.screen.width, SHELL.screen.height);
+    paintScreen(f.factory, zones, r.loop.tickCount, "#15110e", "#5bc8ff", "#ffc46b", SCREEN_ATTRACT_CAP_M, SCREEN_NEXT_CAP_M, SHELL.screen.width, SHELL.screen.height);
     assert.deepEqual(
       f.texts.map((t) => t.text),
       expected,

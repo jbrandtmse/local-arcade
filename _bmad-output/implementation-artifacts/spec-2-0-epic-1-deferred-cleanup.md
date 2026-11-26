@@ -2,17 +2,31 @@
 title: 'Story 2.0: Epic 1 deferred cleanup'
 type: 'feature'
 created: '2026-11-26'
-status: 'ready-for-dev'
+status: 'done'
 review_loop_iteration: 0
-followup_review_recommended: false
-baseline_revision: '95cc286018fa4ddc999a7cfa8a33f52f2471f575'
+followup_review_recommended: true
+baseline_revision: 'fbe9ce2ea8fa13f235727f3c6740eb96d58de4cc'
 context:
   - _bmad-output/planning-artifacts/architecture/architecture-local-arcade-2026-11-19/ARCHITECTURE-SPINE.md
   - _bmad-output/planning-artifacts/sprint-change-proposal-2026-11-26.md
   - _bmad-output/implementation-artifacts/deferred-work.md
   - _bmad-output/implementation-artifacts/epic-2-context.md
 warnings: ['oversized', 'multiple-goals']
-deferred: []
+deferred:
+  - summary: >-
+      main.ts's new renderer posture (ACES + exposure 1.0, CanvasTexture sRGB/anisotropy, the cap-argument switch) has no executed test host -- it is pinned only by source-text (MAIN.includes) tripwires.
+    evidence: |-
+      Verified by the verification-gap review layer: the repo has no headless WebGL host and defers the executed tier to the Epic-3 browser harness (main-glue.test.ts "the executed tier waits" note, DW-15). The source pins are falsifiable against text edits; a posture change or three-version bump that keeps the source text intact would ship visually wrong with the suite green. Pre-existing posture, not caused by this story.
+    location: >- # core/main.ts renderer construction; pinned in main-glue
+      core/main.ts (renderer construction; pins at core/main-glue.test.ts:126-140)
+    severity: low
+  - summary: >-
+      Owner-authored contradiction inside the intent: "the screen face stays the brightest face" cannot hold literally against the brief's fixed emissive pair (screen 1.0 tone-maps to 0.763, marquee 1.2 to 0.804 under the measured ACES curve).
+    evidence: |-
+      Both sources bind: the brief is the byte-embedded binding core and pins the 1.0/1.2 pair; the intent-contract's Always list carries the screen-brightest line. The diff keeps the brief's values and re-expresses the law as "no cabinet light's own contribution may out-shine the brightest emissive sheet" (CEILING 1.18 -> 0.80 output < the marquee's 0.804). Keeping the screen strictly brightest requires a brief amendment (e.g. marquee emissiveIntensity <= 1.0) -- an owner decision this story may not make. Disposition by-design; disclosed in the completion report.
+    location: >-
+      core/room/cabinets.ts + core/room/scene.test.ts (emissive intensities and the exposure law)
+    severity: low
 ---
 
 <intent-contract>
@@ -427,6 +441,37 @@ by the smallest amount that fixes it and list the change in your report.
 
 ## Review Triage Log
 
+### 2026-11-26 — Review pass (build-auto step-4; layers: blind-hunter, edge-case-hunter, verification-gap, intent-alignment)
+- verdicts: 27 findings — high 0, medium 7, low 12, false 8, maybe-false 0
+- findings:
+  - `[medium]` `[patch]` (blind 1; grouped with edge 1-2, vg 2) containment.test.ts:635 and storage.test.ts:756 still pass `MARQUEE_CAP_M` (now 0.09) into the nextCap slot where main.ts switched to `SCREEN_NEXT_CAP_M` — verified: both are executed mirrors of the shipped fallback legs and their assertions are cap-insensitive, so a main.ts regression to the old pairing stays green. Applied: both call sites + imports switched to `SCREEN_NEXT_CAP_M`; both suites re-ran green (12/12, 18/18).
+  - `[low]` `[patch]` (blind 2; grouped with edge 3) `FACE_T` dead export at scene.ts:96 — verified: zero references repo-wide after the rebuild. Applied: export deleted.
+  - `[medium]` `[patch]` (blind 3; grouped with vg 3) the three new art painters execute but no assertion observes their output; the `needLeg` throw law never fires in any rig — verified: only comments in tests reference them; all fake legs are no-ops. Applied: `artRecorder()` + four new tests in cabinets.test.ts (side art fills/stripes/square/rotations, overlay border + one ring per CONTROL_RINGS entry at scaled centres + strokeStyle/lineWidth, contact-shadow gradient stops 0/0.55/transparent, three needLeg throw siblings); green.
+  - `[low]` `[patch]` (blind 4) derivation-record conflict: cabinets.ts comment says screen far-corner own-contribution 0.32, the measured formula gives 0.35 (0.25*(0.7331/0.8083)/0.6534 = 0.347) — verified by re-evaluation. Applied: comment corrected to "0.66 / 0.35".
+  - `[low]` `[patch]` (blind 5; grouped with edge 4, intent 3) cabinets.ts ceiling comment mislabels the law as "screen-brightest ... no light may reach the faces' brightness" while the pinned ceiling 0.80 output sits above the screen sheet's 0.763 — verified against the measured curve. Applied: comment rewritten to the brightest-sheet law scene.test.ts actually pins (the 1.2 marquee at 0.804 is the machine's brightest face); owner-fixed 1.0/1.2 pair untouched; the value-level collision is owner-authored on both sides, dispositioned by-design and recorded in `deferred:`.
+  - `[low]` `[patch]` (blind 6) SHELL_PART_LABELS claims "in build order" but lists each play-button cap before its ring while scene.ts mounts ring-then-cap — verified against mount order. Applied: the two label pairs swapped (count stays 28).
+  - `[low]` `[patch]` (blind 7) verification 8's "with real margin" claim is pinned only by `tris <= 1500` — a re-tune inflating to 1499 keeps the title-claim green. Applied: bound tightened to `tris < 1200` with the measured 928 recorded in the message.
+  - `[low]` `[patch]` (blind 8) side-panel extrusion materials pinned by arity only — swapping either material's colour stays green (cabinets-qa's token-colour table keys on `geo.w`, skipping extrusions). Applied: scene.test.ts now pins mats[1] = `CABINET_MOLDING` and mats[0] = the once-measured literal `0x204659` (0.35 x GLOW_CYAN); hex guard untouched (it scans non-test sources).
+  - `[medium]` `[patch]` (edge 1) storage.test.ts:756 next-cap mirror — grouped entry, same route as blind 1.
+  - `[medium]` `[patch]` (edge 2) containment.test.ts:635 next-cap mirror — grouped entry, same route as blind 1.
+  - `[low]` `[patch]` (edge 3) FACE_T dead export with high-confidence deletion guard — grouped entry, same route as blind 2.
+  - `[low]` `[patch]` (edge 4) claim check: "screen face stays the brightest face" vs marquee sheet 0.804 — grouped entry, same route as blind 5.
+  - `[medium]` `[patch]` (vg 1) the per-cabinet group yaw law (`group.rotation.y = closedYaw(facing)`, scene.ts:499) had an un-falsifiable pin: the fake's rotation object records only `.set(...)` into `node.ry`, the bare `y: 0` property swallowed the assignment, and the only placement (B0, back slot) has true yaw 0 — the :707 pin compared 0 against an initial 0; deleting the assignment kept all suites green (demonstrated by the layer). Applied: fake `rotation.y` is now a setter writing `node.ry`, group nodes start `ry: NaN` (a dropped assignment reddens the pin), plus a new literal `closedYaw` branch test (four axis facings + non-axis throw) in cabinets.test.ts; green.
+  - `[medium]` `[patch]` (vg 2) cap split not adopted at the two mirror sites — grouped entry, same route as blind 1.
+  - `[medium]` `[patch]` (vg 3) the three new painters have no content-observing tests; needLeg throw untested — grouped entry, same route as blind 3.
+  - `[low]` `[defer]` (vg other 1) main.ts's new renderer posture has no executed test host (source-text pins only) — real but pre-existing: the repo defers the executed tier to the Epic-3 browser harness (DW-15); recorded in frontmatter `deferred:`.
+  - `[low]` `[reject]` (vg other 2) SHELL_PART_LABELS feeds only `.length`, no label-to-part binding — doc-only note with no named harm; part-count drift is already caught by the 28 IS-pin plus the mesh-count formula pin.
+  - `[false]` (vg other 3) contact-shadow 0.80->0.60 shrink framed as a gap — it is a pinned report obligation, not a verification gap: the 0.6 box dims are pinned in cabinets-qa's part table and the containment band; the disclosure is owed at the report surface and is delivered in Auto Run Result.
+  - `[low]` `[reject]` (vg other 4) mutation lines live in Design Notes rather than `## Verification` — rejected: the only fix edits this build's spec (rejected per step-4); the five mutation lines exist and the layer confirmed each maps to a failable test.
+  - `[false]` (intent 1) contact shadow 0.80->0.60 is "the single brief number knowingly overrode" — the brief's own smallest-adjustment clause authorizes exactly this (0.80 sheet contradicts the brief's verification-1 z +/-0.30 band); the mandated listing is report-surface and is delivered; no code change owed.
+  - `[false]` (intent 2) matrix phrase "new CABINET_LIGHT_INTENSITY/CABINET_LIGHT_REACH literals" vs kept 0.25/4 — the row's expectation is measured re-derivation recorded, which happened (curve anchors pin 0.25/4/0.45 inside the band); no bad outcome at the pinned surface; the by-eye retune half stays at the lead's smoke by the brief's own order.
+  - `[low]` `[patch]` (intent 3) the summary bullet "screen face stays the brightest face" holds nowhere in the pinned literals — grouped with blind 5: code-side relabel patched; the owner-source collision itself is by-design, recorded in `deferred:`.
+  - `[false]` (intent 4) DW-24 expectations "live at the camera surface" the diff never inspects — the DW-24 test asserts the view basis itself (wrapped vs unwrapped 24*pi/5*pi orientation, player.test.ts:113) plus the canonical range; the rotation.order "YXZ" posture is pinned in main-glue; the browser-side flip is labelled inference per the matrix row's honest-reporting clause, and the honest pre-fix outcome is delivered at the report surface.
+  - `[false]` (intent 5) verification-test substrate fake-vs-real divergence — resolved toward the binding core: brief 8 says real three.js geometry in Node and the eight verification tests use real ExtrudeGeometry/Box3 with the fake-aware mirrors additionally in scene.test.ts; nothing is lost.
+  - `[false]` (intent 6) the 30-mesh budget half is "only implicitly covered" — false: SHELL_PART_MESHES is IS-pinned at 28 and the scene.test.ts mesh-count formula pins every placement's mesh count; 28 <= 30 follows from pins, not from inference.
+  - `[false]` (intent 7) containment-exception bookkeeping never exercised — the matrix row's subject is group children; the coin-door family is world-posed per brief section 1, so the open-door exception correctly never fires, and side art sits at the band edge; scoping follows the row's own wording.
+  - `[false]` (intent 8) report-surface obligations (nine answers, overlap listing, DW-23 measured table, DW-24 repro status) absent from the diff — they are report-surface by contract; all are delivered in Auto Run Result and the completion report.
+
 ## Design Notes
 
 **Governing AD ids (Rule 6):** AD-1 (import direction: all rebuild code stays inside `core/room/` + `core/main.ts`; `depcheck` must stay clean), AD-3 (fixed-60Hz determinism: no wall-clock, no Math.random, no per-frame animation in the builder -- the existing scene.ts source scan keeps policing this), AD-4 (transcendentals only via the contract math module; the DW-24 wrap is plain arithmetic and honors math.ts's "keep angles wrapped" law), AD-11 (registry untouched: no game added, renamed, or rewired; the drift command must stay clean), AD-28 (the NEXT row's own 0.18 m floor survives verbatim as SCREEN_NEXT_CAP_M; the marquee cap becomes a separate 0.09 m law per sprint-change UX-DR2/UX-DR6). The spine's "Room geometry & collision" conventions row (amended 2026-11-26 by commit a945506) is the binding convention for the rebuild: cabinet-kind volumes are collision/targeting/occlusion data and are never extruded; Cabinet visuals are authored shell data in per-cabinet groups inside the volume AABB except the open coin door and side-art decals. P6 added no AD ids and deliberately left mesh/triangle budgets out of the spine -- those bind through the brief and its tests.
@@ -451,6 +496,14 @@ The reproduction test is written first, its expected values are literals (never 
 - `closedYaw` is exported from cabinets.ts and imported by scene.ts -- never duplicated.
 - New primitives reach scene.ts only through the extended `Three` seam; the four fake rigs (scene.test.ts, main-glue.test.ts, cabinets-qa.test.ts, scene-qa.test.ts) learn the same method set, and scene.test.ts's fake gains group/child support so the brief's world-bbox and tilt checks can compute.
 - `multiple-goals` warning: the three DW dispositions ride one story by the lead's dispatch and the proposal (clean-footing goal). Only DW-23 couples to the rebuild (the tone-mapping substrate); DW-24 is an independent Core fix.
+
+**implement: decisions recorded (unattended-run policy, build stage).**
+- `baseline_revision`: recorded at the implement stage's clean-tree start per step-3 = `fbe9ce2` (the lead's stage_spawned write-ahead). The lead's lift commit message cites story_base `1981c85`; `fbe9ce2` adds only spec/tracker bookkeeping over `1981c85` -- no `core/` file -- so the reviewed diff (fbe9ce2..tree) still covers every source change this story made, and the story's already-committed lift content (part of the rebuild) sits below the diff and was reviewed in-tree.
+- DW-24 pre-fix outcome, honest: the reproduction test was written first and FAILED pre-fix at law level (yaw left `[-pi, pi)` at step 1 of the 12 full-turn drive, the range violation the ledger's report implies); the reported floor/ceiling flip itself was not reproducible at repo level (mechanism stays the labelled inference above). Post-fix the pins are green.
+- DW-23 measured values (three 0.187.0, ACESFilmicToneMapping, exposure 1.0): x -> aces(x): 0.01 -> 0.002, 0.1 -> 0.094, 0.2 -> 0.243, 0.5 -> 0.558, 1.0 -> 0.763, 1.2 -> 0.804, 2.0 -> 0.888; inverses: aces^-1(0.20) = 0.17, aces^-1(0.80) = 1.18. Pre: CEILING 2 (-> 0.888) / FLOOR 0.5. Post: 1.18 / 0.17 as IS-pinned drift guards, with the inequality test as the live law. The authored triple INTENSITY 0.25 / REACH 4 / standoff 0.45 KEPT by measurement (own-peak 1.02 marquee / 0.47 screen; far corners 0.66 / 0.35 -- inside the band); no re-tune was needed, so the brief's by-eye retune item is not exercised and stays with the lead's smoke.
+- Smallest-number overlap adjustments (brief clause; listed here and at the report surface): (1) contact shadow 0.80 -> 0.60 m -- the only brief number overridden; the 0.80 sheet cannot satisfy the brief's own verification-1 z +/-0.30 local band; 0.60 is the smallest value that still fully covers the 0.60 x 0.60 footprint. (2) The coin-door frame (0.002-proud) and reject button are mounted in world space beside the world-posed door family per brief section 1, keeping the brief's numbers without putting non-child meshes in the group. (3) Marquee proud 0.2525 / screen proud -0.2831 are the exposure model's own measured literals, not overlap fixes.
+- Screen-brightest tension (Q5): by-design, owner-source collision (brief 1.0/1.2 pair vs the summary bullet); disposition + owner question recorded in frontmatter `deferred:`.
+- Rule 14 in-pass: added string-literal non-ASCII (33 em-dash occurrences across five test files) escaped to `u2014` form; comments left literal per project convention; pre-story baseline strings untouched.
 
 **Falsifiability (mutation lines).** Removing the yaw wrap fails the DW-24 test; setting a side-panel depth to 0.020 fails the bbox-containment test; adding a third emissive material fails the emissive-count test; removing the cabinet-kind skip fails the no-mesh-for-cabinet-volume test; leaving the old exposure literals while ACES is live fails the exposure test. Each narrowed law's replacement test must exist for the narrowing to count.
 
@@ -487,5 +540,29 @@ The reproduction test is written first, its expected values are literals (never 
 
 ## Auto Run Result
 
-Status: ready-for-dev
+Status: done
 Blocking condition: none
+
+**Summary of implemented change.** Story 2.0 landed whole: the stand-up cabinet rebuilt to the owner brief (profiled side/core extrusions + front panel in a per-cabinet local-frame group rotated by the shared `closedYaw` law; cabinet-kind volumes never drawn; DW-42's deck slab gone), the DW-24 yaw wrap law with a reproduction-first literal-value test, the DW-23 exposure law re-derived by numerically measuring three 0.187.0's ACES curve (bounds 2/0.5 -> 1.18/0.17; authored 0.25/4/0.45 triple kept by measurement), the one-line 0.09 m marquee with the cap split (marquee 0.09 / screen NEXT 0.18), three new deterministic painters (`paintSideArt`/`paintControlOverlay`/`paintContactShadow`) with loud `needLeg` guards, six new tokens, and the six enumerated test-law narrowings (no deletions). Step-4 review patches then hardened the verification itself (see triage log).
+
+**Files changed (16 tracked; +1276/-342 lines incl. spec).**
+- `core/room/cabinets.ts` (+172/-83) -- SHELL re-authored, SIDE/INNER profiles, SHELL_PART_LABELS/MESHES (28), exported `closedYaw`, cap split, measured DW-23 band constants with recorded derivation.
+- `core/room/scene.ts` (+299/-130) -- the rebuild: cabinet-kind volume skip, extended Three seam (group/extrude/cylinder/sphere/material arrays), per-cabinet group + 24 children + 4 world coin-door meshes, shared geos/mats, emissive pair, CONTACT_SHADOW_M 0.60.
+- `core/room/surfaces.ts` (+189/-19) -- one-line `paintMarquee` law, PaintContext transform/path/gradient legs with `needLeg` throws, three new painters.
+- `core/main.ts` (+33/-5) -- ACESFilmicToneMapping + exposure 1.0, sRGB/anisotropy on canvas textures, seam adapter additions, cap-argument switch.
+- `core/room/tokens.ts` (+16) -- the six cabinet-hardware tokens.
+- `core/player.ts` (+7) -- DW-24 canonical-range wrap law.
+- `core/room/scene.test.ts` (+512/-223) -- fake learns the extended seam (groups, parent chain, world/inGroupFrame math, assignment-writing rotation), six narrowings re-expressed, exposure/IS/cap/hex pins, triage pins (molding token + darkened-hue literal, yaw pin now falsifiable).
+- `core/room/cabinets.test.ts` (+450/-28) -- SHELL/label/cap pins, the brief's eight verification tests against real three geometry, `closedYaw` literal branches, the five new painter/needLeg tests, margin-pinned triangle budget.
+- `core/player.test.ts` (+61) -- DW-24 reproduction test + narrowed accumulation pin.
+- `core/room/cabinets-qa.test.ts` (+98/-34), `core/room/scene-qa.test.ts` (+55/-7), `core/main-glue.test.ts` (+14), `core/patrons/scheduler.test.ts` (+7/-4), `core/containment.test.ts` (+2/-2), `core/storage.test.ts` (+2/-2) -- fakes speak the extended seam; posture/cap pins; NEXT-cap mirror adoption (triage).
+- `_bmad-output/implementation-artifacts/spec-2-0-...md` -- this artifact.
+- Four evidence PNGs in `evidence/` (front, three-quarter, side at 2 m; from the door at 11 m) -- captured from the implementation agent's own fresh dev server, reviewed here.
+
+**Review findings breakdown.** 27 findings from four layers: 0 high, 7 medium, 12 low, 8 false. Patched entries (smallest fixes applied in-session, every touched suite re-run green): next-cap mirror adoption in containment/storage tests; fake-yaw falsifiability fix + `closedYaw` literal-branch test; five new painter/needLeg observation tests; `FACE_T` dead export removed; derivation comment 0.32 -> 0.35; ceiling-law comment relabel; label order fix; triangle budget margin pin; side-panel material colour pins. Deferred (frontmatter `deferred:`, both low): the pre-existing no-executed-host posture for main.ts renderer wiring (Epic-3 harness, DW-15); the owner-side screen-brightest vs 1.0/1.2 emissive-pair contradiction (by-design, owner question). Rejected with reason: SHELL_PART_LABELS label-to-part binding (doc-only, no named harm); mutation-line section placement (fix would edit this build's spec). False rows carry their refutations in the triage log.
+
+**Follow-up review recommendation: true.** First pass patched three medium entries (>= 2 medium rule). Named unverified risk: the triage-authored tests themselves (fake rotation setter + NaN initial, the five painter tests, the yaw/closedYaw pins, the 0x204659 and CABINET_MOLDING colour pins) were never reviewed by an independent layer -- a follow-up pass should confirm they cannot pass vacuously and that the 0x204659 literal matches the shipped `darkenHex(GLOW_CYAN, 0.35)`. Patched counts by verdict: 3 medium, 6 low entries.
+
+**Verification performed.** Post-patch: `npm run typecheck` clean; `npm test` 379/379 green (pre-patch 374; +5 triage tests); `node ci/depcheck.mjs` clean; `node ci/lint-bans.mjs` clean; `node tools/gen-registry.mjs && git diff --exit-code -- generated/` clean; `npm run build` once at story end -- clean bundle (dist/assets 644.7 kB / gzip 171.8 kB; the >500 kB chunk notice is the known sealed-bundle posture, not a failure). Matrix Test Audit: all six I/O rows covered and green -- extreme yaw -> player.test.ts "DW-24: continuous yaw past one full turn..."; marquee too wide -> cabinets.test.ts "marquee/screen fit laws die loudly..."; cabinet-kind unrendered -> scene.test.ts "one box mesh per NON-cabinet..." + count formula + verification 7; local-frame containment -> cabinets.test.ts verification 1-8 (real geometry); exposure re-derivation -> scene.test.ts exposure law + IS pins + main-glue posture pins; fresh-environment ordering -> each changed test file run in its own process, all green. Manual: the four evidence screenshots reviewed against the nine acceptance questions (answers in the completion report); :5173 never touched; screenshots were taken before the triage patches, which are comment/test/data-order-only -- zero visual delta.
+
+**Residual risks.** DW-24's browser flip mechanism remains a labelled inference (law-level reproduction pre-fix failed at the range check; the visual symptom was never reproduced headlessly). The brief's by-eye light retune was not exercised (measurement kept 0.25/4) and stays with the lead's smoke. Seated-play (Q8) and the DW-24 fix are verified at code/law level, not by key-driven browser play in this run. Evidence screenshots predate test-only triage patches (see above). Node 24.16 ran the loop while `engines` pins Node 26 (version-agnostic results; noted for the lead).

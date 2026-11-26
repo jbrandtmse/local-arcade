@@ -53,11 +53,28 @@ function fakeThree() {
     boxGeometry(w, h, d) {
       return { w, h, d } satisfies GeoRec;
     },
+    // Story 2.0 (DW-29 rebuild): this rig must speak the EXTENDED seam —
+    // the brief's "every headless fake" requirement.
+    extrudeGeometry(points, depth) {
+      return { points, depth };
+    },
+    cylinderGeometry(radiusTop, radiusBottom, height, radialSegments) {
+      return { radiusTop, radiusBottom, height, radialSegments };
+    },
+    sphereGeometry(radius, widthSegments, heightSegments) {
+      return { radius, widthSegments, heightSegments };
+    },
     standardMaterial(params) {
       return { params: { ...params } } satisfies MatRec;
     },
     mesh(geometry, material) {
-      const rec: MeshRec = { geo: geometry as GeoRec, mat: material as MatRec, x: NaN, y: NaN, z: NaN };
+      const rec: MeshRec = {
+        geo: geometry as GeoRec,
+        mat: (Array.isArray(material) ? material[0] : material) as MatRec,
+        x: NaN,
+        y: NaN,
+        z: NaN,
+      };
       meshes.push(rec);
       const placed: Placed = {
         position: {
@@ -71,6 +88,13 @@ function fakeThree() {
         rotation: { set() {} },
       };
       return placed;
+    },
+    group() {
+      return {
+        position: { set() {} },
+        rotation: { set() {}, y: 0 },
+        add() {},
+      };
     },
     pointLight(color) {
       const rec: LightRec = { color, x: NaN, y: NaN, z: NaN };
@@ -124,6 +148,20 @@ const built = (() => {
         if (!m) throw new Error("fake measureText: font string carries no px size");
         return { width: text.length * 0.92 * Number(m[1]) };
       },
+      // Story 2.0: the side-art / overlay / contact-shadow painters use the
+      // transform + path legs — the needLeg guard in surfaces.ts throws on
+      // a missing one, so this fake implements them (and carries no text).
+      save() {},
+      restore() {},
+      translate() {},
+      rotate() {},
+      beginPath() {},
+      arc() {},
+      stroke() {},
+      lineWidth: 0,
+      createRadialGradient() {
+        return { addColorStop() {} };
+      },
     };
     return { width, height, getContext: (kind) => (kind === "2d" ? ctx : null) };
   };
@@ -163,7 +201,16 @@ test("front-wall wainscot bands stop at the door faces: nothing intrudes into th
 test("build-time text law: every painted string is an authored record's string — the flyer's verbatim line, each placement's title words, and its zone strings; nothing invented (AD-24 whitelist + 1.4)", () => {
   const DOT = String.fromCharCode(0xb7);
   const withText = built.canvasTexts.filter((t) => t.length > 0);
-  assert.equal(withText.length, 1 + 2 * cabinetPlacements.length, "flyer + one marquee + one screen canvas per placement (carpet carries none)");
+  assert.equal(withText.length, 1 + 2 * cabinetPlacements.length, "flyer + one marquee + one screen canvas per placement carry the only text");
+  // Story 2.0: the rebuild adds side-art, control-overlay and contact-
+  // shadow canvases — pure shape painters, zero text (the AD-24 law
+  // extended, never relaxed: textless canvases must STAY textless).
+  const textless = built.canvasTexts.filter((t) => t.length === 0);
+  assert.equal(
+    textless.length,
+    3 + 2 * cabinetPlacements.length,
+    "carpet + street glazing + ONE shared contact shadow + per-placement side art + control overlay carry no painted text",
+  );
   const flyerCanvas = withText.find((t) => t.some((s) => WELCOME_FLYER.text.includes(s)));
   assert.ok(flyerCanvas, "the flyer canvas carries the verbatim line");
   // Verbatim in the metric-robust form (rework pass 1 word-wrap moved the
@@ -176,8 +223,10 @@ test("build-time text law: every painted string is an authored record's string �
   );
   for (const p of cabinetPlacements) {
     const titleWords = p.title.toUpperCase().split(/\s+/);
-    const marquee = withText.find((t) => t.length === titleWords.length && t.every((s) => titleWords.includes(s)));
-    assert.ok(marquee, `marquee canvas lettered with exactly the title record's words "${p.title}"`);
+    // Story 2.0 contract change 4: the marquee is ONE line — the whole
+    // uppercased title joined with single spaces, never stacked words.
+    const marquee = withText.find((t) => t.length === 1 && t[0] === p.title.toUpperCase());
+    assert.ok(marquee, `marquee canvas lettered with exactly the one-line title "${p.title.toUpperCase()}"`);
     const screen = withText.find((t) => t.includes(p.screenZones.next.toUpperCase()));
     assert.ok(screen, "the screen canvas carries the NEXT zone string");
     const allowed = new Set([...titleWords, p.screenZones.next.toUpperCase(), ...p.screenZones.score]);
@@ -190,13 +239,12 @@ test("build-time text law: every painted string is an authored record's string �
 
 test("1.4 lettering hues: marquee and the screen's NEXT row carry the placement's marquee hue, the attract rows the machine hue — through the scene builder's own injected canvases (1.4 AC5, mockup .next/.attract)", () => {
   for (const p of cabinetPlacements) {
-    const titleWords = p.title.toUpperCase().split(/\s+/);
     const next = p.screenZones.next.toUpperCase();
-    const marqueeI = built.canvasTexts.findIndex((t) => t.length === titleWords.length && t.every((s) => titleWords.includes(s)));
+    const marqueeI = built.canvasTexts.findIndex((t) => t.length === 1 && t[0] === p.title.toUpperCase());
     const screenI = built.canvasTexts.findIndex((t) => t.includes(next));
     assert.ok(marqueeI >= 0 && screenI >= 0, "marquee + screen canvases exist for the placement");
     const marqueeStyles = built.canvasTextStyles[marqueeI]!;
-    assert.equal(marqueeStyles.length, titleWords.length, "every marquee line was recorded with its style");
+    assert.equal(marqueeStyles.length, 1, "the marquee letters exactly its one line (2.0 contract change 4)");
     for (const style of marqueeStyles) {
       assert.equal(style, toCss(p.marqueeHue), `marquee lettering style ${style} is not the placement's marquee hue`);
     }

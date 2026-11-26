@@ -40,9 +40,9 @@ import { frontDoorHandleYaw, frontDoorOpenPose, frontDoorRamp } from "./room/doo
 import { ROOM_BLACK, WALL_WARM, toCss } from "./room/tokens.ts";
 import { compositeScreen, repaintScreen, type CanvasFactory } from "./room/surfaces.ts";
 import {
-  MARQUEE_CAP_M,
   SHELL,
   SCREEN_ATTRACT_CAP_M,
+  SCREEN_NEXT_CAP_M,
   cabinets,
   coinDoorOpen,
   coinDoorPose,
@@ -109,6 +109,12 @@ try {
 
 function bootArcade(): void {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
+  // Story 2.0 (brief section 5): the tone-curve substrate the DW-23
+  // exposure law is re-pinned against — ACES filmic at exposure 1.0. The
+  // scene.test.ts exposure pins derive their literals from measurements
+  // against exactly this curve (three 0.187.0).
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.0;
   renderer.setClearColor(ROOM_BLACK, 1);
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -126,11 +132,33 @@ function bootArcade(): void {
   const makeCanvas: CanvasFactory = (width, height) => new OffscreenCanvas(width, height);
   const three: Three = {
     boxGeometry: (w, h, d) => new THREE.BoxGeometry(w, h, d),
+    extrudeGeometry: (points, depth) => {
+      // Brief step 1: the authored profile as a Shape, extruded along +Z
+      // with no bevel (hard plywood edges).
+      const shape = new THREE.Shape();
+      shape.moveTo(points[0]!.x, points[0]!.y);
+      for (const pt of points.slice(1)) shape.lineTo(pt.x, pt.y);
+      shape.closePath();
+      return new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false });
+    },
+    cylinderGeometry: (radiusTop, radiusBottom, height, radialSegments) =>
+      new THREE.CylinderGeometry(radiusTop, radiusBottom, height, radialSegments),
+    sphereGeometry: (radius, widthSegments, heightSegments) =>
+      new THREE.SphereGeometry(radius, widthSegments, heightSegments),
     standardMaterial: (params) => new THREE.MeshStandardMaterial(params as THREE.MeshStandardMaterialParameters),
-    mesh: (geometry, material) => new THREE.Mesh(geometry as THREE.BufferGeometry, material as THREE.Material),
+    mesh: (geometry, material) =>
+      new THREE.Mesh(geometry as THREE.BufferGeometry, material as THREE.Material | THREE.Material[]),
+    group: () => new THREE.Group(),
     pointLight: (color, intensity, distance) => new THREE.PointLight(color, intensity, distance),
     ambientLight: (color, intensity) => new THREE.AmbientLight(color, intensity),
-    canvasTexture: (source) => new THREE.CanvasTexture(source as CanvasImageSource),
+    canvasTexture: (source) => {
+      const texture = new THREE.CanvasTexture(source as CanvasImageSource);
+      // Brief section 5: painted sheets are sRGB and stay sharp at grazing
+      // angles — every CanvasTexture the seam ever makes gets both.
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      return texture;
+    },
     markTextureUpdated: (texture) => {
       (texture as THREE.Texture).needsUpdate = true; // repaint of a live screen
     },
@@ -559,7 +587,7 @@ function bootArcade(): void {
           toCss(placement.hue),
           toCss(placement.marqueeHue),
           SCREEN_ATTRACT_CAP_M,
-          MARQUEE_CAP_M,
+          SCREEN_NEXT_CAP_M,
           SHELL.screen.height,
         );
         three.markTextureUpdated(s.texture);
@@ -592,7 +620,7 @@ function bootArcade(): void {
             pres.canvas,
             toCss(ROOM_BLACK),
             toCss(placement.marqueeHue),
-            MARQUEE_CAP_M,
+            SCREEN_NEXT_CAP_M,
             SHELL.screen.height,
           );
           three.markTextureUpdated(s.texture);

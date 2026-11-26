@@ -185,7 +185,14 @@ export function createPlayerController(
       const dtSeconds = dt * SECONDS_PER_TICK;
 
       // Look first: raw px deltas -> yaw/pitch (pitch hard-clamped ±85°).
+      // DW-24 (Story 2.0): wrap yaw into the canonical [-π, π) range at
+      // every look step — plain arithmetic on multiples of math.PI * 2
+      // (AD-4-safe: no new transcendentals), so |yaw| stays bounded and the
+      // contract math "keep angles wrapped" law plus the renderer's Euler
+      // can never meet a huge angle. The wrap never changes the view basis.
       state.yaw -= view.aim.dx * MOUSE_SENSITIVITY;
+      const TWO_PI = math.PI * 2;
+      state.yaw = state.yaw - TWO_PI * Math.floor((state.yaw + math.PI) / TWO_PI);
       state.pitch -= view.aim.dy * MOUSE_SENSITIVITY;
       if (state.pitch > PITCH_LIMIT) state.pitch = PITCH_LIMIT;
       if (state.pitch < -PITCH_LIMIT) state.pitch = -PITCH_LIMIT;

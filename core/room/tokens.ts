@@ -70,6 +70,22 @@ export const UI_FOCUS = 0x5bc8ff;
 export const GLASS_DARK = 0x3a2c20;
 export const GLASS_DIM = 0x2a2018;
 
+// Story 2.0 (cabinet rebuild brief section 5): the cabinet-hardware family —
+// the darkest fills the room may carry. These are surfaces lit BY the
+// machine, never light sources (emissive stays confined to the screen and
+// marquee faces). Hexes are the brief's starting values; tokens.ts is their
+// only home (the scene.test.ts hex-scan guard binds each hex here).
+/** Cabinet Black: textured vinyl panels (brief `CABINET_BLACK`). */
+export const CABINET_BLACK = 0x161618;
+/** Cabinet Molding: the T-molding edge wall (brief `CABINET_MOLDING`). */
+export const CABINET_MOLDING = 0x0c0c0d;
+/** Cabinet Metal: coin-door frame, joystick shaft (brief `CABINET_METAL`). */
+export const CABINET_METAL = 0x8a8d91;
+/** Button caps: the era hardware family (brief `BUTTON_*`). */
+export const BUTTON_RED = 0xd8342b;
+export const BUTTON_YELLOW = 0xf2c230;
+export const BUTTON_WHITE = 0xece8e0;
+
 /** CSS paint form of a token (for canvas painters, Rule 14: derived). */
 export function toCss(hex: number): string {
   return `#${hex.toString(16).padStart(6, "0")}`;
