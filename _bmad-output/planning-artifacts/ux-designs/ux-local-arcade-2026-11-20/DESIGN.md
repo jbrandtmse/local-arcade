@@ -5,7 +5,7 @@ type: design
 purpose: visual-identity
 status: final
 created: 2026-11-20
-updated: 2026-11-20
+updated: 2026-11-26
 sources:
   - '_bmad-output/brainstorming/brainstorm-local-llm-arcade-2026-11-18/'
   - '_bmad-output/planning-artifacts/ux-designs/ux-local-arcade-2026-11-20/imports/arcade-floor-plan.html'
@@ -30,6 +30,15 @@ colors:
   glow-orange: '#FF9A5C'
   glow-red: '#FF6B5E'
   glow-steel: '#7FB0C9'
+  # Cabinet hardware/materials — the machine's own body: vinyl panels, T-molding
+  # edges, metal, button caps. The darkest fills allowed: near-black material
+  # identity, never pure black. Light still comes FROM the machines.
+  cabinet-black: '#161618'
+  cabinet-molding: '#0c0c0d'
+  cabinet-metal: '#8a8d91'
+  button-red: '#d8342b'
+  button-yellow: '#f2c230'
+  button-white: '#ece8e0'
   # In-world text surfaces.
   paper-card: '#F2E8D4'
   card-ink: '#2A241C'
@@ -46,7 +55,7 @@ colors:
 typography:
   marquee-title:
     fontFamily: 'Chakra Petch'
-    note: 'Physical signage — cap height 0.18m on the marquee bar; legible to ~15m. Eurostile-flavored era display.'
+    note: 'Physical signage — cap height 0.09m, ONE line, emissive-lit from within the in-body marquee face centred ~1.71m; legible ~8m lit. Eurostile-flavored era display. The on-screen NEXT row keeps its own 0.18m floor (UX-DR6 / AD-28).'
   instruction-heading:
     fontFamily: 'Archivo Narrow'
     note: 'Printed card heading, x-height ≥ 20mm, set like an 80s operators sheet.'
@@ -154,13 +163,14 @@ The palette is a *lighting* palette. Everything is judged against the dim warm e
 - **Paper Card (`#F2E8D4`) / Card Ink (`#2A241C`)** — instruction cards, the welcome flyer, the report claim-check: aged paper cream, warm-black print. The only "white" surfaces in the room, and only as paper.
 - **Nameplate Brass (`#D8C48F`)** — museum voice, Hall of Models only.
 - **Sign Chalk (`#E8E4DD`)** — painted room signage and room-sign subtitles.
+- **Cabinet hardware (`cabinet-black`, `cabinet-molding`, `cabinet-metal`, `button-red/yellow/white`)** — the upright's own body: vinyl-textured panels, the black T-molding edge wall, coin-door/joystick metal, button caps. These are the darkest fills allowed — near-black for material identity, never pure black — and they are *surfaces lit by the machine*, not light sources: the light-from-a-machine law is untouched.
 - **UI trio (`ui-surface`, `ui-text`, `ui-muted`)** — outside-fiction surfaces only (site page, settings). `{colors.ui-accent}` borrows the room's cyan glow so the plain page still feels related — but no other token crosses the fiction boundary.
 
 Avoid: pure white or pure black fills, wall-painted neon decoration, photoreal grunge/scan textures, any chromatic color in the room that isn't light-from-a-machine.
 
 ## Typography
 
-In-room type is physical signage, not interface type; sizes are world-scale and legibility is a design law. The minimums are authored in the frontmatter notes (marquee cap 0.18m to ~15m; card body x-height ≥12mm at 0.5m; room-sign cap ≥60mm at 3m; nameplate ≥30mm at 2m) and enforced by the legibility lint. Swap candidates for any provisional face must pass that table, not just the era-voice lint.
+In-room type is physical signage, not interface type; sizes are world-scale and legibility is a design law. The minimums are authored in the frontmatter notes (marquee cap 0.09m, one line, lit to ~8m; on-screen NEXT floor 0.18m, independent of the marquee cap; card body x-height ≥12mm at 0.5m; room-sign cap ≥60mm at 3m; nameplate ≥30mm at 2m) and enforced by the legibility lint. Swap candidates for any provisional face must pass that table, not just the era-voice lint.
 
 - **Chakra Petch** (marquee-title) — Eurostile-flavored era display for game names on marquees. `[ASSUMPTION: exact face is provisional; must be free-license and era-flavored — swap candidate is Saira Condensed.]`
 - **Archivo Narrow / Archivo** (instruction-heading/body) — the printed operators-sheet voice: dense, squared, honest. Attribution text lives here and on nameplates — nowhere else in the room.
@@ -185,13 +195,13 @@ Depth is *atmospheric*, never card-shadow. In-room: attract glow halos and marqu
 
 ## Shapes
 
-Hard corners dominate: `{rounded.cabinet}` (0) for cabinet shells, screens, and bezels — 80s cabinets are boxes, softened only by wear, never by radius. Paper surfaces carry `{rounded.card}` (4px) — a real card's corner. Only outside-fiction UI uses `{rounded.ui-md}`. No pills, no circles-as-surfaces.
+Hard corners dominate: `{rounded.cabinet}` (0) for cabinet shells, screens, and bezels — hard corners means **flat plywood panels with sharp edges: no fillets, no radius**, not axis-aligned bricks. The upright reads its profiled side silhouette — toe-kick recess, sloped control panel, recessed leaning screen opening, marquee overhang — extruded from those flat panels and softened only by wear. The room envelope stays box-built. Paper surfaces carry `{rounded.card}` (4px) — a real card's corner. Only outside-fiction UI uses `{rounded.ui-md}`. No pills, no circles-as-surfaces — that bars flat circular UI surfaces; physical era hardware seen round (button caps, joystick ball-top) is exempt.
 
 ## Components
 
-- **Marquee** — `{colors.glow-marquee}` (or the game's own art-lit variant) lettering of `Manifest.title` on a dark cabinet-top bar; lit from within; never smaller than authored cap height. Game name only.
+- **Marquee** — `{colors.glow-marquee}` (or the game's own art-lit variant) lettering of `Manifest.title` on the lit marquee face inset *inside* the cabinet top at ~1.71m, cap 0.09m on ONE line, emissive from within, era-true retainer strips; never below the authored cap height. Game name only.
 - **Cabinet** (stand-up | sit-down shells) — `{rounded.cabinet}`; both standard models always glowing, always performing.
-- **Cabinet screen** (Core-owned surface treatment) — attract/score/NEXT all render here. Score table set in `instruction-heading` scale rules (screen type, era-CRT voice, no paper stock); the **NEXT** signal at the marquee's authored minimum, legible from across the room; fault fallback keeps marquee + screen motion alive. Screen glows are the machine's own hue family.
+- **Cabinet screen** (Core-owned surface treatment) — attract/score/NEXT all render here. Score table set in `instruction-heading` scale rules (screen type, era-CRT voice, no paper stock); the **NEXT** signal at its own authored minimum (0.18m cap, independent of the marquee cap), legible from across the room; fault fallback keeps marquee + screen motion alive. The screen face self-glows (emissive; color black) — room light no longer washes it. Screen glows are the machine's own hue family.
 - **Instruction Card** — `{colors.paper-card}` sheet behind the coin door; heading + rules + attribution (the only in-room attribution surface besides nameplates). Matches its plan in the Workshop drawer (card↔drawer pairing). Print budget: one rule per line, capped length — era operators' sheets were terse anyway.
 - **Nameplate** — `{colors.nameplate-brass}` on Room Black; Hall of Models rows only; names the model.
 - **Room-sign** — `{colors.sign-chalk}` painted/printed voice: zone labels at door height, banter subtitle signs, report-fixture signage. Appears only as physical signage stock at fixed authored positions; never floats, never overlays the view.
