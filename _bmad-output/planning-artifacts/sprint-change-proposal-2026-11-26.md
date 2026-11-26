@@ -5,6 +5,7 @@
 - **Change scope:** Moderate (Direct Adjustment inside existing Story 2.0)
 - **Owner decision:** Incremental review mode; work folded into **Story 2.0**, not a new story and not a 1.10 reopen
 - **Status:** APPROVED by owner 2026-11-26 — P1–P3 applied to epics.md by this run; P4 staged for the Story 2.0 spawn owner; P5 routed to bmad-ux, P6 routed to bmad-architecture as work orders
+- **Owner task brief (verbatim):** `sprint-change-proposal-2026-11-26-owner-task.md` (same folder) — the owner's complete corrective task, extracted byte-for-byte (15,484 bytes) from the original correct-course invocation transcript; this is the authoritative implementation brief Story 2.0's spec must carry verbatim. The "owner corrective task 2026-11-26" citation below refers to that file.
 
 ---
 
