@@ -37,3 +37,4 @@
 2026-11-26T19:59:02Z	Story 2.0	fresh_check	env=clean-checkout	tests=121	result=pass	order=forward,reverse	worktree=fresh-22@a2e9d72
 2026-11-26T19:59:40Z	Story 2.0	committed	sha=f9c5a6b	submodules=	ci=none	runs=none	amendments=none
 2026-11-26T19:59:40Z	Story 2.0	story_cycle	plan_to_commit_min=690	implement_passes=1	reviews=1	rework=0	first_ci=none
+2026-11-26T20:04:35Z	Story 2.1	stage_spawned	stage=plan	story=2-1-core-audio-manager-attract-sound-that-occludes-and-swells	spawn_at=2026-11-26T20:04:35Z	agent_name=2-1-core-audio-plan-1	cycle_iteration=1	baseline=c97878a	prompt=C:/tmp/spawn-2-1-plan-1.txt
