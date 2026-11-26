@@ -145,6 +145,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - evidence: grep: main.ts builds the WebGLRenderer with no toneMapping anywhere; the 2/0.5 bounds encode inverse-square+linear semantics (three decay=2); a tone-map change re-derives them with the suite green — spec residual risks already label this
 - 2026-11-23T14:03:41Z status=wontfix-theoretical owner=1-4-the-standard-stand-up-cabinet-shell-marquee-live-screen by=cr note=reopen_if: tone mapping lands in main.ts or the exposure constants move under a non-linear tone curve
 - 2026-11-26T06:12:28Z status=routed owner=2-0-epic-1-deferred-cleanup by=correct-course note=reopen_if FIRED - ACES tone mapping lands in main.ts under Story 2.0; exposure bounds 2/0.5 and CABINET_LIGHT_INTENSITY/REACH re-derived under the tone curve and re-pinned
+- 2026-11-26T19:44:21Z status=resolved-by:2-0-epic-1-deferred-cleanup by=adjudication note=ACES tone mapping landed (build 357c1c2); law re-expressed CEILING 1.18->0.80 FLOOR 0.17->0.20 on measured table (three 0.187.0 exposure 1.0); QA curve-anchor pins (fit constants + matrices parsed from shipped ShaderChunk) guard the 2.3 literals
 
 ### DW-24: mouse-look: mousing far left/right makes the view become the floor (camera flips/slams to floor at extreme yaw after big horizontal drags)
 - source: owner report 2026-11-23 (mid-run, story 1.5 in plan) | severity: minor | fix-risk: small | footprint: core/player.ts look math / camera basis (yaw wrap, pitch clamp)
@@ -152,6 +153,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - 2026-11-23T14:51:13Z status=routed owner=burndown by=owner note=owner said: do not fix now; address in the next pass over the backlog
 - 2026-11-25T10:57:00Z status=decision-pending owner=burndown by=burndown note=to_x0:schedule_the_mouse-look_yaw-wrap/pitch-clamp_pass_at_Epic-2_X.0_per_owner_ruling_2026-11-23_do-not-fix-during-stories
 - 2026-11-26T03:01:24Z status=routed owner=2-0-epic-1-deferred-cleanup by=x0 note=default-include: minor + small fix-risk; owner ruling 2026-11-23 (do-not-fix-during-stories) now applied - this is the next-pass-over-backlog; repro beyond smoke-tested ~2.5 rad drags
+- 2026-11-26T19:43:56Z status=routed owner=burndown by=adjudication note=RESIDUAL: law-level repro FAILED honestly in story (triage test); browser flip never reproduced; owner ruling 2026-11-23 do-not-fix-now address-in-next-backlog-pass - handed to Epic-2 burndown
 
 ### DW-25: Moon Patrol respawn pad-clear filter never removes minefields (x/w vs x1/x2 NaN predicate) — buggy can respawn onto a mine
 - source: story 1.5 implement review B3+E4 (shared root cause); spec-1-5 frontmatter deferred | severity: medium | fix-risk: small | footprint: games/moon-patrol/sim/world.js:106 respawn predicate; data shape sim/course.js:100; vendored law kept world.js unmodified below seam edits (AC1)
@@ -183,6 +185,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - 2026-11-25T10:56:58Z owner=1-10-epic-1-burn-down by=burndown note=chartered_into_Story_1.10_owner-prioritized_cabinet_realism_pass
 - 2026-11-26T00:37:20Z status=resolved-by:1-10-epic-1-burn-down by=adjudication note=contours shipped (marquee box,deck,kick,hood,wings;SHELL_PART_MESHES 11);QA IS-value drift pins + VG-1 continuity pins falsify the byte-identical law (AABB/faces/canvases/lights);realism verdict adjudicates at the smoke immediately following - a failed smoke reopens through the rework loop
 - 2026-11-26T06:13:05Z status=routed owner=2-0-epic-1-deferred-cleanup by=correct-course note=REOPENED per its 1-10 adjudication clause (proposal wrote status=reopened - rendered routed per ledger grammar): the owner-review hold (f900038/82270ad) is the smoke-equivalent realism adjudication promised; VERDICT FAIL - shell still reads vending-machine; owner-authored corrective task drives the rebuild; seated in Story 2.0 per owner ruling
+- 2026-11-26T19:44:21Z status=resolved-by:2-0-epic-1-deferred-cleanup by=adjudication note=cabinet shell rebuilt to owner brief (marquee box, contours, bezel/hood, deck silhouette) in build 357c1c2; 4 evidence views evidence/story-2-0-cabinet-*; brief-mandated pins + QA/CR witnesses incl exact-AABB and extrusion-guard; realism verdict re-adjudicated at smoke per 9-question owner checklist - FAIL reopens per correct-course
 
 ### DW-30: boot identity uses crypto.randomUUID outside any supervisor: a runtime without Web Crypto (insecure-context http origin) throws at boot instead of degrading — settle with the deploy origin's scheme (droplet https vs plain http)
 - source: 1-8-the-room-knows-you-without-an-account | severity: medium | fix-risk: low | footprint: core
@@ -252,6 +255,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - evidence: core/room/cabinets.ts SHELL.deck centerY 0.75 height 0.08 (bottom 0.71, top 0.79) vs coin-door record top 0.73; scene.ts deck mount proud 0.06 exceeds the door's 0.02; no binding law violated (the coin door itself is byte-unchanged); the 0.75 dim is the Decided-in-stage-5 smoke-tuned value recorded in the spec claim-check
 - 2026-11-26T00:26:01Z status=by-design owner=1-10-epic-1-burn-down by=cr note=flag for the lead's Chrome+Edge smoke: if the covered band reads wrong at 2m/6m, smoke-tune SHELL.deck centerY/proud there
 - 2026-11-26T06:12:28Z status=routed owner=2-0-epic-1-deferred-cleanup by=correct-course note=deck slab deleted outright by the profile rebuild; the coin-door top-band overlap closes with the part
+- 2026-11-26T19:44:22Z status=resolved-by:2-0-epic-1-deferred-cleanup by=adjudication note=deck slab re-seated inside exact-AABB law; verification-7/DW-42 pin in cabinets.test.ts; halfAlong+0.01 mutation witness RED then byte-identical revert; coin-door top band clear
 
 ### DW-43: Cabinet-shell contour extrusion is single-placement-only: the SHELL formula scales parts by cabinetPlacements.length but authored data holds one placement and there is no injection seam — per-placement contour repetition untestable once 3.4 makes placement a pure function
 - source: 1-10-epic-1-burn-down | severity: low | fix-risk: low | footprint: core
