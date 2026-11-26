@@ -29,13 +29,13 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 11-20-2026 20:55
-last_updated: 11-26-2026 01:32
+last_updated: 11-26-2026 02:32
 project: local-arcade
 project_key: NOKEY
 tracking_system: file-system
 story_location: C:/git/local-arcade/_bmad-output/implementation-artifacts
 development_status:
-  epic-1: in-progress
+  epic-1: done
   1-1-project-bootstrap-and-the-deterministic-kernel-core: done
   1-2-first-person-walk-look-and-move-no-prompts: done
   1-3-the-arcade-room-slots-pillars-zones-and-the-roadmap-wall: done
@@ -46,7 +46,7 @@ development_status:
   1-8-the-room-knows-you-without-an-account: done
   1-9-the-street-door-beat-loading-as-fiction-s-first-shot: done
   1-10-epic-1-burn-down: done
-  epic-1-retrospective: optional
+  epic-1-retrospective: done
 
   epic-2: backlog
   2-1-core-audio-manager-attract-sound-that-occludes-and-swells: backlog
@@ -102,3 +102,26 @@ development_status:
   7-3-two-live-in-one-frame-playable-and-attract-side-by-side: backlog
   7-4-the-corner-found-by-ear-pinball-s-audio-anchors: backlog
   epic-7-retrospective: optional
+action_items:
+  - id: "epic-1-retro-item-1-apply-falsifiable-pin-convention-to-_bma"
+    epic: 1
+    action: "Apply falsifiable-pin convention to _bmad/custom/skill-rules.md: byte-identical/unchanged
+      assertions must use literal expected values, never re-derived from subject constants"
+    owner: "owner"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-11-26.md"
+  - id: "epic-1-retro-item-2-raise-api_timeout_ms-and-or-inference-se"
+    epic: 1
+    action: "Raise API_TIMEOUT_MS and/or inference-server parallel slots so the four
+      review layers survive a queueing server (1.9 paint-stall, 1.10 edge-hunter ~74min
+      timeout)"
+    owner: "owner"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-11-26.md"
+  - id: "epic-1-retro-item-3-keep-the-explicit-tracker-lead-owned-do"
+    epic: 1
+    action: "Keep the explicit tracker lead-owned do-not-touch clause in every spawn
+      prompt for the rest of the run"
+    owner: "lead"
+    status: open
+    ref: "_bmad-output/implementation-artifacts/epic-1-retro-2026-11-26.md"

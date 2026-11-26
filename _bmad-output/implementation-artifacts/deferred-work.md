@@ -183,6 +183,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: 1-8-the-room-knows-you-without-an-account | severity: medium | fix-risk: low | footprint: core
 - evidence: core/main.ts boot storage.visitorId() -> default uuidFn crypto.randomUUID; missing API throws before loop.start; spec DN9 verified-present for Node 26 + evergreen Chrome/Edge only; storage port degrade law does NOT cover this (the throw is at key generation, not storage access)
 - 2026-11-24T19:59:30Z status=routed owner=3-15-the-public-posture-one-sealed-bundle-to-one-droplet by=lead note=harvested from spec 1-8 frontmatter deferred; fix-risk low = one-line fallback uuid generator or https-only settle; footprint core (boot wiring)
+- 2026-11-26T02:31:31Z by=retro note=1.9 catch changed the failure SHAPE (epic-1 retro cross-seam pass, main.ts:99-108): boot now DEGRADES but mislabeled - whole-boot catch mounts workbench reason=unsupported and Reload deterministically re-throws = terminal loop on plain-http LAN origins (https droplet unaffected); when 3-15 settles the origin scheme also make the catch distinguish boot-dependency-throw from browser-incapability; plausible confidence (static+suite evidence, no insecure-context browser run)
 
 ### DW-31: storage service conflates a port read/write failure with absence: a flaky or mid-session-changing port could clobber a higher PB or orphan a PB under a visitor id never persisted
 - source: spec-1-8-the-room-knows-you-without-an-account.md | severity: med | fix-risk: med | footprint: in-story
