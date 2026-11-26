@@ -268,3 +268,8 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: story 2.0 implement deferred: | severity: low | fix-risk: low | footprint: small
 - evidence: spec-2-0 frontmatter deferred: #2; core/room/cabinets.ts emissive pair + scene.test.ts exposure law; measured ACES anchors 1.0 to 0.763, 1.2 to 0.804
 - 2026-11-26T15:35:41Z status=decision-pending owner=burndown by=harvest note=inbox=U-9; in-story disposition by-design (law re-expressed, ceiling 1.18 to 0.80); owner decides which source binds
+
+### DW-46: ci/depcheck.mjs scanner misses import specifiers after a ${}-bearing template literal in the same file: a core->games (or sim/presentation purity) import placed after such a template passes the AD-1/AD-2 gate green
+- source: lead AD-verification mutation witness (story 2.0 adr gate) | severity: med | fix-risk: med | footprint: small
+- evidence: probe pair: core/__probe_a.ts (template then games import) not cited vs core/__probe_b.ts (import then template) cited red; same miss for import appended after toCss template in core/room/tokens.ts; scan walk at ci/depcheck.mjs:70-96 does not track template-literal mode
+- 2026-11-26T15:46:32Z status=routed owner=burndown by=lead-ad-verification note=AD-1 leg sound for template-free files and before-template positions; found while witnesses required; no current source violates AD-1 - verified by post-revert green + full-suite posture
