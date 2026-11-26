@@ -144,6 +144,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: spec-1-4-the-standard-stand-up-cabinet-shell-marquee-live-screen.md | severity: low | fix-risk: low | footprint: in-story
 - evidence: grep: main.ts builds the WebGLRenderer with no toneMapping anywhere; the 2/0.5 bounds encode inverse-square+linear semantics (three decay=2); a tone-map change re-derives them with the suite green — spec residual risks already label this
 - 2026-11-23T14:03:41Z status=wontfix-theoretical owner=1-4-the-standard-stand-up-cabinet-shell-marquee-live-screen by=cr note=reopen_if: tone mapping lands in main.ts or the exposure constants move under a non-linear tone curve
+- 2026-11-26T06:12:28Z status=routed owner=2-0-epic-1-deferred-cleanup by=correct-course note=reopen_if FIRED - ACES tone mapping lands in main.ts under Story 2.0; exposure bounds 2/0.5 and CABINET_LIGHT_INTENSITY/REACH re-derived under the tone curve and re-pinned
 
 ### DW-24: mouse-look: mousing far left/right makes the view become the floor (camera flips/slams to floor at extreme yaw after big horizontal drags)
 - source: owner report 2026-11-23 (mid-run, story 1.5 in plan) | severity: minor | fix-risk: small | footprint: core/player.ts look math / camera basis (yaw wrap, pitch clamp)
@@ -181,6 +182,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - 2026-11-24T14:24:52Z status=routed owner=burndown by=lead note=owner-initiated; NOT an AC miss for 1-4 (marquee-lit law met) - enhancement beyond current ACs; priority-rank at the Epic 1 burndown gate, candidate new story (visual polish) on the decision sheet; geometry lives in core/room/cabinets.ts + collision volumes + screen surface mapping
 - 2026-11-25T10:56:58Z owner=1-10-epic-1-burn-down by=burndown note=chartered_into_Story_1.10_owner-prioritized_cabinet_realism_pass
 - 2026-11-26T00:37:20Z status=resolved-by:1-10-epic-1-burn-down by=adjudication note=contours shipped (marquee box,deck,kick,hood,wings;SHELL_PART_MESHES 11);QA IS-value drift pins + VG-1 continuity pins falsify the byte-identical law (AABB/faces/canvases/lights);realism verdict adjudicates at the smoke immediately following - a failed smoke reopens through the rework loop
+- 2026-11-26T06:13:05Z status=routed owner=2-0-epic-1-deferred-cleanup by=correct-course note=REOPENED per its 1-10 adjudication clause (proposal wrote status=reopened - rendered routed per ledger grammar): the owner-review hold (f900038/82270ad) is the smoke-equivalent realism adjudication promised; VERDICT FAIL - shell still reads vending-machine; owner-authored corrective task drives the rebuild; seated in Story 2.0 per owner ruling
 
 ### DW-30: boot identity uses crypto.randomUUID outside any supervisor: a runtime without Web Crypto (insecure-context http origin) throws at boot instead of degrading — settle with the deploy origin's scheme (droplet https vs plain http)
 - source: 1-8-the-room-knows-you-without-an-account | severity: medium | fix-risk: low | footprint: core
@@ -249,8 +251,10 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: spec-1-10-epic-1-burn-down | severity: low | fix-risk: low | footprint: in-story
 - evidence: core/room/cabinets.ts SHELL.deck centerY 0.75 height 0.08 (bottom 0.71, top 0.79) vs coin-door record top 0.73; scene.ts deck mount proud 0.06 exceeds the door's 0.02; no binding law violated (the coin door itself is byte-unchanged); the 0.75 dim is the Decided-in-stage-5 smoke-tuned value recorded in the spec claim-check
 - 2026-11-26T00:26:01Z status=by-design owner=1-10-epic-1-burn-down by=cr note=flag for the lead's Chrome+Edge smoke: if the covered band reads wrong at 2m/6m, smoke-tune SHELL.deck centerY/proud there
+- 2026-11-26T06:12:28Z status=routed owner=2-0-epic-1-deferred-cleanup by=correct-course note=deck slab deleted outright by the profile rebuild; the coin-door top-band overlap closes with the part
 
 ### DW-43: Cabinet-shell contour extrusion is single-placement-only: the SHELL formula scales parts by cabinetPlacements.length but authored data holds one placement and there is no injection seam — per-placement contour repetition untestable once 3.4 makes placement a pure function
 - source: 1-10-epic-1-burn-down | severity: low | fix-risk: low | footprint: core
 - evidence: QA observation at story 1.10 qa_complete, confirmed valid by CR: core/room/cabinets.ts SHELL loop multiplies by cabinetPlacements.length; only one authored placement; no seam to plant two
 - 2026-11-26T00:46:06Z status=routed owner=3-4-the-layout-system-placement-is-a-pure-build-time-function by=lead note=adjudicated at story 1-10 ledger gate (not a 1.10 fix: 1.10 shipped the law for the authored single placement); the placement seam is 3.4's own ground — pin contour repetition at that story
+- 2026-11-26T06:12:28Z by=correct-course note=law unchanged; part names superseded by the Story 2.0 profile rebuild (3-4 AC bullet reworded to name SIDE_PROFILE/INNER_PROFILE panels + assemblies)
