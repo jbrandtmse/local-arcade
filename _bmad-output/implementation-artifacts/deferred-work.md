@@ -53,6 +53,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: _bmad-output/implementation-artifacts/spec-1-1-project-bootstrap-and-the-deterministic-kernel-core.md | severity: med | fix-risk: med | footprint: ci/
 - evidence: CR re-spawn 3 blind+edge layers; AD-4 names exactly sin/cos/tan/asin/acos/atan2/pow/exp/log; widening the ban set changes AD-4 scope
 - 2026-11-21T23:06:38Z status=escalated owner=burndown by=cr note=AD-4-scope amendment is owner-only (architecture amendment) - to decision sheet; decide before the Epic 3 L0 gate locks the rule surface
+- 2026-11-26T02:35:46Z status=decision-pending owner=burndown by=unattended note=inbox=U-3
 
 ### DW-9: core/contract/math.ts fixed coefficients have documented exactness boundaries: sin/cos argument reduction exact to |x|~1e15, atan2 signed-zero branch parity not promised - goldens pin this module's own outputs
 - source: _bmad-output/implementation-artifacts/spec-1-1-project-bootstrap-and-the-deterministic-kernel-core.md | severity: low | fix-risk: low | footprint: core/contract/
@@ -156,6 +157,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - 2026-11-23T20:25:26Z status=routed owner=1-6-one-busy-machine-a-patron-actually-plays by=dev note=1.6 drives the sim to a real end state via autoplay (AD-8 L1) — the respawn unfairness lands squarely in that path; fix upstream at C:/git/moonpatrol then re-vendor
 - 2026-11-24T07:01:45Z status=routed owner=1-6-one-busy-machine-a-patron-actually-plays by=lead note=bundle_half_resolved_in_1-6_(x1/x2_predicate_re-vendored + pad-clear pin world_gameplay.test.js);upstream C:/git/moonpatrol commit is owner call — routed to epic-1 decision sheet;entry stays open pending upstream commit
 - 2026-11-25T10:57:00Z status=escalated owner=burndown by=burndown note=bundle_half_resolved_in_1.6;remainder_is_the_upstream_C:/git/moonpatrol_commit_owner-only_to_epic-1_decision_sheet
+- 2026-11-26T02:35:47Z status=decision-pending owner=burndown by=unattended note=inbox=U-5
 
 ### DW-26: the PROVISIONAL play(seed) seam flips the wrapper to mode play even for a sim that ships no play hook (kernel-side restart owns the start verb)
 - source: spec-1-5-moon-patrol-plays-in-place-vendored-wrapped-alive.md | severity: low | fix-risk: low | footprint: in-story
@@ -229,6 +231,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: spec-1-10-epic-1-burn-down | severity: med | fix-risk: med | footprint: in-story
 - evidence: ci/lint-bans.mjs BAN_LOOKUP/GLOBAL_CLOCK key exact receiver.member pairs (Date.now, Date.perf now, globalThis.Date family); a planted sim file using Date.parse / Date.UTC / performance.timeOrigin exits 0. Closing this moves the banned SET - owner-only posture per DW-8 precedent; the 1.10 spec binds FORMS of already-banned APIs, never new API families
 - 2026-11-26T00:25:25Z status=escalated owner=burndown by=cr note=decision-sheet alongside DW-8; distinct family (wall-clock members, not transcendentals)
+- 2026-11-26T02:35:46Z status=decision-pending owner=burndown by=unattended note=inbox=U-4
 
 ### DW-40: cycle-log 1.10 qa_complete row has ts and spawn_at swapped: ts=21:18:28Z is the spawn time, spawn_at=21:59:41Z is the completion (inverted vs the log schema)
 - source: spec-1-10-epic-1-burn-down | severity: low | fix-risk: low | footprint: out-of-story
