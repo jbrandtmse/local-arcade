@@ -56,3 +56,4 @@
 2026-11-27T08:35:49Z	Story 2.1	fresh_check	env=recipe tests=80 result=pass order=forward,reverse
 2026-11-27T08:37:19Z	Story 2.1	committed	sha=3ff2beb ci=none submodules=
 2026-11-27T08:37:19Z	Story 2.1	story_cycle	plan_to_commit_min=702 implement_passes=1 reviews=1 rework=0 first_ci=none
+2026-11-27T08:53:47Z	Epic 2	planning_artifacts_amended	item=rule-20-spine-conventions-row commit=22aba24 by=Planner-via-bmad-architecture files=ARCHITECTURE-SPINE.md+architecture.memlog.md note=additive Conventions row (game audio asset recipe -> gen-registry inline embed; GameRegistryEntry.attractSound); no AD touched; context cache invalidated - recompile (attempt 5) before 2-2 plan spawn; pushed by lead
