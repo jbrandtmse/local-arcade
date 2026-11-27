@@ -51,3 +51,4 @@
 2026-11-27T08:06:27Z	Story 2.1	report_error	fault=stage	field=loc_numbers	reported=+2372/-29	actual=+2385/-32	impact=spec-record-only;corrected-at-review-ruling
 2026-11-27T08:06:27Z	Story 2.1	ruling	question=stale-record-numbers-in-2.1-record-blocks	choice=lead-edit-pass-LOC-corrected+post-QA/CR-totals-added	rejected=1732-lines-subclaim+10/14-triage-header-subclaim	why=git-fresh-wins;1682-exact-at-5b30578;header-matches-rows	category=decide	policy=U5
 2026-11-27T08:06:27Z	Story 2.1	ruling	question=clock-boundary-label+MixInput-signature-lag-shipped-shape	choice=amend-AC4+DN8+Tasks-line+Spec-Change-Log-entry	rejected=none	why=records-aligned-to-shipped-shape;AD-3-pin-count-fences-3-currentTime-sites;guarantee-unchanged	category=decide	policy=U6
+2026-11-27T08:08:22Z	Story 2.1	ledger_adjudicated	owned=1	resolved=0	reowned=0	terminal=1	note=DW-47-dropped-duplicate-of-DW-15;occurrence-trailer-on-DW-15
