@@ -304,3 +304,13 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: spec-2-1-core-audio-manager-attract-sound-that-occludes-and-swells.md | severity: low | fix-risk: med | footprint: in-epic
 - evidence: The Auto Run Result follow-up recommendation lists them; deferred-work.md received only DW-47 at dev_complete, so the burn-down drain could not see the rest.
 - 2026-11-27T07:46:05Z status=routed owner=3-7-the-l2-room-audit-whole-room-proof-and-the-numbers-that-make by=cr note=3.7's plan spawn receives these via its ledger slice and must address or decline each leg (Rule 17)
+
+### DW-52: 2.2 by-ear read-claims (doorway ordering mix, approach swell, seated collapse tuned-in) have no executed browser/audio-runtime tier
+- source: spec-2-2-the-proximity-ladder-and-the-seated-focus-mix-tuned-in.md frontmatter deferred: | severity: low | fix-risk: med | footprint: cross-cutting
+- evidence: pure-law literal pins + fake-AudioContext rig + literal param targets are this story's falsifiable tier (2.1 posture; no browser-E2E harness until Epic 3); lead smoke walk plus Epic-3 harness are the executed tier
+- 2026-11-27T14:11:48Z status=open owner=2-2-the-proximity-ladder-and-the-seated-focus-mix-tuned-in by=harvest note=same browser-harness tier as DW-15
+
+### DW-53: Recipe-less placed chains still wake, hold a NEAREST_N budget seat, and act as the ladder's nearest other - a never-sounding cabinet can budget-silence or ladder-duck real machines behind it
+- source: spec-2-2-the-proximity-ladder-and-the-seated-focus-mix-tuned-in.md frontmatter deferred: | severity: low | fix-risk: low | footprint: in-epic
+- evidence: one root cause behind BH-4 + EG-1/EG-2; real behavior, unreachable in shipped data (sole authored placement embeds its attract recipe); documented in core/audio/budget.ts header; law keys on placement until 3.7 rules the authored-data call
+- 2026-11-27T14:12:01Z status=open owner=2-2-the-proximity-ladder-and-the-seated-focus-mix-tuned-in by=harvest note=authored-data call for 3.7
