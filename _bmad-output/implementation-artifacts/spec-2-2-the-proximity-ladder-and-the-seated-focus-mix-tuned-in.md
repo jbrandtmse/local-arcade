@@ -2,9 +2,10 @@
 title: 'Story 2.2: The proximity ladder and the seated focus mix — "tuned in"'
 type: 'feature'
 created: '2026-11-27'
-status: 'ready-for-dev'
+status: 'done'
 review_loop_iteration: 0
 followup_review_recommended: false
+baseline_revision: '12d71ccab81ccb929a5030d9da4e0baca148c20e'
 context:
   - _bmad-output/planning-artifacts/architecture/architecture-local-arcade-2026-11-19/ARCHITECTURE-SPINE.md
   - _bmad-output/implementation-artifacts/epic-2-context.md
@@ -25,6 +26,21 @@ deferred:
     location: >-
       core/audio/mix.ts ladder/focus multipliers + core/audio/budget.ts constants;
       pinned in core/audio/{mix,budget,manager}.test.ts
+    severity: low
+  - summary: >-
+      Placed chains whose attract carries no recipe still wake, still hold a NEAREST_N budget seat, and
+      still act as the ladder's "nearest other" — a never-sounding cabinet can budget-silence or ladder-duck
+      the real machines behind it. Whether budget/ladder key on recipe presence is an authored-data call for
+      Story 3.7 (its finals own these numbers and the room's authored contents); the law keys on placement
+      until then.
+    evidence: |-
+      One root cause behind blind-hunter BH-4 + edge-case EG-1/EG-2 (intent-alignment D5 notes the same):
+      real behavior, unreachable in shipped data — the sole authored placement embeds its attract recipe —
+      and 2.1's recipe-less-chain pin labels the shape "a 2.2 room service shape". Documented in budget.ts's
+      header; not pinned either way until 3.7 rules.
+    location: >-
+      core/audio/manager.ts tick()'s computeBudget candidate list and the nearestOtherM loop;
+      documented at the core/audio/budget.ts header
     severity: low
 ---
 
@@ -120,6 +136,34 @@ deferred:
 
 ## Review Triage Log
 
+### 2026-11-27 — Review pass
+
+verdicts: 23 findings — high 0, medium 1, low 12, false 10, maybe-false 0 · routes: 7 patched, 3 deferred (one root-cause entry), 13 rejected (3 low-severity rejects, 10 false)
+
+- BH-1 (blind-hunter) — `CULL_RADIUS_M`'s inclusive edge unpinned while the cull-test comment claims that leg; `<=` -> `<` survives on the 30/26 m fixtures. low · **patched**: the cull pin now places `cabinet-cull-edge` at exactly 25 m and asserts it keeps its slot; the `<=` -> `<` witness reds it.
+- BH-2 — the frustum `>=` threshold edge is untested (`>=` -> `>` red nowhere). low · **rejected**: exact cos 0.5 needs dx = dz*sqrt(3), unreachable at dyadic/rational fixture coordinates; the practical "hair above/below" pin adds no real guard, and the leg is already discriminated from both sides (0.8 in, 0.406 out).
+- BH-3 — `INITIAL_LADDER_DWELL` starts off-manifold: `pendingId: "clear"`, a state `advanceDwell` never emits. low · **patched**: `pendingId: ""`, the `INITIAL_DWELL` idiom; behavior-neutral today (Design Notes implement 2).
+- BH-4 — a recipe-less placed chain is treated as audible: it wakes, holds a `NEAREST_N` seat, and can ladder-duck every real machine behind a never-sounding nearest; the diff is silent on it. low · **deferred** (grouped with EG-1/EG-2 — same root cause): real behavior, unreachable in shipped data, authored-data call for 3.7 → frontmatter `deferred` + `budget.ts` header note.
+- BH-5 — the manager comment claims first-match determinism for a double-seated view with no pin. low · **rejected**: the scheduler's seat law admits at most one `"visitor-seated"` cabinet — the state is unreachable; pinning it would guard a configuration the system cannot produce.
+- BH-6 — `ChainDebug.audible`/`distanceM`/`ladderApplied` keep refreshing while the graph is `silent` (actuation skipped), so the record can read `audible: true` with no set-target. low · **rejected**: matches 2.1's established posture that law values update whether or not actuation runs; the record describes the mix decision, and freezing the fields during suspension would split record from law with no pin demanding it.
+- BH-7 — `BudgetDecision.awakeIds` JSDoc promises a debug consumer that does not exist. low · **patched**: the comment now states what is true — input-order candidate set, the interlock read lives in the suite (no new debug surface added).
+- BH-8 — the ladder helpers take/return `string`: an occlusion dwell wired into the ladder helper typechecks and silently ducks everything to `LADDER_FAR_DUCK`. low · **patched**: `LadderTier` typing on `ladderSampleKey`/`ladderMultiplierFor` — Design Notes 2's key-space separation now compile-enforced.
+- EG-1 (edge-case, JSON) — `computeBudget` candidates include recipe-less chains: never-sounding cabinets consume `NEAREST_N` slots and budget-silence real attract chains. low · **deferred**: one root cause with BH-4 (single deferred entry).
+- EG-2 (edge-case, JSON) — the `nearestOtherM` loop includes recipe-less chains: audible chains ladder-duck behind silent machines, FR-3 ordering inverted. low · **deferred**: one root cause with BH-4.
+- VG-1 (verification-gap, pre-verified) — the manager's `visitorOccupied` -> budget wiring has no discriminating pin: flipping the flag to `false` keeps every test green (in every seated fixture the ear at `ENTRY_SPAWN` yaw 0 cone-wakes the chain, cos ~0.94). medium · **patched**: new manager wire pin seats a chain whose cone AND near legs both fail (`yaw = PI`) and asserts `audible: true`; the `visitorOccupied: false` witness reds it.
+- VG-2 — `## Verification` carries zero demonstrated `mutation:` lines: the Design Notes falsifiability paragraph is forward-looking and 2.1's evidence trail is absent from this spec. low · **patched**: 15 witness mutations applied/reverted byte-identically in the pass and recorded under `## Verification`.
+- VG-3 — the busy pin's inline mutation note names the wrong chain: arming focus on `"patron-autoplay"` makes B0 the seated/self chain, so the floor lands in b1's targets, not b0's. low · **patched**: note corrected (the assertion itself already checks both chains).
+- D1 (intent-alignment) — "byte-preserved pins" survives on values, not text: 2.1 call sites rewritten with required neutral inputs; `advanceDwell`'s signature widened. **false**: the intent's own "reusing 2.1's generic advanceDwell" sentence endorses the widening and Design Notes 7 prescribes the required-fields design; every 2.1 pin asserts exactly its old literals (green).
+- D2 — the interlock is structural + test-checked, not runtime-asserted. **false**: the Tasks line prescribes the structural form verbatim ("compute budget FROM the awake list, never beside it"); a runtime throw is a reading the spec never took.
+- D3 — FR-3 ordering never runs against the authored room, only synthetic fixtures. **false**: the authored room IS one placement; the I/O matrix and Design Notes 8 prescribe exactly the injected B0/B1 tier, and the room-level claim is labelled deferred (frontmatter item 1).
+- D4 — distance is computed on two surfaces (manager `distanceOf`, `budget.ts` internal sqrt) with no cross-check pin. **false**: descriptive duplication, not behavior — both computations carry their own pins, and neither output feeds the other, so no caller can diverge.
+- D5 — the ladder's "nearest" is unqualified by audibility. **false**: the Approach prescribes it ("`"clear"` iff `distanceM <= nearestOtherM + PROXIMITY_BAND_M`" over placed chains); the real-behavior consequence is exactly the BH-4/EG-1/EG-2 deferred entry, already recorded.
+- D6 — the focus "center" is inaudible at this tier (self multiplier has no audible effect until play-mode audio exists). **false**: Design Notes 1 states exactly this ("the 'full level' is the contract the machine's own audio rides") and the intent's gate-preservation clause binds it.
+- D7 — "no transcendentals" read as "no inverse trig" (`math.sin`/`math.cos` are called). **false**: the Always line prescribes "a forward cosine against the facing basis" — the basis of a yaw carrier needs sin/cos, and the intent itself routes them through the deterministic `math` module (AD-4); determinism is pinned by the twins.
+- D8 — AD-3 enrolment asserts `budget.ts` by name (`files.length >= 5`), stronger than the promised passive enrolment. **false**: a stronger pin than promised contradicts no intent expectation; the readdir mechanism is unchanged.
+- D9 — one write inside `_bmad-output/` (spec frontmatter status/baseline stamps). **false**: implement-stage bookkeeping on the workflow's own story spec; AGENTS.md's no-hand-edit rule targets planning artifacts via their owning skills — this spec is the skill-owned artifact being advanced.
+- D10 — literal pins freeze placeholder values, spending 3.7 churn. **false**: the spec's own falsifiability paragraph demands exactly these literal reds ("`FOCUS_DUCK` -> 1 -> the collapse and floor-literal pins red"); the mutation guard is this story's falsifiable tier, with the trade recorded knowingly (Design Notes 5).
+
 ## Design Notes
 
 **Governing AD ids (Rule 6):** AD-7 (one Core Audio Manager owns the graph; proximity ladder + seated focus mix + channel budget = distance-cull + nearest-N inside the awake set; mix derives solely from tick state; duck levels authored data), AD-27 (audible ⇒ awake interlock; awake set is a pure tick-state function; every number is on AD-27's Deferred row — 3.7 finals), AD-3 (no wall clock in the law; the AD-3 scan covers the new module), AD-23 (occupancy is scheduler-owned, read via `state()`; the focus layer reads the same settled occupancy the audio system already sees per the fixed in-tick order), AD-15 (unchanged: the Manager stays one supervisor-wrapped system), AD-18/AD-11 (sealed bundle untouched — no new assets or registry fields), AD-1/AD-2 (no game half involvement; depcheck green), AD-14 (Core side stays TypeScript).
@@ -133,6 +177,14 @@ deferred:
 6. The AC's "ambience and zone sound following their own authored levels" clause: NO ambience or zone audio source exists in this repo (UX-DR25: the soundscape IS the seek system — never ambience padding; zone audio = Snack Bar clink, M5/AD-25). Rule 1 note: no ambience/zone consumers in this story; the first is the M5 Snack Bar. The focus law ducks cabinet chains only — non-cabinet audio, when it exists, is outside the chain set and keeps its authored level by construction. Never-add check: the fake-rig node-kind census (one chain per placement, no new kinds).
 7. The new `MixInput` fields are REQUIRED (neutral values written explicitly at each existing call site in the same change set) — an optional-fields design would let the law's new legs silently default in future callers; 2.1's "narrow, never delete" precedent carries: existing pins keep asserting exactly what they asserted.
 8. Multi-machine AC legs pin at law/budget tier with synthetic distances derived from the authored Wall Slot records (B0/B1/B3 exist in slot-config; manager-tier pins inject synthetic `CabinetPlacement` records at authored slot ids). The authored `cabinetPlacements` list stays one entry — room presence is the ledger's job (AD-9/AD-10), never this story's.
+
+**implement: decisions recorded (unattended-run policy).**
+1. Silent-chain participation (review-pass deferral, frontmatter): a placed chain whose attract carries no recipe still wakes, still takes a `NEAREST_N` seat, and still counts as the ladder's "nearest other". The law keys on placement, not recipe — an authored-data call for 3.7; the ruling is documented in `budget.ts`'s header so 3.7's tuners find it where the numbers live.
+2. `INITIAL_LADDER_DWELL` starts `{appliedId: "clear", pendingId: "", pendingTicks: 0}` — the review pass caught an off-manifold `pendingId: "clear"` (`advanceDwell` never emits pending === applied). Behavior-neutral today (the applied-check short-circuits), but it keeps any future full-state `deepEqual` pin on the ladder dwell honest.
+3. `LadderTier = "clear" | "low"` types `ladderSampleKey`/`ladderMultiplierFor`: Design Notes 2's "two key spaces, one machine" separation is now a compile-time guard — an occlusion dwell fed through a ladder helper no longer typechecks. `mixStep`'s single `appliedId as LadderTier` read is the only seam that crosses `DwellState`.
+4. Falsifiability corrections made by the witness runs (Rule 19), all re-demonstrated red afterward: the manager collapse and doorway pins assert the symbol product AND the literal (0.03125 / 0.125) — the symbol-times-symbol form survived the `FOCUS_DUCK -> 1` / `LADDER_FAR_DUCK -> 1` witnesses; the ladder flap-mirror pin counts applied-tier transitions across the sweep (`flips === 0`) — the end-snapshot form survived the delete-the-ladder-dwell witness; the cull pin places a chain at exactly `CULL_RADIUS_M` (the `<=` -> `<` witness initially survived on 30/26-m fixtures).
+5. A manager-tier pin seats a chain whose cone and near legs both fail (ear at `ENTRY_SPAWN`, `yaw = PI`) so ONLY the seated leg can wake it — the interlock's seat leg otherwise had no real-input proof (every other seated fixture is cone-woken, cos ~0.94).
+6. The Manual-check dev-server leg was NOT executed this pass (headless Node-tier pass): the `arcadeDebug.audio` `distanceM`/`ladderApplied`/`audible` legs are pinned at the fake-rig tier, and the by-ear/browser tier is recorded in the frontmatter `deferred` list — never claimed from the suite.
 
 **Extend, don't copy (Rule 2).** The ladder tier extends `advanceDwell` (mix.ts :95) — same machine, new key space. The focus multiplier extends the `mixStep` product. `budget.ts` has no existing sibling (the repo has no wake set — 2.1 Design Notes verified the scan); the future kernel sim wake-set story is named above as the unification owner. The fake-rig two-chain tests extend 2.1's `createFakeGraph` and injected-`placements` seam — no new rig class.
 
@@ -156,8 +208,48 @@ deferred:
 
 **Manual checks:**
 - Start your own dev server on a fresh port (never the lead's :5173): after the first gesture and the door beat, `arcadeDebug.audio.chains[0]` shows `audible: true`, `ladderApplied: "clear"`, a plausible `distanceM`; sit at B0 and the record shows the occupancy flip — the audible by-ear collapse is the lead's smoke / Epic-3 harness tier, report it as deferred, never claim it from the suite.
+- Executed this pass: NO — headless Node-tier pass, no browser leg run. The `arcadeDebug.audio` `distanceM`/`ladderApplied`/`audible` record legs are pinned at the fake-rig tier instead; the browser/by-ear tier stands in frontmatter `deferred` item 1.
+
+**Mutations demonstrated (implement pass).** Each applied at the cited file, the named tests observed RED in the same run, then reverted — the witness runner (`C:/tmp/witness.mjs`) printed `byte-identical after revert: true` for every mutation, and `git diff` was clean of them before the finalize commit. AC9 (loop commands, byte-preserved 2.1 pins) and AC10 (either-order fresh environment) are process ACs verified by the Commands runs plus the reversed-file-order audio run (58/58), not by mutation.
+
+- mutation: plant `Date.now()` in `core/audio/budget.ts` -> AD-3 no-wall-clock readdir pin (`manager.test.ts`, scan now covers `budget.ts`) red — reverted. (AC7)
+- mutation: `LADDER_FAR_DUCK` -> 1 in `mix.ts` -> the ladder-constants pin, the doorway-ordering law pin, and the approach-swell pin red; and at the manager tier, the doorway-ordering pin (literal 0.125 leg added by this pass — the symbol-product-only form survived this mutation first) red — reverted. (AC1)
+- mutation: `FOCUS_DUCK` -> 1 in `mix.ts` -> the focus-three-way law pin red; and the manager seated-collapse pin (literal 0.03125 leg added by this pass after the symbol-only form survived) red — reverted. (AC4)
+- mutation: seat detection widened to `"patron-autoplay"` in `manager.ts` -> the busy-is-not-focus pin red — reverted. (AC5)
+- mutation: `PROXIMITY_BAND_M` -> 0 in `mix.ts` -> the ladder-constants pin and the tie dead-band pin red — reverted. (AC1/CAP-3 spatial leg)
+- mutation: drop the seated-occupied leg from `budget.ts`'s awake predicate -> the seated-beyond-near-radius pin and the mixed-room interlock pin red — reverted. (AC6)
+- mutation: compute the budget BESIDE instead of FROM the awake list in `budget.ts` -> the seated-beyond-near-radius pin and the `inBudget` subset-of-`awake` interlock pin red — reverted. (AC6, AD-27)
+- mutation: `CULL_RADIUS_M` -> 0 -> the manager no-cull-today pin red (the lone authored chain loses its seat) — reverted. (AC6)
+- mutation: `NEAREST_N` -> 0 -> the manager no-cull-today pin red — reverted. (AC6)
+- mutation: cull `<=` -> `<` in `budget.ts` -> the cull pin's exact-25 m edge leg red (this leg is the BH-1 patch; pre-patch the mutation survived) — reverted. (AC6)
+- mutation: delete the ladder dwell usage in `mixStep` (applied tier flips on the first sample) -> the ladder-dwell flip-count pin and the approach-swell pin red; the flap-mirror pin was GREEN under this first run (end-snapshot form), its transition-count fix makes it red too — reverted. (AC3/CAP-3 temporal leg)
+- mutation: `focusMultiplierFor` -> always duck in `mix.ts` -> the focus-three-way pin and the seated-composition pin red (the "focused chain's multiplier stays FULL" / `seatedVolumeId` contract leg at multiplier level) — reverted. (AC4, Design Notes 1)
+- mutation: manager's `visitorOccupied` wired to `false` -> the new occupancy-to-budget wire pin red (this pin is the VG-1 patch; pre-patch the mutation survived every test) — reverted. (AC6, interlock over the real wiring)
+- mutation: add an extra `createGain()` node in the manager graph -> the one-graph topology-census pin red — reverted. (AC8, UX-DR25 never-add check)
+- mutation: plant a hidden module-level counter in `budget.ts` -> the determinism-twin pin red — reverted. (AC7, NFR-10)
 
 ## Auto Run Result
 
-Status: ready-for-dev
+Status: done
 Blocking condition: none
+
+Story 2.2 shipped on baseline `12d71ccab81ccb929a5030d9da4e0baca148c20e` (branch `ARC-1-epic2`, implement stage, unattended epic cycle). The proximity ladder, the seated focus layer, and the channel budget are live in the mix law exactly per the Design Notes rulings; every constant is a labelled placeholder for 3.7.
+
+**Files changed (7):**
+- `core/audio/budget.ts` (NEW) — pure channel budget: awake set (seated union near-radius union forward-cosine frustum, player.ts basis via the deterministic `math`), cull + nearest-N computed FROM the awake list (AD-27 interlock structural); labelled placeholders `NEAR_RADIUS_M`/`AWAKE_FRUSTUM_COS_MIN`/`CULL_RADIUS_M`/`NEAREST_N`; header records the silent-chain participation ruling.
+- `core/audio/budget.test.ts` (NEW) — 10 pins: each awake leg discriminated, seated-beyond-radius, mixed-room `inBudget` subset-of-`awake` interlock, exact-25 m cull edge, nearest-N truncation, volumeId tie-break, determinism twin.
+- `core/audio/mix.ts` — law extended in place: ladder tier (`ladderSampleKey`/`ladderMultiplierFor`/`INITIAL_LADDER_DWELL`/`LadderTier`), focus layer (`FocusLayer`/`focusMultiplierFor`), `audible = awake && inBudget`, product + two multipliers zeroed when inaudible; `advanceDwell` generified with a `dwellTicks` parameter (default `DWELL_TICKS`) — one machine, two key spaces; 2.1's gate/swell/profile law byte-preserved.
+- `core/audio/mix.test.ts` — 23 pins (11 of 2.1 green on their original literals + 12 new): doorway ordering at `ENTRY_SPAWN` over authored Wall Slot distances, approach swell, ladder dwell + alternating-never-flap (transition-count form), tie dead-band, focus three-way, seated composition, audible-false gain 0.
+- `core/audio/manager.ts` — per-chain planar distance, one `computeBudget` call with scheduler-occupancy flags, new law inputs, stored ladder dwell; `ChainDebug` gains `distanceM`/`ladderApplied`/`audible`; actuation stays gain+lowpass `setTarget` only; `core/main.ts` untouched.
+- `core/audio/manager.test.ts` — 25 pins (14 of 2.1 green unchanged + 11 new): two-injected-placement collapse/stand-up/busy, doorway ordering at manager tier, no-cull-today, occupancy-to-budget wire pin, determinism twin, extended AD-3 readdir pin, AD-23 non-mutation pin green, topology census.
+- the spec itself (frontmatter, Design Notes implement decisions, Review Triage Log, Verification mutation record, this result).
+
+**Review findings breakdown (23; full rows in the Review Triage Log):** high 0, medium 1, low 12, false 10, maybe-false 0. Patched 7: the cull exact-edge pin (BH-1), `INITIAL_LADDER_DWELL` off-manifold pending (BH-3), `awakeIds` JSDoc drift (BH-7), `LadderTier` typing (BH-8), the manager occupancy-to-budget wire pin (VG-1, the medium), the missing mutation-record evidence trail (VG-2), the busy-pin note's wrong chain (VG-3). Deferred 3 as one root-cause entry (BH-4 + EG-1 + EG-2; D5 notes the same surface): recipe-less chains hold budget/ladder seats — frontmatter `deferred` item 2, `budget.ts` header note, authored-data call for 3.7. Rejected low 3 with reasons: the cone `>=` edge (exact cos 0.5 unreachable at dyadic coordinates — fix would be fabricated FP), the double-seated-view pin (unreachable per the seat law), the suspended-graph debug posture (consistent with 2.1's law-updates-without-actuation stance). Rejected false 10: D1-D10, each prescribing the spec's own Design Notes/Always/Tasks text (required fields, structural interlock, injected-placement tier, unqualified ladder nearest, identity-not-audibility focus center, forward-cosine reading, stronger-than-promised AD-3 pin, workflow frontmatter bookkeeping, deliberate literal pins).
+
+**Follow-up review recommended: NO.** The single medium was patched and re-witnessed inside this pass; no high findings; nothing routes to intent_gap or bad_spec. Counts: 7/7 patches verified by their named witness going red, 3 rejects verified unreachable-or-prescribed, 1 deferral recorded for the lead's harvest.
+
+**Verification performed:** `npm run typecheck` clean; `npm test` 460/460; `node ci/depcheck.mjs`, `node ci/lint-bans.mjs` clean; `node tools/gen-registry.mjs` + `generated/` no drift; `npm run build` once, clean; reversed-file-order audio run 58/58 (hermeticity/order check); 15 mutation witnesses applied/red/reverted byte-identically (all recorded under `## Verification`, mapped to AC1-AC8). Tiers executed: pure-law literal pins, fake-graph manager rig, budget unit pins, source pins (AD-3 scan, AD-23 non-mutation, depcheck/lint-bans), demonstrated mutations. Tiers NOT executed: browser/by-ear (frontmatter `deferred` item 1) — no dev-server/browser leg ran in this pass; the lead's smoke walk and the Epic-3 harness own it.
+
+**Residual risks / hand-offs:** every ladder/focus/budget number is a placeholder (AD-27 Deferred row; DW-50/DW-51 stay owner=3-7, untouched here); the budget's placeholder posture (nothing culled at `NEAREST_N = 4` / `CULL_RADIUS_M = 25`) means "tuned in" ships as the focus floor, not as budget silence, until 3.7 tightens; the kernel sim-liveness story reuses/extends `budget.ts`'s awake predicate (Design Notes 3) rather than re-deriving it; the silent-chain ruling rides with 3.7's authored-data pass (deferred item 2).
+
+**Deferred findings for the ledger harvest (frontmatter `deferred`, both severity low):** (1) by-ear/browser tier for doorway ordering / approach swell / seated collapse — no executed audio-runtime tier this epic; pure-law pins + fake-graph rig + literal targets are the falsifiable tier. (2) recipe-less chains hold budget/ladder seats — real behavior, unreachable in shipped data; `budget.ts` header records the placement-not-recipe keying until 3.7 rules.

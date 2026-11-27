@@ -5,9 +5,14 @@
 // repo that names WebAudio node factories (the L0 lint bans every
 // AudioContext reference in both plugin halves).
 //
-// Law path (tick): listener pose -> occlusionIds (occlusion.ts) ->
-// mixStep (mix.ts) -> setTarget on each chain's gain + lowpass. The law
-// path sees NO time at all: the injected AudioGraph seam hands out param
+// Law path (tick): listener pose -> occlusionIds (occlusion.ts) + planar
+// distances to each chain's speaker + one computeBudget call (budget.ts:
+// the awake set and the nearest-N selection, Story 2.2) -> mixStep (mix.ts,
+// fed plain numbers/flags — the law still never sees the listener pose,
+// only manager-measured distances and booleans) -> setTarget on each
+// chain's gain + lowpass. Actuation stays gain + lowpass only: budget,
+// ladder, and focus are gain-only — no start/stop churn, no new nodes. The
+// law path sees NO time at all: the injected AudioGraph seam hands out param
 // handles whose setTarget(value) is stamped at the audio clock inside the
 // labelled adapter below (AD-3 exemption, Design Notes item 8 — an audio
 // clock, not a wall clock; no Date/performance anywhere in core/audio/).
@@ -25,7 +30,16 @@ import { collisionVolumes, type CollisionVolume } from "../room/collision-volume
 import { cabinetPlacements, placementGeometry, type CabinetPlacement } from "../room/cabinets.ts";
 import type { GameRegistryEntry } from "../contract/wrapper.ts";
 import { occlusionIds, type RayPoint } from "./occlusion.ts";
-import { INITIAL_DWELL, OPEN_PROFILE, mixStep, type DwellState, type MixTarget } from "./mix.ts";
+import { computeBudget } from "./budget.ts";
+import {
+  INITIAL_DWELL,
+  INITIAL_LADDER_DWELL,
+  OPEN_PROFILE,
+  mixStep,
+  type DwellState,
+  type FocusLayer,
+  type MixTarget,
+} from "./mix.ts";
 import { renderAttractLoop } from "./synth.ts";
 
 // --- The injected graph seam (scene.ts's structural-injection idiom) -------
@@ -291,14 +305,22 @@ interface Chain {
   volumeId: string;
   gameId: string;
   hasRecipe: boolean;
-  /** The panner-fixed source point (authored speaker position). */
+  /** The panner-fixed source point (authored speaker position) — the
+   * distance/budget target point. */
   speaker: RayPoint;
   gainNode: AudioGainHandle;
   lowpassNode: AudioLowpassHandle;
   dwell: DwellState;
+  /** The proximity-ladder hysteresis memory (Story 2.2): the same
+   * advanceDwell machine keyed on "clear"/"low". */
+  ladderDwell: DwellState;
   target: MixTarget;
   lastOccluderIds: string[];
   lastOccupancy: Occupancy;
+  /** This tick's measured planar distance + budget verdict (debug + the
+   * arcadeDebug record; the law gets them as fresh numbers each tick). */
+  distanceM: number;
+  audible: boolean;
 }
 
 export interface ChainDebug {
@@ -310,6 +332,12 @@ export interface ChainDebug {
   appliedId: string;
   gain: number;
   lowpassHz: number;
+  /** Planar distance ear -> speaker this tick, metres (manager-measured). */
+  distanceM: number;
+  /** The APPLIED ladder tier: "clear" | "low" (dwell-hysteresis-bounded). */
+  ladderApplied: string;
+  /** awake && inBudget this tick — false means gain-only silence. */
+  audible: boolean;
 }
 
 export interface AudioManagerDebug {
@@ -374,39 +402,98 @@ export function createAudioManager(opts: AudioManagerOptions): AudioManager {
       gainNode,
       lowpassNode,
       dwell: INITIAL_DWELL,
+      ladderDwell: INITIAL_LADDER_DWELL,
       target: { gain: 0, lowpassHz: OPEN_PROFILE.lowpassHz },
       lastOccluderIds: [],
       lastOccupancy: "attract",
+      distanceM: 0,
+      audible: false,
     });
   }
 
-  /** Whose ear the ray starts from, this tick. */
-  function ear(): RayPoint {
+  /** Whose ear the ray starts from, this tick — planar pose + yaw (the
+   * budget's frustum leg rides the same handover as the ray origin; both
+   * poses carry yaw: EntryPose and PlayerState). */
+  function ear(): RayPoint & { yaw: number } {
     const entryState = opts.entry.state();
     if (entryState.phase === "control" || entryState.phase === "workbench") {
       const p = opts.player.state;
-      return { x: p.x, y: EYE_HEIGHT, z: p.z };
+      return { x: p.x, y: EYE_HEIGHT, z: p.z, yaw: p.yaw };
     }
     const pose = opts.entry.pose();
-    return { x: pose.x, y: pose.y, z: pose.z };
+    return { x: pose.x, y: pose.y, z: pose.z, yaw: pose.yaw };
   }
 
   function tick(): void {
     const entryState = opts.entry.state();
     const listener = ear();
+    const view = opts.scheduler.state();
     const occupancies = new Map<string, Occupancy>(
-      opts.scheduler.state().cabinets.map((c) => [c.volumeId, c.occupancy]),
+      view.cabinets.map((c) => [c.volumeId, c.occupancy]),
     );
+    // The focus layer's ONLY occupancy source (AD-23): the scheduler's
+    // settled cabinet view, read in the fixed in-tick order (audio runs
+    // after patrons/seat). Exactly "visitor-seated" arms focus; "patron-
+    // autoplay" never does. Deterministic first match if the view ever
+    // lists more than one seated cabinet (the seat never does).
+    const seatedVolumeId = view.cabinets.find((c) => c.occupancy === "visitor-seated")?.volumeId;
+    // Measure planar (x/z) distances from the ear to each chain's speaker
+    // — the law sees these numbers, never the pose itself.
+    const distanceOf = new Map<string, number>();
+    for (const chain of chains) {
+      const dx = chain.speaker.x - listener.x;
+      const dz = chain.speaker.z - listener.z;
+      distanceOf.set(chain.volumeId, Math.sqrt(dx * dx + dz * dz));
+    }
+    // One budget call per tick over the chain candidates: the awake set
+    // (visitor-seated ∪ near radius ∪ frustum cone) and the distance-cull
+    // + nearest-N selection inside it (AD-7/AD-27 interlock: audible ⇒
+    // awake, structural to computeBudget).
+    const budget = computeBudget(
+      { x: listener.x, z: listener.z, yaw: listener.yaw },
+      chains.map((c) => ({
+        volumeId: c.volumeId,
+        x: c.speaker.x,
+        z: c.speaker.z,
+        visitorOccupied: occupancies.get(c.volumeId) === "visitor-seated",
+      })),
+    );
+    const awake = new Set(budget.awakeIds);
+    const inBudget = new Set(budget.inBudgetIds);
     const silent = graph.state() !== "running";
     if (!silent) graph.setListenerPosition(listener.x, listener.y, listener.z);
     for (const chain of chains) {
       const ids = occlusionIds(listener, chain.speaker, volumes);
       const occupancy = occupancies.get(chain.volumeId) ?? "attract";
-      const step = mixStep({ entry: entryState, occupancy, sampleIds: ids, dwell: chain.dwell, volumes });
+      const distanceM = distanceOf.get(chain.volumeId)!;
+      let nearestOtherM = Infinity;
+      for (const other of chains) {
+        if (other === chain) continue;
+        const d = distanceOf.get(other.volumeId)!;
+        if (d < nearestOtherM) nearestOtherM = d;
+      }
+      const focus: FocusLayer =
+        seatedVolumeId === undefined ? "none" : seatedVolumeId === chain.volumeId ? "self" : "other";
+      const step = mixStep({
+        entry: entryState,
+        occupancy,
+        sampleIds: ids,
+        dwell: chain.dwell,
+        volumes,
+        distanceM,
+        nearestOtherM,
+        focus,
+        ladderDwell: chain.ladderDwell,
+        awake: awake.has(chain.volumeId),
+        inBudget: inBudget.has(chain.volumeId),
+      });
       chain.dwell = step.dwell;
+      chain.ladderDwell = step.ladderDwell;
       chain.target = step.target;
       chain.lastOccluderIds = ids;
       chain.lastOccupancy = occupancy;
+      chain.distanceM = distanceM;
+      chain.audible = step.audible;
       if (silent) continue;
       chain.gainNode.gain.setTarget(step.target.gain);
       chain.lowpassNode.frequency.setTarget(step.target.lowpassHz);
@@ -434,6 +521,9 @@ export function createAudioManager(opts: AudioManagerOptions): AudioManager {
         appliedId: c.dwell.appliedId,
         gain: c.target.gain,
         lowpassHz: c.target.lowpassHz,
+        distanceM: c.distanceM,
+        ladderApplied: c.ladderDwell.appliedId,
+        audible: c.audible,
       })),
     };
   }

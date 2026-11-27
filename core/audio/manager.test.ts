@@ -9,10 +9,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
+import { math } from "../contract/index.ts";
 import type { AttractSound, GameRegistryEntry } from "../contract/wrapper.ts";
 import { ENTRY_STREET_VIEW, type EntryPhase, type EntryPose, type EntryState } from "../entry.ts";
 import { ENTRY_SPAWN, collisionVolumes } from "../room/collision-volumes.ts";
-import { placementGeometry } from "../room/cabinets.ts";
+import { placementGeometry, type CabinetPlacement } from "../room/cabinets.ts";
+import { GLOW_CYAN, GLOW_MARQUEE } from "../room/tokens.ts";
 import { EYE_HEIGHT, type PlayerState } from "../player.ts";
 import type { Occupancy } from "../patrons/scheduler.ts";
 import {
@@ -27,7 +29,7 @@ import {
   type PannerSetup,
   type RawContext,
 } from "./manager.ts";
-import { ATTRACT_BASE_GAIN, DWELL_TICKS, OCCLUSION_PROFILES, OPEN_PROFILE } from "./mix.ts";
+import { ATTRACT_BASE_GAIN, DWELL_TICKS, FOCUS_DUCK, LADDER_DWELL_TICKS, LADDER_FAR_DUCK, OCCLUSION_PROFILES, OPEN_PROFILE } from "./mix.ts";
 
 const REPO = path.resolve(import.meta.dirname, "..", "..");
 const recipe: AttractSound = JSON.parse(
@@ -611,6 +613,232 @@ test("the manager mutates no kernel state (AD-23: occupancy is scheduler-owned; 
   assert.equal(JSON.stringify(registry[0]!.attractSound), before.recipe, "the registry recipe is data: the synth renders it, nothing writes into it");
 });
 
+// --- Story 2.2: the proximity ladder + the seated focus mix, manager tier ---
+// Two INJECTED placements on the authored back-row slots (B0/B1: the test's
+// room shape is synthetic, the slot geometry is authored data), so every
+// 2.2 law rides the real chain machinery: distances measured by the
+// manager, the budget decided by budget.ts, focus read off the scheduler's
+// SETTLED view (AD-23). The by-ear claim ("it sounds tuned in") stays
+// browser-tier — deferred to the Epic 3 harness plus the lead's smoke walk
+// (spec frontmatter); these pins are the law-shape tier.
+
+const twoPlacements: readonly CabinetPlacement[] = [
+  { volumeId: "cabinet-B0", slotId: "B0", title: "MOON PATROL", screenZones: { attract: "MOON PATROL", next: "NEXT", score: [] }, hue: GLOW_CYAN, marqueeHue: GLOW_MARQUEE, gameId: "moon-patrol", busy: true },
+  { volumeId: "cabinet-B1", slotId: "B1", title: "MOON PATROL", screenZones: { attract: "MOON PATROL", next: "NEXT", score: [] }, hue: GLOW_CYAN, marqueeHue: GLOW_MARQUEE, gameId: "moon-patrol", busy: true },
+];
+
+function makeSchedulerTwo(occupancy: { B0: Occupancy; B1: Occupancy }) {
+  return {
+    state: () => ({
+      tick: 0,
+      cabinets: [
+        { volumeId: "cabinet-B0", gameId: "moon-patrol", occupancy: occupancy.B0, runCount: 1, lastSeed: 7, queue: [], rearmTick: 0 },
+        { volumeId: "cabinet-B1", gameId: "moon-patrol", occupancy: occupancy.B1, runCount: 1, lastSeed: 7, queue: [], rearmTick: 0 },
+      ],
+    }),
+  };
+}
+
+function buildTwo(initialState: GraphState = "running") {
+  const rig = createFakeGraph(initialState);
+  const entryKit = makeEntry("control", 1);
+  const occupancy: { B0: Occupancy; B1: Occupancy } = { B0: "attract", B1: "attract" };
+  const playerKit = makePlayer();
+  const manager = createAudioManager({
+    graph: rig.graph,
+    registry,
+    scheduler: makeSchedulerTwo(occupancy),
+    player: playerKit.player,
+    entry: entryKit.entry,
+    placements: twoPlacements,
+  });
+  return { rig, manager, entryKit, occupancy, playerKit };
+}
+
+/** The two gain params in chain order (params push lowpass-then-gain per
+ * chain; the filter keeps placement order). */
+function gainParamsOf(rig: ReturnType<typeof createFakeGraph>): FakeParam[] {
+  return rig.params.filter((p) => p.label.endsWith(".gain"));
+}
+
+/** Mirror of the manager's OWN planar-distance form (same operands, same
+ * order) so strictEqual compares bit-for-bit, never within a tolerance. */
+function spawnDistTo(slotId: string): number {
+  const c = placementGeometry(slotId).center;
+  const dx = c.x - ENTRY_SPAWN.x;
+  const dz = c.z - ENTRY_SPAWN.z;
+  return Math.sqrt(dx * dx + dz * dz);
+}
+
+test("Story 2.2 doorway ordering at the manager tier: at the spawn pose exactly the nearest chain reads full, the next-back chain lands its LADDER_FAR_DUCK rung (FR-3)", () => {
+  const { rig, manager } = buildTwo("running");
+  const [b0Gain, b1Gain] = gainParamsOf(rig);
+  assert.ok(b0Gain !== undefined && b1Gain !== undefined);
+  for (let i = 0; i < LADDER_DWELL_TICKS + 5; i++) manager.tick();
+  const dbg = manager.state();
+  assert.equal(dbg.chains[1]!.ladderApplied, "clear", "B1 is the nearest chain to the spawn ear: the clear rung, held through the dwell (mutation: PROXIMITY_BAND_M -> 1.5 swallows the gap: red at the b0 literals below)");
+  assert.equal(dbg.chains[0]!.ladderApplied, "low", "B0 sits outside the band around the nearest distance, so it applied the low rung (mutation: LADDER_DWELL_TICKS -> 1 still lands here; the flap/mid-dwell legs live at the law tier in mix.test.ts)");
+  assert.equal(b1Gain!.targets.at(-1), ATTRACT_BASE_GAIN, "at the doorway exactly the nearest machine reads full level");
+  assert.equal(b0Gain!.targets.at(-1), ATTRACT_BASE_GAIN * LADDER_FAR_DUCK, "the next-back machine lands its ladder rung: 0.125 (mutation: LADDER_FAR_DUCK -> 1 reds this literal and the ordering collapses)");
+  assert.equal(b0Gain!.targets.at(-1), 0.125, "the far-rung product as a literal, so the rung level itself is pinned: LADDER_FAR_DUCK -> 1 reads 0.5 here (mutation: LADDER_FAR_DUCK -> 1 — red here)");
+  assert.equal(dbg.chains[0]!.distanceM, spawnDistTo("B0"), "the debug record carries the manager's measured PLANAR distance, bit-for-bit (mutation: fold y into the distance and the strict equality reds)");
+  assert.equal(dbg.chains[1]!.distanceM, spawnDistTo("B1"));
+  assert.equal(dbg.chains[0]!.audible, true, "both chains are awake and in budget at the shipped placeholders (the no-cull-today row: CULL_RADIUS_M sits past the room diagonal, NEAREST_N above the two)");
+  assert.equal(dbg.chains[1]!.audible, true);
+});
+
+test("the seated focus mix at the manager tier: sitting at B0 collapses every OTHER chain to the FOCUS_DUCK floor while 2.1's seated gate keeps B0's own attract silent (Design Notes 1's composition)", () => {
+  const { rig, manager, occupancy } = buildTwo("running");
+  const [b0Gain, b1Gain] = gainParamsOf(rig);
+  assert.ok(b0Gain !== undefined && b1Gain !== undefined);
+  occupancy.B0 = "visitor-seated";
+  for (let i = 0; i < LADDER_DWELL_TICKS + 5; i++) manager.tick();
+  assert.equal(b1Gain!.targets.at(-1), ATTRACT_BASE_GAIN * FOCUS_DUCK, "0.03125: the room collapses around the machine the visitor sits at \u2014 the non-focus chain sits at base x clear-rung x FOCUS_DUCK (mutation: focus never arming, e.g. seatedVolumeId mis-read as undefined: B1 stays at 0.5 \u2014 red here)");
+  assert.equal(b1Gain!.targets.at(-1), 0.03125, "the floor product as a literal, so the level itself is pinned: FOCUS_DUCK -> 1 reads 0.5 here (mutation: FOCUS_DUCK -> 1 \u2014 red here)");
+  assert.equal(b0Gain!.targets.at(-1), 0, "the seated Cabinet's own attract stays silent: that is 2.1's occupancyGate, byte-preserved. Its focus multiplier reads FULL (1) \u2014 observable at the law tier (mix.test.ts's composition pin), because at this tier the gate zeroes the gain for any focus value");
+  assert.deepEqual(rig.sources.map((s) => s.started), [1, 1], "the collapse is gain-only: both forever-loops started exactly once at build and never restart (mutation: start/stop the source on focus and the count reds)");
+  const dbg = manager.state();
+  assert.equal(dbg.chains[0]!.occupancy, "visitor-seated", "focus follows the scheduler's settled occupancy record \u2014 exactly this value arms it (the busy pin below proves nothing else does)");
+  assert.equal(dbg.chains[1]!.audible, true, "near-silent is not budget-silent: the ducked chain stays awake and in budget");
+});
+
+test("busy is not focus: \"patron-autoplay\" arms nothing \u2014 no chain touches the FOCUS_DUCK floor anywhere in its sequence, and the busy cabinet keeps sounding", () => {
+  const { rig, manager, occupancy } = buildTwo("running");
+  const [b0Gain, b1Gain] = gainParamsOf(rig);
+  assert.ok(b0Gain !== undefined && b1Gain !== undefined);
+  occupancy.B0 = "patron-autoplay";
+  for (let i = 0; i < LADDER_DWELL_TICKS + 5; i++) manager.tick();
+  assert.equal(b1Gain!.targets.at(-1), ATTRACT_BASE_GAIN, "no seated visitor: focus neutral, B1 keeps its clear-rung full level");
+  assert.equal(b0Gain!.targets.at(-1), ATTRACT_BASE_GAIN * LADDER_FAR_DUCK, "the busy cabinet still sits on its ladder rung and STILL SOUNDS (2.1's busy law, now riding the ladder)");
+  const floor = ATTRACT_BASE_GAIN * FOCUS_DUCK;
+  assert.ok(!b0Gain!.targets.includes(floor) && !b1Gain!.targets.includes(floor), "the focus floor appears NOWHERE in either sequence (mutation: arming focus on patron-autoplay makes B0 the seated chain, so 0.03125 lands in b1's targets \u2014 red here)");
+});
+
+test("stand-up lifts the focus floor on the SAME tick (no dwell, no timer on focus): every chain returns to its own ladder rung; the stood-from Cabinet's attract return stays the scheduler's re-arm law", () => {
+  const { rig, manager, occupancy } = buildTwo("running");
+  const [b0Gain, b1Gain] = gainParamsOf(rig);
+  assert.ok(b0Gain !== undefined && b1Gain !== undefined);
+  occupancy.B0 = "visitor-seated";
+  for (let i = 0; i < LADDER_DWELL_TICKS + 5; i++) manager.tick();
+  assert.equal(b1Gain!.targets.at(-1), ATTRACT_BASE_GAIN * FOCUS_DUCK, "first prove the collapse, then stand up");
+  occupancy.B0 = "attract";
+  manager.tick(); // ONE tick after standing
+  assert.equal(b1Gain!.targets.at(-1), ATTRACT_BASE_GAIN, "the floor is gone one tick later: focus has no hysteresis of its own (only the ladder's dwell, which B1 never left) (mutation: gating focus through advanceDwell keeps 0.03125 here \u2014 red)");
+  assert.equal(b0Gain!.targets.at(-1), ATTRACT_BASE_GAIN * LADDER_FAR_DUCK, "the stood-from cabinet resumes its own rung at the audio tier; WHEN it shows attract again is the scheduler's 600-tick ATTRACT_DWELL re-arm \u2014 untouched by this story");
+});
+
+test("the manager's own occupancy-to-budget wire: a seated chain stays audible when ONLY the seated leg can wake it (AD-27's interlock over the settled view)", () => {
+  const { manager, occupancy, playerKit } = buildTwo("running");
+  occupancy.B0 = "visitor-seated";
+  playerKit.state.yaw = math.PI; // face away: B0's cone leg fails (cos ~-0.94) and the near leg fails (dist ~12.2 > NEAR_RADIUS_M)
+  manager.tick();
+  const dbg = manager.state();
+  assert.equal(dbg.chains[0]!.audible, true, "awake on the seated leg alone \u2014 the manager passes the settled visitor-seated truth into computeBudget (mutation: visitorOccupied wired false in manager.ts \u2014 red here)");
+  assert.equal(dbg.chains[1]!.audible, false, "the unoccupied neighbour fails all three legs at this pose: the seated flag, not the pose, is the discriminator");
+});
+
+test("no-cull-today on the authored one-Cabinet room: the shipped placeholders leave the lone chain audible at the full base gain, ladder clear (Design Notes 5)", () => {
+  const { manager } = build("running");
+  manager.tick();
+  const chain = manager.state().chains[0]!;
+  assert.equal(chain.audible, true, "awake (the frustum leg fires at the spawn facing) and in budget (CULL_RADIUS_M past the room diagonal, NEAREST_N above the one chain) (mutation: CULL_RADIUS_M -> 0 or AWAKE_FRUSTUM_COS_MIN -> 1 reds here \u2014 this is the manager-tier budget pin the budget.test.ts row points at)");
+  assert.equal(chain.ladderApplied, "clear", "a lone chain always samples clear: nearestOtherM = Infinity, nothing to duck behind");
+  assert.equal(chain.gain, ATTRACT_BASE_GAIN, "2.1's numbers stay byte-identical for a one-Cabinet room: the ladder and focus layers multiply by 1");
+  assert.equal(chain.distanceM, spawnDistTo("B0"));
+});
+
+test("budget silence at the manager tier is gain-only: turned away past the near radius the chain reads gain 0 while its loop keeps running and its colour stays open (AD-27)", () => {
+  const { rig, manager, playerKit } = build("running");
+  const gainParam = rig.params.find((p) => p.label.endsWith(".gain"))!;
+  const freqParam = rig.params.find((p) => p.label.endsWith(".frequency"))!;
+  manager.tick();
+  assert.equal(manager.state().chains[0]!.audible, true, "at spawn the ear faces the Cabinet: audible");
+  playerKit.state.yaw = math.PI; // the visitor turns around: cone leg fails, near leg fails (dist ~12.2 > NEAR_RADIUS_M), nobody sits
+  for (let i = 0; i < 5; i++) manager.tick();
+  const chain = manager.state().chains[0]!;
+  assert.equal(chain.audible, false, "no awake leg fires: asleep (mutation: NEAR_RADIUS_M -> 15 keeps it awake \u2014 red here)");
+  assert.equal(chain.gain, 0, "silence is the gain multiplier, computed in the law");
+  assert.equal(gainParam.targets.at(-1), 0, "and it reaches the param as a setTarget value, never as a stop");
+  assert.ok(freqParam.targets.every((t) => t === OPEN_PROFILE.lowpassHz), "the lowpass never moved: budget silence never re-colours a chain");
+  assert.deepEqual(rig.sources, [{ bufferIndex: 0, started: 1 }], "the looping source is neither started nor stopped by the budget (gain-only law, widened)");
+});
+
+test("two Placements, one graph, still exactly one looping chain each: no new node kind anywhere (AD-7's one-graph law widened to the Story 2.2 room)", () => {
+  const { rig } = buildTwo("suspended");
+  const placements = 2;
+  assert.equal(rig.labels.sources.length, placements);
+  assert.equal(rig.labels.lowpasses.length, placements);
+  assert.equal(rig.labels.gains.length, placements);
+  assert.equal(rig.labels.panners.length, placements);
+  assert.equal(rig.connects.length, 4 * placements, "every leg is source->lowpass->gain->panner->destination, twice: the ladder, the focus layer, and the budget add NO node to the graph (mutation: a per-chain duck node lands here as a 9th connect and a 5th kind)");
+});
+
+test("determinism twin over the two-chain walk: identical rigs with a scripted pose walk and a mid-walk seat record identical param sequences and identical debug records", () => {
+  const a = buildTwo("running");
+  const b = buildTwo("running");
+  for (let tick = 0; tick < 40; tick++) {
+    const spot = tick < 20 ? { x: ENTRY_SPAWN.x, z: ENTRY_SPAWN.z } : behindPillar1();
+    if (tick === 25) {
+      a.occupancy.B0 = "visitor-seated";
+      b.occupancy.B0 = "visitor-seated";
+    }
+    for (const kit of [a, b]) {
+      kit.playerKit.state.x = spot.x;
+      kit.playerKit.state.z = spot.z;
+      kit.manager.tick();
+    }
+  }
+  const sequences = (kit: ReturnType<typeof buildTwo>) => kit.rig.params.map((p) => [p.label, p.targets.slice()] as const);
+  assert.deepEqual(sequences(a), sequences(b), "budget + ladder + focus + occlusion compose to the same numbers twice (no clock, no hidden order)");
+  assert.deepEqual(a.rig.connects, b.rig.connects);
+  assert.deepEqual(JSON.stringify(a.manager.state()), JSON.stringify(b.manager.state()), "the debug records (distances, tiers, audible flags) replay identically too");
+});
+
+test("the manager mutates no kernel state on the two-chain budget path either (AD-23: placements, occupancy, pose, volumes, recipe all stay read-only)", () => {
+  const stableScheduler = {
+    state: () => ({
+      tick: 0,
+      cabinets: [
+        { volumeId: "cabinet-B0", gameId: "moon-patrol", occupancy: "patron-autoplay" as Occupancy, runCount: 1, lastSeed: 7, queue: [], rearmTick: 0 },
+        { volumeId: "cabinet-B1", gameId: "moon-patrol", occupancy: "attract" as Occupancy, runCount: 1, lastSeed: 7, queue: [], rearmTick: 0 },
+      ],
+    }),
+  };
+  const rig = createFakeGraph("running");
+  const entryKit = makeEntry("control", 1);
+  const playerKit = makePlayer();
+  const manager = createAudioManager({
+    graph: rig.graph,
+    registry,
+    scheduler: stableScheduler,
+    player: playerKit.player,
+    entry: entryKit.entry,
+    placements: twoPlacements,
+  });
+  // Behind pillar-1: the ticks ride the raycast, the occlusion dwell, the
+  // budget, both ladder chains, and the actuation path in one sweep.
+  const spot = behindPillar1();
+  playerKit.state.x = spot.x;
+  playerKit.state.z = spot.z;
+  const before = {
+    scheduler: JSON.stringify(stableScheduler.state()),
+    player: JSON.stringify(playerKit.state),
+    entryState: JSON.stringify(entryKit.entry.state()),
+    entryPose: JSON.stringify(entryKit.entry.pose()),
+    volumes: JSON.stringify(collisionVolumes),
+    placements: JSON.stringify(twoPlacements),
+    recipe: JSON.stringify(registry[0]!.attractSound),
+  };
+  for (let i = 0; i < DWELL_TICKS + 5; i++) manager.tick();
+  assert.equal(JSON.stringify(stableScheduler.state()), before.scheduler, "occupancy is scheduler-owned: the manager reads state() and writes nothing back (AD-23)");
+  assert.equal(JSON.stringify(playerKit.state), before.player, "the listener pose is player-owned: the budget measures it, never touches it");
+  assert.equal(JSON.stringify(entryKit.entry.state()), before.entryState, "the beat state is entry-owned");
+  assert.equal(JSON.stringify(entryKit.entry.pose()), before.entryPose, "the beat pose is entry-owned");
+  assert.equal(JSON.stringify(collisionVolumes), before.volumes, "the authored volume list is read, never edited");
+  assert.equal(JSON.stringify(twoPlacements), before.placements, "the injected placement list is read, never edited (the 2.0 continuity line, widened)");
+  assert.equal(JSON.stringify(registry[0]!.attractSound), before.recipe, "the registry recipe is data: the synth renders it, nothing writes into it");
+});
+
 test("AD-3: no wall-clock identifiers in core/audio; the audio clock stays confined to the labelled adapter", () => {
   // READDIR, not a hand-list: a hand-picked four files would silently stop
   // covering the scan the moment a fifth lands under core/audio/ (Story
@@ -619,7 +847,7 @@ test("AD-3: no wall-clock identifiers in core/audio; the audio clock stays confi
   const files = readdirSync(path.join(REPO, "core", "audio"))
     .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"))
     .sort();
-  assert.ok(files.includes("manager.ts") && files.length >= 4, "the enumeration sees the real sources");
+  assert.ok(files.includes("manager.ts") && files.includes("budget.ts") && files.length >= 5, "the enumeration sees the real sources, Story 2.2's budget.ts enrolled automatically (AD-3 scan covers the new pure module for free)");
   for (const file of files) {
     const src = readFileSync(path.join(REPO, "core", "audio", file), "utf8")
       .replace(/\/\/[^\n]*/g, "")
