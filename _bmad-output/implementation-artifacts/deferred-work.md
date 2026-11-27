@@ -101,6 +101,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - 2026-11-24T06:44:33Z occurrence=1-6-one-busy-machine-a-patron-actually-plays
 - 2026-11-25T10:56:59Z owner=3-2-the-gate-goes-deterministic-l0-l1-scripts-contract-test-skil by=burndown note=same_browser-harness_tier_as_DW-12;bullet_in_epics.md_3.2
 - 2026-11-27T08:07:29Z occurrence=2-1-core-audio-manager-attract-sound-that-occludes-and-swells by=lead note=audio-glue legs (AudioContext construction, gesture-resume, live param actuation) pinned only at source/fake tier; lead smoke walk is this story's runtime check
+- 2026-11-27T18:46:13Z occurrence=2-2-the-proximity-ladder-and-the-seated-focus-mix-tuned-in by=lead note=by-ear read-claims (doorway ladder ordering, approach swell, seated collapse tuned-in) pinned only at param/fake tier; same browser/audio-runtime tier; DW-52 dropped as this occurrence's duplicate
 
 ### DW-16: Front wall open above the door head: no lintel volume over the door gap (visible see-through band y 2.1-3.0 when looking up at the door; 13cm recess behind the panel)
 - source: spec-1-3-the-arcade-room-slots-pillars-zones-and-the-roadmap-wall.md | severity: med | fix-risk: med | footprint: in-story
@@ -309,8 +310,15 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: spec-2-2-the-proximity-ladder-and-the-seated-focus-mix-tuned-in.md frontmatter deferred: | severity: low | fix-risk: med | footprint: cross-cutting
 - evidence: pure-law literal pins + fake-AudioContext rig + literal param targets are this story's falsifiable tier (2.1 posture; no browser-E2E harness until Epic 3); lead smoke walk plus Epic-3 harness are the executed tier
 - 2026-11-27T14:11:48Z status=open owner=2-2-the-proximity-ladder-and-the-seated-focus-mix-tuned-in by=harvest note=same browser-harness tier as DW-15
+- 2026-11-27T18:46:14Z status=dropped by=lead note=duplicate-of-DW-15; occurrence trailer lands on DW-15; browser/audio-runtime tier already carried there (Epic 3 3.2/3.15 closes it)
 
 ### DW-53: Recipe-less placed chains still wake, hold a NEAREST_N budget seat, and act as the ladder's nearest other - a never-sounding cabinet can budget-silence or ladder-duck real machines behind it
 - source: spec-2-2-the-proximity-ladder-and-the-seated-focus-mix-tuned-in.md frontmatter deferred: | severity: low | fix-risk: low | footprint: in-epic
 - evidence: one root cause behind BH-4 + EG-1/EG-2; real behavior, unreachable in shipped data (sole authored placement embeds its attract recipe); documented in core/audio/budget.ts header; law keys on placement until 3.7 rules the authored-data call
 - 2026-11-27T14:12:01Z status=open owner=2-2-the-proximity-ladder-and-the-seated-focus-mix-tuned-in by=harvest note=authored-data call for 3.7
+- 2026-11-27T18:46:14Z status=routed owner=3-7-the-l2-room-audit-whole-room-proof-and-the-numbers-that-make by=lead note=authored-data/law call: never-sounding recipe-less cabinet can budget-silence or ladder-duck real machines; address or decline together with DW-50/DW-51/DW-54 at 3.7
+
+### DW-54: Seated (visitor-occupied) cabinets hold no budget priority: in a 4+ awake-chain room the farthest seated machine can fall out of the NEAREST_N selection while every other mix layer treats it as the focus center
+- source: spec-2-2-the-proximity-ladder-and-the-seated-focus-mix-tuned-in | severity: med | fix-risk: med | footprint: in-epic
+- evidence: uniform nearest-N is spec-prescribed and the seated chain's attract is gate-silent today, so no audible harm in shipped data; room growth plus play-mode audio over the focused chain is the authored-law call; mechanism-adjacent to DW-53
+- 2026-11-27T18:33:55Z status=routed owner=3-7-the-l2-room-audit-whole-room-proof-and-the-numbers-that-make by=cr note=address or decline with DW-50/DW-51/DW-53; a focus-priority leg in computeBudget would be the shape if wanted
