@@ -2,9 +2,10 @@
 title: 'Story 2.1: Core Audio Manager — attract sound that occludes and swells'
 type: 'feature'
 created: '2026-11-26'
-status: 'ready-for-dev'
+status: 'done'
+baseline_revision: '09a273bfdbe0c390e9cd56763edea2d8d037c724'
 review_loop_iteration: 0
-followup_review_recommended: false
+followup_review_recommended: true
 context:
   - _bmad-output/planning-artifacts/architecture/architecture-local-arcade-2026-11-19/ARCHITECTURE-SPINE.md
   - _bmad-output/implementation-artifacts/epic-2-context.md
@@ -118,7 +119,42 @@ deferred:
 
 ## Spec Change Log
 
+- [implement 2026-11-26] Scanner defect found by the falsifiability pass, fixed in-pass: `ci/lint-bans.mjs`'s unstable scanner lexes each backtick independently, so the CLOSING backtick of a `${...}` template literal starts a fresh literal and swallows the rest of the file (or the next backtick) into one token — any code after a substituted template was invisible to every rule. The witness "plant `new AudioContext` in the adapter -> lint-bans red" ran GREEN through the planted line because `games/moon-patrol/presentation/adapter.js:57` carries a substituted template. Fix: `scanTokens` re-arms at each substitution tail (literal parts stay opaque; contents scan as code; character-wise walk to the next `${` or closing backtick). This also hardens the pre-existing sim-path bans against future templates. A new `ci/lint-bans.test.ts` test pins that code after a substituted template stays visible to every rule in both halves. No AC or Design Note changed — the spec's lint task ("new rule + extended scan set") stands; the scanner fix is the precondition for the AC's guarantee to hold on the real tree.
+
+- [implement-review 2026-11-26] Listener actuation added (review I1/E1). The intent's spatial law says the listener-pose + HRTF panners carry the positional change — but the shipped first pass never actuated the listener, so attenuation was pinned against wherever the browser left the default listener. The seam gained `setListenerPosition(x,y,z)`, `RawContext.listener` (`RawParamTriple`), and the adapter's third labelled clock site (one `currentTime` read, three `setTargetAtTime` writes); `tick()` drives it from the ear rule (player pose in control/workbench, entry pose pre-control) while the graph runs. The AD-3 source pin now counts exactly 3 `currentTime` occurrences in `manager.ts` (field + param stamp + listener stamp). No AC text changed — the intent contract always required this; the implementation was caught missing it.
+- [implement-review 2026-11-26] Guarded boot graph + silent fallback (review B1). An insecure origin (plain http) has no `AudioContext` global, and construction can throw (hardware/policy); the unguarded construction inside `bootArcade` fell to the boot gate's catch — a working room traded for the workbench. `core/main.ts` now builds its graph via `buildAudioGraph()` (typeof guard + construction try/catch, both landing on `createSilentGraph()` — the inert, permanently-suspended fallback no gesture can resurrect), pinned by the glue source pins and new inertness tests. AD-15 posture; no AC text changed.
+- [implement-review 2026-11-26] Review-pass hardening batch (each its own root cause, all pinned): `mix.ts` profile lookup reads the caller-threaded volume list instead of a module-level id→kind map (E4); `ci/lint-bans.mjs` graph-ban receivers widened to the global aliases `self`/`top`/`parent`/`global` and the keyword-lexed `global` token accepted, violation reports deduped by position+rule (B5/E5/B6/V4); gen-registry gates `sampleRate` to the `createBuffer` range `[8000, 192000]` and rejects recipes whose rounded render is empty (E2); a dead-band invariant pin asserts every authored occluder stays fatter than `2 x DEADBAND_M` on every axis (B4/E3 — the general thin-volume clamp stays a 3.7 pass); dead `occluderVolumes` export removed and `SMOOTHING_S`/`SPEAKER_HEIGHT_M`/the panner law now pinned as literals (B7/V3); the main.ts timer pin tightened to the call form `set(Timeout|Interval)\s*\(` (B8/I6); Rule 14 — literal em-dashes in this story's assertion-message strings replaced by Unicode escape sequences in the source (I4). No AC or Design Note changed.
+
 ## Review Triage Log
+
+### 2026-11-26 — Review pass (first pass, four layers, 24 findings)
+
+Verdicts: 24 findings — high 0, medium 9, low 15, false 0, maybe-false 0. Patched 21, rejected 3. One shared root cause groups: B4/E3 (dead-band thin-volume exposure), B5/E5 (lint receiver set), B6/V4 (duplicate lint reports), B7/V3 (dead export + unpinned smoothing), B8/I6 (timer regex), E1/I1 (listener never actuated), B2/V1 (adapter executed-tier).
+
+- [B1][medium][patch] `core/main.ts` constructed `AudioContext` ungarded inside the boot try — insecure origin or throwing constructor loses the room to the workbench. Fix: `buildAudioGraph()` guard legs + `createSilentGraph()` fallback; glue pins + inertness tests.
+- [B2][medium][patch] The browser adapter (`createWebAudioGraph`) had no executed test — only the fake-graph seam it feeds was exercised. Fix: shadow-RawContext test runs the real adapter in Node (loop flag, lowpass type, panner law on the node, stamped params, listener triple, connects, buffer copy).
+- [B3][low][patch] Silent cabinet (registry entry without a recipe) untested. Fix: test asserts full chain, no buffer/source, debug `hasRecipe: false`, `gameId: ""`.
+- [B4][low][patch] Thin authored occluders would silently invert under the dead-band shrink; nothing caught drift in `DEADBAND_M`. Fix: invariant pin over the authored list (door z 0.120 thinnest leg); general clamp deferred to 3.7 (noted in Auto Run Result).
+- [B5][medium][patch] Graph-ban receivers stopped at `globalThis`/`window`: `self.AudioContext` etc. walked green in both halves. Fix: `WEBAUDIO_RECEIVERS` widened; `global` accepted as keyword token; alias fixtures pin each receiver.
+- [B6][low][patch] One physical reference could report twice (destructure leg + bare leg own one position). Fix: dedupe by `file:line:col:rule`; count pins.
+- [B7][low][patch] Dead `occluderVolumes` export; `SMOOTHING_S` unpin-as-literal. Fix: export removed; literal pins for `SMOOTHING_S`, `SPEAKER_HEIGHT_M`, and the full `PANNER_SETUP`.
+- [B8][low][patch] The no-timer glue pin's regex had word-order slack. Fix: `set(Timeout|Interval)\s*\(` call-form pin; W14 witness planted.
+- [B9][low][patch] The synth output clamp leg was dead code for the authored recipe (amps never sum past 1). Fix: overlapping full-amp notes saturate exactly ±1 (W7/Witness shows the pin catches it).
+- [E1][medium][patch] Same root cause as I1: listener never actuated. Fix above (listener seam + adapter stamp + tick wire + follow tests).
+- [E2][medium][patch] gen-registry accepted recipes that throw at boot (sampleRate 4000, sub-sample loops). Fix: createBuffer-range bound + empty-render guard, both pinned; W11 witness.
+- [E3][medium][patch] Same root cause as B4. Fixed with the invariant pin.
+- [E4][low][patch] `profileForApplied` read a module-level kind map, ignoring the caller's volume list — a threaded-scene caller gets wrong profiles. Fix: lookup reads the injected list; injection-observable pin (W15 witness).
+- [E5][medium][patch] Same root cause as B5. Fixed with the receiver widening.
+- [V1][medium][patch][pre-verified] The adapter had no executed test host (pre-verified gap, trust as filed). Fix: same shadow-RawContext tier as B2 — the adapter now executes under Node.
+- [V2][medium][patch] Four AC claims (looped source, listener law, silent cabinet, swell/gain actuation while suspended) had pins but no demonstrated mutation witness. Fix: W1-W6/W8 witnesses recorded in `## Verification`.
+- [V3][low][patch] Same root cause as B7. Fixed.
+- [V4][low][patch] Same root cause as B6. Fixed.
+- [I1][medium][patch] Same root cause as E1 — intent matrix row 1 (positional change rides the listener) unimplemented. Fixed; listener-follow + suspended-no-write tests pin it.
+- [I2][low][reject] Claim: the swell's phase window (boot-check/door/ready-handle/open) is not re-pinned in mix law tests. Rejected: Design Note 5's one-law reading — `bleedFraction` IS the swell, and the window is pinned by 1.9's entry-phase law; a mix-side phase-window list would duplicate the source of truth (fix would edit this build's own contract reading).
+- [I3][low][reject] Claim: adapter reads `ctx.currentTime`, a wall-clock-ish read in `core/`. Rejected: Design Note 8 labels exactly this boundary; the AD-3 pin confines the count to the three labelled sites — the guard the finding wants already exists and adding another would widen the scan without new law.
+- [I4][low][patch] Rule 14: literal em-dashes inside this story's string literals. Fix: Unicode escape sequences in the source across the touched test files (pre-existing literals in older-story files left untouched — not this build's lines).
+- [I5][low][reject] Claim: the AD-15 fault posture (audio system throwing) is not exercised in this story. Rejected: the registration posture (supervisor-wrapped system after patrons/seat) is delivered and pinned by the glue pins; the fault law itself is 1.7's containment supervisor and already pinned there — re-pinning in 2.1 adds a branch to an owned-elsewhere law.
+- [I6][low][patch] Same root cause as B8 (timer regex). Fixed.
 
 ## Design Notes
 
@@ -152,6 +188,35 @@ deferred:
 - `node tools/gen-registry.mjs && git diff --exit-code -- generated/` (loop) -- expected: no registry drift.
 - `npm run build` (once, at story end) -- expected: clean static bundle.
 
+**Mutations demonstrated (implement pass, 2026-11-26; each applied → red → reverted, tree byte-identical):**
+- mutation: delete the dwell counter in `advanceDwell` (candidate applies on first match) → `core/audio/mix.test.ts` dwell-flip + alternating-flap + release-dwell pins red (3 fail)
+- mutation: `DEADBAND_M = 0` → `core/audio/occlusion.test.ts` grazing-pin + over-pillar-top pin red (2 fail)
+- mutation: swap the `wall` and `door` entries of `OCCLUSION_PROFILES` → `core/audio/mix.test.ts` "mix law literals" door pin red (0.125 → 0.03125)
+- mutation: `occupancyGate` to idle-only (nonzero only while `attract`) → `core/audio/mix.test.ts` busy-cabinet autoplay pin red
+- mutation: drop `"door"` from `OCCLUDER_KINDS` → `core/audio/occlusion.test.ts` kind-set pin + street door-front pin red (2 fail)
+- mutation: plant `new AudioContext()` in `games/moon-patrol/presentation/adapter.js` after the substituted template at :57 → `node ci/lint-bans.mjs` exit 1 naming no-webaudio-graph. First attempt ran GREEN through the planted line: the unstable scanner swallowed everything after a substituted template's closing backtick into one token — see Spec Change Log; fixed by re-arming `scanTokens` at substitution tails, pinned by a new `ci/lint-bans.test.ts` test (code after a substituted template stays visible to every rule, in both halves).
+- mutation: `attract-sound.json` gain 0.45 -> 0.46 → `core/audio/synth.test.ts` hash-of-samples pin red, and regenerated `generated/game-registry.ts` bytes drift (md5 6c7d42dd -> a62ad497), restored on revert.
+- mutation: drop `source.connect(lowpassNode)` in `manager.ts` → `core/audio/manager.test.ts` one-owned-chain topology pin red (connects array misses the source->lowpass leg).
+- mutation: add `void Date.now();` inside `mixStep` → `core/audio/manager.test.ts` AD-3 no-wall-clock source-scan pin red (`core/audio/mix.ts` flagged).
+
+**Mutations demonstrated (review-pass patches, 2026-11-26; each applied → red → reverted, tree byte-identical by sha256):**
+- mutation: `source.loop = true` -> `false` in the adapter → `manager.test.ts` adapter test red ("the attract source is a forever-loop") — records the looped-source AC leg (V2).
+- mutation: delete `filter.type = "lowpass";` → adapter test red ("the adapter SETS the colouration type") — records the lowpass-leg AC leg (V2).
+- mutation: delete the `setListenerPosition` call in `tick()` → "the listener follows the ear" test red — records the positional-change law (I1/E1).
+- mutation: `SPEAKER_HEIGHT_M = 1.5` -> `1.4` → HRTF-panner literal pin red (every derived pin rides the constant; only the literal catches it) — records the panner AC leg (V2).
+- mutation: `swellFactor` body -> `return 1;` → `mix.test.ts` swell + mix-law pins red (2), `manager.test.ts` door-swell pin red (1) — records the swell AC leg (V2).
+- mutation: delete `if (silent) continue;` in `tick()` → autoplay-blocked pin red — records the suspended-actuation AC leg (V2).
+- mutation: module counter added to the synth sample sum → `synth.test.ts` hash + seam + clamp + wave pins red (4) — records the determinism AC leg (V2).
+- mutation: drop the `game?.attractSound !== undefined` guard → silent-cabinet test red (construction throws on the missing recipe) — records the silent-attract path (B3).
+- mutation: remove `self` from `WEBAUDIO_RECEIVERS` → lint-bans alias test red — records the widened receiver set (B5/E5).
+- mutation: `DEADBAND_M = 0.05` -> `0.07` → dead-band invariant pin red naming `door-front` (z 0.120; 0.06 floats a hair past it) — records the thin-occluder exposure (B4/E3).
+- mutation: gen-registry `sampleRate` bounds -> positivity-only AND empty-render guard -> `false` → `tools/gen-registry.test.ts` attractSoundPath test red (the 4000 case emits happily) — records the boot-throw gate (E2).
+- mutation: delete the `typeof AudioContext === "undefined"` guard leg in `main.ts` → 2.1 audio-wiring glue pin red — records the guarded-boot posture (B1).
+- mutation: disable the lint-bans violation dedupe (`if (false) continue;`) → destructure count pin red (4 != 3) — records the single-report law (B6/V4).
+- mutation: plant `setTimeout(() => {}, 0);` inside `buildAudioGraph` → 2.1 audio-wiring glue timer pin red — records the gesture-driven resume law (B8/I6).
+- mutation: drop the `input.volumes` wire from `profileForApplied` in `mixStep` → "profile lookup reads the INJECTED volume list" pin red — records the injection law (E4).
+- mutation: `SMOOTHING_S = 0.15` -> `0.2` → adapter test red at the literal smoothing pin — records the authored glide constant (B7/V3).
+
 `Shared surfaces:` `tools/registry-list.json` + `generated/game-registry.ts` (read by gen-registry.test.ts, registry-e2e.test.ts, the drift command — the new optional field must ride the same change set so no loop command passes against a partial edit); `GameRegistryEntry` in `core/contract/wrapper.ts` (contract seam; wrapper.test.ts); `ci/lint-bans.mjs` scan set + rule table (lint-bans.test.ts); `window.arcadeDebug` in core/main.ts (entry/visit-arc test readers). Hermeticity: every test added or changed passes on a fresh environment, in either order; no `core/audio/` test touches :5173, another test's state, or execution order.
 
 **Manual checks:**
@@ -160,7 +225,17 @@ deferred:
 
 ## Auto Run Result
 
-Status: ready-for-dev
+Status: done
 Blocking condition: none
 
-Planning-stage halt per dispatch (`Halt after planning.`). The spec above is the contract; implement stage records `baseline_revision` at its clean-tree start. The epic-2-context cache (compile attempt 4) was validated current (newer than every planning-artifacts file) and reused, not recompiled. Uncommitted spec is staged for the lead's validation gate — nothing committed or pushed.
+**Summary.** Story 2.1 delivered as specced: one Core Audio Manager (`core/audio/manager.ts`) owns the single injected graph with one looping source -> lowpass -> gain -> HRTF panner chain per placed Cabinet; pure occlusion (`occlusion.ts`, single-ray slab-clip with the dead-band) and pure mix law with dwell hysteresis (`mix.ts`); deterministic PCM synth (`synth.ts`) rendering the Moon Patrol recipe that `gen-registry` validates and inlines (sealed bundle); the door beat's sound twin rides `bleedFraction`; the L0 graph ban covers both plugin halves; boot construction is guarded and falls to a silent fallback graph instead of the workbench. All 8 Design Note decisions landed; the review pass added the listener actuation the intent required (see Spec Change Log).
+
+**Files.** 21 files changed vs baseline 09a273b (+2372/-29): new `core/audio/{manager,mix,occlusion,synth}.ts` + their co-located suites (1682 lines across the 8 files); touched `core/main.ts` (buildAudioGraph, system seat, gesture resume, debug record), `core/main-glue.test.ts` (2.1 pins), `core/contract/{index,wrapper}.ts` (`attractSound` seam), `ci/lint-bans.mjs/.test.ts` (both-halves scan, widened receivers, dedupe), `tools/gen-registry.mjs/.test.ts`, `tools/registry-list.json`, `generated/game-registry.ts` (regenerated), `games/moon-patrol/assets/attract-sound.json`, `docs/game-authoring.md` (checklist wording), this spec.
+
+**Review breakdown (first pass, 24 findings: 0 high, 9 medium, 15 low).** 21 patched across 7 shared root causes (rows carry the fix applied); 3 rejected: I2 (swell window re-pin would duplicate the 1.9 entry law against Design Note 5's one-law reading), I3 (the labelled `currentTime` boundary is Design Note 8's own contract and the AD-3 pin fences its count), I5 (the fault law is 1.7's supervisor, already pinned there; 2.1's registration posture is delivered and pinned). Full rows in `## Review Triage Log`.
+
+**Follow-up recommendation.** `followup_review_recommended: true` (first pass, six medium findings patched). Recommend the lead re-run review at the code-review stage after 2.2 layers onto this Manager, and keep 3.7's authored-audio pass carrying: final profile/smoothing/dwell/dead-band numbers, the general thin-occluder clamp (this pass only pinned the invariant on the authored list), a build-time note when overlapping recipe amps sum past 1, and the 1.3/2.1 rayclip unification (Design Notes, "Extend, don't copy").
+
+**Verification performed.** `npm run typecheck` clean; `npm test` 425/425 green (the four `core/audio/` suites plus `ci/lint-bans.test.ts` 17/17, `tools/gen-registry.test.ts` 9/9, `core/main-glue.test.ts` 12/12 also green run standalone — hermeticity); `node ci/depcheck.mjs` clean; `node ci/lint-bans.mjs` clean on the real tree; `node tools/gen-registry.mjs` re-emits byte-identical to the staged generated module (the drift command shows the intended `attractSound` addition against the pre-change commit — the story's own change set); `npm run build` clean once. 25 mutation witnesses total (9 implement-pass + 16 review-pass) each applied, observed red, reverted byte-identical (sha256-verified) — lines recorded in `## Verification`.
+
+**Residual risks (honest tier statement).** Executed tiers: fake-AudioContext graph rig, pure-law literal pins, source-text pins, and the browser adapter run under a shadowed RawContext in Node. NOT executed anywhere in this story: any browser or audio-runtime tier — real HRTF listener following, by-ear localization, the audible door swell, and the live autoplay gesture wiring are pinned only at source/fake level and deferred to the lead's smoke / the Epic-3 harness (the frontmatter `deferred:` item stands). A browser-glue edit that keeps main.ts's pinned source text intact would ship silent with this suite green.

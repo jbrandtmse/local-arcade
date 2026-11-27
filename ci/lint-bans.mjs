@@ -1,9 +1,18 @@
 #!/usr/bin/env node
-// L0 sim-path lint bans (AD-4/AD-8 subset; the full L0 gate is Epic 3).
-// Scans games/<game-id>/sim/** for nondeterminism sources: Math.random,
+// L0 lint bans over BOTH plugin halves (AD-4/AD-8/AD-7 subset; the full L0
+// gate is Epic 3).
+// games/<game-id>/sim/** gets the nondeterminism bans: Math.random,
 // Date.now, performance.now, and engine-variable Math transcendentals
 // (sin/cos/tan/asin/acos/atan2/pow/exp/log — replace with the core/contract
-// math module). The rules bind FORMS, not spellings: member chains (dot and
+// math module).
+// games/<game-id>/presentation/** is scanned for ONE rule only:
+// no-webaudio-graph (Story 2.1, AD-7) — any AudioContext/webkitAudioContext/
+// OfflineAudioContext reference (bare, new, dotted or bracket on a global
+// receiver (globalThis/window/self/top/parent/global), or destructured out
+// of one) is red in BOTH halves: the Core Audio Manager owns the one
+// graph; games supply assets and requests, never nodes. The wall-clock rules stay sim-only (presentation
+// halves may use Math.random — the render half is outside the replay law).
+// The rules bind FORMS, not spellings: member chains (dot and
 // optional-chain), bracket-string access, destructured-global binding sources
 // (renaming the binding does not launder the source name), and bare
 // Date/performance identifiers (no-date-use / no-performance-use — wall-clock
@@ -61,12 +70,12 @@ function listSourceFiles(dir) {
   return found;
 }
 
-function simFiles() {
+function halfFiles(half) {
   if (!statSyncSafe(gamesDir).isDirectory()) return [];
   const files = [];
   for (const gameId of readdirSync(gamesDir)) {
-    const simDir = path.join(gamesDir, gameId, "sim");
-    if (statSyncSafe(simDir).isDirectory()) files.push(...listSourceFiles(simDir));
+    const dir = path.join(gamesDir, gameId, half);
+    if (statSyncSafe(dir).isDirectory()) files.push(...listSourceFiles(dir));
   }
   return files;
 }
@@ -134,11 +143,32 @@ function regexEnd(text, open) {
   return -1;
 }
 
+// The unstable scanner lexes each backtick independently and never knows
+// a `${...}` substitution CLOSED: at the template's closing backtick it
+// starts a fresh literal and swallows the rest of the file (or the next
+// backtick) into one token. So after each substitution-closing `}`, the
+// tail text is consumed character-wise to the next `${` (re-arm the
+// scanner inside the substitution) or to the closing backtick (template
+// over, normal scanning resumes). Literal parts stay one opaque token;
+// substitution contents are scanned as code, so bans see identifiers
+// inside them (a planted `new AudioContext()` inside a template leg is
+// as red as one in a statement).
+function templateTailEnd(text, closeBrace) {
+  for (let i = closeBrace + 1; i < text.length; i++) {
+    const c = text[i];
+    if (c === "\\") i++;
+    else if (c === "`") return { end: i + 1, closed: true };
+    else if (c === "$" && text[i + 1] === "{") return { end: i + 2, closed: false };
+  }
+  return { end: text.length, closed: true }; // unterminated: consume to EOF
+}
+
 function scanTokens(text) {
   const scanner = createScanner();
   scanner.setText(text);
   const isTrivia = (t) => t >= SyntaxKind.FirstTriviaToken && t <= SyntaxKind.LastTriviaToken;
   const toks = [];
+  const openSubsts = []; // one frame per open template: brace depth inside the substitution
   let guard = 0;
   let prevCode = SyntaxKind.Unknown;
   while (guard++ < text.length + 16) {
@@ -156,6 +186,30 @@ function scanTokens(text) {
         scanner.setText(text, end);
         continue;
       }
+    }
+    if (kind === SyntaxKind.TemplateHead) {
+      openSubsts.push({ brace: 0 });
+      toks.push({ kind, value: scanner.getTokenValue(), pos });
+      prevCode = kind;
+      continue;
+    }
+    if (openSubsts.length > 0) {
+      const frame = openSubsts[openSubsts.length - 1];
+      if (kind === SyntaxKind.OpenBraceToken) frame.brace++;
+      else if (kind === SyntaxKind.CloseBraceToken && frame.brace === 0) {
+        // This `}` closes the substitution (not a nested block): consume
+        // the template tail up to the next `${` or the closing backtick.
+        const tail = templateTailEnd(text, pos);
+        toks.push({
+          kind: tail.closed ? SyntaxKind.TemplateTail : SyntaxKind.TemplateMiddle,
+          value: text.slice(pos, tail.end),
+          pos,
+        });
+        prevCode = tail.closed ? SyntaxKind.NoSubstitutionTemplateLiteral : SyntaxKind.TemplateHead;
+        if (tail.closed) openSubsts.pop();
+        scanner.setText(text, tail.end);
+        continue;
+      } else if (kind === SyntaxKind.CloseBraceToken) frame.brace--;
     }
     toks.push({ kind, value: scanner.getTokenValue(), pos });
     prevCode = kind;
@@ -323,25 +377,127 @@ function bareWallclockHits(toks) {
   return hits;
 }
 
+// Story 2.1 (AC: the L0 ban covers BOTH halves): no-webaudio-graph. Any
+// reference to the WebAudio context family is the graph-building substance
+// itself — the Core Audio Manager owns the one graph (AD-7); a game half
+// that names AudioContext is building nodes, not supplying assets. Forms:
+// bare identifier (`new AudioContext`, aliases, extends), dotted/bracket on
+// the globalThis/window receivers, and destructure sources. Property keys
+// named AudioContext name nothing at runtime (colon guard, like the
+// bare-wall-clock rule's); member access ON an object (`ctx.AudioContext`)
+// stays green — same sanctioned posture as obj.Date in the wall-clock leg.
+const NO_WEBAUDIO = "no-webaudio-graph (the Core Audio Manager owns the WebAudio graph; games supply assets and requests, never nodes; AD-7)";
+const WEBAUDIO_NAMES = new Set(["AudioContext", "webkitAudioContext", "OfflineAudioContext"]);
+// The global receivers the graph family can hang off. Wider than the
+// wall-clock value receivers: the ban's whole point is that NO spelling
+// of the global reaches a game half, so self./top./parent./global. are
+// banned receivers here even where they stay sanctioned Math-as-value
+// paths for the wall-clock rules.
+const WEBAUDIO_RECEIVERS = new Set(["globalThis", "window", "self", "top", "parent", "global"]);
+
+function webaudioHits(toks) {
+  const hits = [];
+  for (let i = 0; i < toks.length; i++) {
+    const t = toks[i];
+    // "global" lexes as a keyword token (declare global), not an
+    // Identifier — the receiver leg must see it too.
+    if (t.kind !== SyntaxKind.Identifier && t.kind !== SyntaxKind.GlobalKeyword) continue;
+    if (WEBAUDIO_RECEIVERS.has(t.value)) {
+      // globalThis.AudioContext / window["OfflineAudioContext"]: the
+      // receiver leg owns these (sole-owner posture); the bare leg skips
+      // them via the member-link guard below.
+      if (isMemberLink(toks[i + 1])) {
+        // dotted / optional-chain: window.AudioContext, globalThis?.AudioContext
+        const member = toks[i + 2];
+        if (member?.kind === SyntaxKind.Identifier && WEBAUDIO_NAMES.has(member.value)) {
+          hits.push({ rule: NO_WEBAUDIO, pos: t.pos });
+          continue;
+        }
+      }
+      const off = isMemberLink(toks[i + 1]) ? 1 : 0;
+      const open = toks[i + 1 + off];
+      const str = toks[i + 2 + off];
+      const close = toks[i + 3 + off];
+      if (
+        open?.kind === SyntaxKind.OpenBracketToken &&
+        (str?.kind === SyntaxKind.StringLiteral || str?.kind === SyntaxKind.NoSubstitutionTemplateLiteral) &&
+        close?.kind === SyntaxKind.CloseBracketToken &&
+        WEBAUDIO_NAMES.has(str.value)
+      ) {
+        hits.push({ rule: NO_WEBAUDIO, pos: t.pos });
+        continue;
+      }
+    }
+    if (!WEBAUDIO_NAMES.has(t.value)) continue;
+    if (isMemberLink(toks[i - 1])) continue; // property access on some object
+    if (toks[i + 1]?.kind === SyntaxKind.ColonToken) continue; // property key or label
+    hits.push({ rule: NO_WEBAUDIO, pos: t.pos });
+  }
+  return hits;
+}
+
+// Destructured source leg for the WebAudio family (both halves): pulling
+// `{ AudioContext }` out of globalThis/window is aliasing the graph itself.
+// Mirrors the wall-clock destructure walk-back at the value receivers.
+function webaudioDestructureHits(toks) {
+  const hits = [];
+  for (let j = 1; j < toks.length - 1; j++) {
+    if (toks[j].kind !== SyntaxKind.EqualsToken) continue;
+    const src = toks[j + 1];
+    if (src.kind !== SyntaxKind.Identifier || !WEBAUDIO_RECEIVERS.has(src.value)) continue;
+    if (toks[j - 1].kind !== SyntaxKind.CloseBraceToken) continue;
+    let depth = 0;
+    let k = j - 1;
+    for (; k >= 0; k--) {
+      if (toks[k].kind === SyntaxKind.CloseBraceToken) depth++;
+      else if (toks[k].kind === SyntaxKind.OpenBraceToken && --depth === 0) break;
+    }
+    if (depth !== 0) continue; // unbalanced: not a binding pattern we trust
+    for (let m = k + 1; m <= j - 2; m++) {
+      const t = toks[m];
+      if (t.kind !== SyntaxKind.Identifier) continue;
+      if (toks[m - 1]?.kind === SyntaxKind.ColonToken) continue; // renamed binding name, not a source name
+      if (WEBAUDIO_NAMES.has(t.value)) hits.push({ rule: NO_WEBAUDIO, pos: t.pos });
+    }
+  }
+  return hits;
+}
+
 // Hits are merged positionally: every file's stream stays sorted by
-// source position, like the single-pass scanner it replaces.
-function bannedChains(text) {
-  const toks = scanTokens(text);
-  return [...accessHits(toks), ...destructureHits(toks), ...bareWallclockHits(toks)].sort((a, b) => a.pos - b.pos);
+// source position, like the single-pass scanner it replaces. Two legs
+// can OWN the same token positionally (a destructured `{ AudioContext }`
+// or `{ Date }` is hit by the destructure leg AND the bare leg, and a
+// shorthand re-export adds a third) — the per-file report dedupes an
+// identical file:line:col:rule to a single violation, so counts stay
+// honest while the position sort still owns the order.
+function bannedChains(toks) {
+  return [...accessHits(toks), ...destructureHits(toks), ...bareWallclockHits(toks)];
 }
 
 const violations = [];
-for (const file of simFiles()) {
+const halves = [
+  ...halfFiles("sim").map((file) => ({ file, sim: true })),
+  ...halfFiles("presentation").map((file) => ({ file, sim: false })),
+];
+const seenViolations = new Set();
+for (const { file, sim } of halves) {
   const text = readFileSync(file, "utf8");
   const lineStarts = computeLineStarts(text);
-  for (const { rule, pos } of bannedChains(text)) {
+  const toks = scanTokens(text);
+  // The wall-clock/transcendental rules bind the sim half only; the
+  // WebAudio graph ban binds BOTH halves.
+  const legs = sim ? [...bannedChains(toks), ...webaudioHits(toks), ...webaudioDestructureHits(toks)] : [...webaudioHits(toks), ...webaudioDestructureHits(toks)];
+  for (const { rule, pos } of legs.sort((a, b) => a.pos - b.pos)) {
     const { line, col } = lineAndCol(lineStarts, pos);
-    violations.push(`${path.relative(root, file)}:${line}:${col}: ${rule}`);
+    const message = `${path.relative(root, file)}:${line}:${col}: ${rule}`;
+    if (seenViolations.has(message)) continue;
+    seenViolations.add(message);
+    violations.push(message);
   }
 }
 
 if (violations.length > 0) {
   for (const v of violations) console.error(`lint-bans: ${v}`);
-  console.error(`lint-bans: ${violations.length} banned-API use(s) in sim paths`);
+  console.error(`lint-bans: ${violations.length} banned-API use(s) in plugin halves`);
   process.exit(1);
 }

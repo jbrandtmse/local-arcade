@@ -7,6 +7,8 @@ export { createGate, gateDeep, toPlain, type TickGate } from "./freeze.ts";
 export { canonicalSerialize, fnv1a64, stateHashOf } from "./hash.ts";
 export {
   createGameInstance,
+  type AttractSound,
+  type AttractSoundNote,
   type GameCanvasLike,
   type GameControls,
   type GameInstance,

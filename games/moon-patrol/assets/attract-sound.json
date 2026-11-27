@@ -1,0 +1,24 @@
+{
+  "sampleRate": 22050,
+  "loopSeconds": 1.6,
+  "wave": "square",
+  "gain": 0.45,
+  "notes": [
+    { "start": 0.0, "end": 0.12, "freq": 82.41, "amp": 0.3 },
+    { "start": 0.2, "end": 0.32, "freq": 82.41, "amp": 0.3 },
+    { "start": 0.4, "end": 0.52, "freq": 110.0, "amp": 0.3 },
+    { "start": 0.6, "end": 0.72, "freq": 110.0, "amp": 0.3 },
+    { "start": 0.8, "end": 0.92, "freq": 82.41, "amp": 0.3 },
+    { "start": 1.0, "end": 1.12, "freq": 82.41, "amp": 0.3 },
+    { "start": 1.2, "end": 1.32, "freq": 110.0, "amp": 0.3 },
+    { "start": 1.4, "end": 1.52, "freq": 82.41, "amp": 0.3 },
+    { "start": 0.1, "end": 0.28, "freq": 329.63, "amp": 0.42 },
+    { "start": 0.3, "end": 0.48, "freq": 493.88, "amp": 0.42 },
+    { "start": 0.5, "end": 0.68, "freq": 587.33, "amp": 0.42 },
+    { "start": 0.7, "end": 0.88, "freq": 493.88, "amp": 0.42 },
+    { "start": 0.9, "end": 1.08, "freq": 659.25, "amp": 0.42 },
+    { "start": 1.1, "end": 1.28, "freq": 587.33, "amp": 0.42 },
+    { "start": 1.3, "end": 1.48, "freq": 493.88, "amp": 0.42 },
+    { "start": 1.5, "end": 1.58, "freq": 392.0, "amp": 0.42 }
+  ]
+}

@@ -190,8 +190,9 @@ test("1.4 cabinet wiring: the phase advances as a kernel system, coin doors togg
   assert.ok(body.includes("three.markTextureUpdated(s.texture)"), "a repaint marks the SAME texture dirty (no second canvas)");
   // 1.9 moved pin: the arcadeDebug line gains the entry sequence (phase +
   // timeToPlayableMs + failNow) beside the rest — console-only, zero UI.
+  // 2.1 moved it again: the line gains the Core Audio Manager.
   assert.ok(
-    MAIN.includes("window.arcadeDebug = { player, loop, cabinets, seat, scheduler, presenter, containment, storage, entry };"),
+    MAIN.includes("window.arcadeDebug = { player, loop, cabinets, seat, scheduler, presenter, containment, storage, entry, audio };"),
     "the console smoke can read the cabinet runtime, the seat cycle (1.5), the Patron scheduler + figure presenter (1.6), the containment handle with injectFault (1.7 — the smoke drives a REAL fault chain), the storage/identity service (1.8 — the smoke reads visitorId + rowsFor), and the entry sequence (1.9 — phase, the timeToPlayableMs measurement, and failNow to drive the workbench swap through the real law) — console-only, zero UI (AD-24)",
   );
   for (const banned of ["performance.now", "Date.now", "Math.random", "tickCount"]) {
@@ -474,4 +475,46 @@ test("1.9 entry-beat wiring: the whole boot runs inside ONE bootArcade() under a
   assert.ok(renderAt >= 0 && stampAt > renderAt, "the frame stamp rides AFTER the render call returned (a throwing render never counts — while ZERO frames have rendered the stall law drives the workbench, AC4; a wedge AFTER the first rendered frame is outside this story's matrix — deferred, review pass 1)");
   // Debug surface gains the entry (console-only trigger for the swap).
   assert.ok(MAIN.includes("entry: EntrySequence;"), "the arcadeDebug type carries the entry sequence");
+});
+
+// Story 2.1 (AC: one manager, one graph): the boot wiring pins — exactly
+// one AudioContext construction site in the boot body, the audio system
+// registered after patrons/seat (the mix reads this tick's settled
+// occupancy), the three wired gestures each carry a resume attempt, and
+// arcadeDebug gains the manager. The existing input pin substrings
+// (canvasClick, mouseDown, key(e.code, true)) stay byte-unchanged above.
+test("2.1 audio wiring: one AudioContext construction, audio after seat, gesture-driven resume, arcadeDebug carries the manager", () => {
+  const constructions = MAIN.match(/new AudioContext\(/g) ?? [];
+  assert.equal(constructions.length, 1, "exactly one AudioContext construction site in main.ts \u2014 the repo's one graph (AD-7)");
+  assert.ok(MAIN.includes("graph: buildAudioGraph(),"), "the manager gets its graph from ONE guarded site (the seam idiom, like the Three injection)");
+  assert.ok(MAIN.includes("return createWebAudioGraph(new AudioContext());"), "the sole construction is injected into the manager's browser adapter");
+  // The boot gate (AC4) turns a THROWING boot into the workbench — so an
+  // insecure origin (no AudioContext global on plain http) or a throwing
+  // constructor must take the silent graph INSIDE bootArcade, never reach
+  // that gate: audio absence is silent, never a lost room (AD-15).
+  assert.ok(
+    MAIN.includes('if (typeof AudioContext === "undefined") return createSilentGraph();') &&
+      MAIN.includes("} catch {\n      return createSilentGraph();\n    }"),
+    "no AudioContext global AND a construction throw both fall to the silent graph (mutation: delete either leg and the room dies on a blocked-audio environment \u2014 red here)",
+  );
+
+  // AD-15/AD-23: audio joins the system order AFTER patrons/seat, so every
+  // tick mixes against this tick's settled occupancy.
+  const patronsAt = MAIN.indexOf('loop.addSystem("patrons"');
+  const seatAt = MAIN.indexOf('loop.addSystem("seat"');
+  const audioAt = MAIN.indexOf('loop.addSystem("audio"');
+  assert.ok(patronsAt > 0 && seatAt > patronsAt && audioAt > seatAt, "registration order: ... patrons -> seat -> audio");
+  assert.ok(MAIN.includes('loop.addSystem("audio", () => audio.tick());'), "the manager body is one supervisor-wrapped system call (AD-15)");
+
+  // Autoplay law at the device edge: click, mousedown and keydown each
+  // attempt one resume (rejected attempts are swallowed in the manager and
+  // retried by the next gesture — no timer in main.ts for it).
+  assert.ok(MAIN.includes('canvas.addEventListener("click", () => audio.requestResume());'), "click attempts resume");
+  assert.ok(MAIN.includes('window.addEventListener("mousedown", () => audio.requestResume());'), "mousedown attempts resume");
+  assert.ok(MAIN.includes('window.addEventListener("keydown", () => audio.requestResume());'), "keydown attempts resume");
+  assert.ok(!/\bset(Timeout|Interval)\s*\(/.test(MAIN), "resume is gesture-driven: no setTimeout/setInterval CALL anywhere in the glue (the pin bans the call form, not any pair of words around 'audio')");
+
+  // Debug surface carries the manager (mix numbers are plain data; the
+  // by-ear claim is browser-tier, never made from here).
+  assert.ok(MAIN.includes("audio: AudioManager;"), "the arcadeDebug type carries the audio manager");
 });

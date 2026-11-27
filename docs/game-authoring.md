@@ -9,9 +9,13 @@ A game is a two-part plugin — you never touch Core code:
 ```text
 games/<game-id>/
   sim/            # pure deterministic rules. No three, no WebAudio, no DOM, no window.
-  presentation/   # three.js adapter binding sim state to the cabinet's screen/marquee/audio.
+  presentation/   # three.js adapter binding sim state to the cabinet's screen/marquee.
+                  #   No WebAudio either (Story 2.1, AD-7): the one Core Audio
+                  #   Manager owns the graph; you supply the attract recipe.
   manifest.json   # written by the Registration skill, never by hand.
-  assets/         # art, audio, impulse mapping, dialogue trees.
+  assets/         # art, attract-sound recipe (attract-sound.json, plain data
+                  #   validated + inlined by the generator at build), impulse
+                  #   mapping, dialogue trees.
 ```
 
 The sim half must run headless in Node in seconds — that's what the CI gates consume. If your rules can't run without a browser, the split is wrong.
@@ -143,6 +147,7 @@ Written by the Registration skill against `ci/manifest-schema.json`; relevant to
 Run before asking for review — every line is a lint rule:
 
 - [ ] sim half imports nothing from `three`, WebAudio, DOM/window, or other games
+- [ ] neither half names `AudioContext`/`webkitAudioContext`/`OfflineAudioContext` (bare, `new`, on any global receiver — `globalThis`/`window`/`self`/`top`/`parent`/`global` — or destructured) — the Core Audio Manager owns the one graph; your attract sound is an `assets/attract-sound.json` recipe, never a node (Story 2.1, AD-7; `node ci/lint-bans.mjs` checks both halves)
 - [ ] no `Math.random`, `Date.now`, `performance.now` anywhere in the sim
 - [ ] no `Math.sin/cos/tan/asin/acos/atan2/pow/exp/log` in the sim — Core math module only
 - [ ] no timers/rAF/promises mutating state; all mutation inside `tick()`

@@ -150,6 +150,79 @@ test("impulsePath: parsed mapping embedded sorted; a bad reaction name, a missin
   expectFailure(dir, "impulse mapping must be an object");
 });
 
+// Story 2.1 (AD-7/AD-18 data side): the attract-loop RECIPE is the sibling
+// asset — validated at BUILD, embedded as parsed data in fixed key order,
+// never fetched at runtime. Bad recipes/notes are build errors.
+test("attractSoundPath: recipe embedded fixed-key-order; missing file, bad shape, and bad notes die loudly", () => {
+  const dir = fixtureRoot();
+  const good = {
+    sampleRate: 8000,
+    loopSeconds: 0.5,
+    wave: "square",
+    gain: 0.5,
+    notes: [
+      { start: 0, end: 0.25, freq: 220, amp: 0.5 },
+      { start: 0.3, end: 0.5, freq: 440, amp: 0.25 },
+    ],
+  };
+  const entry = (recipePath: string) =>
+    JSON.stringify([{ id: "alpha", simPath: "games/alpha/sim/sim.js", attractSoundPath: recipePath }]);
+  writeFileSync(path.join(dir, "attract.json"), JSON.stringify({ notes: good.notes, wave: good.wave, gain: good.gain, loopSeconds: good.loopSeconds, sampleRate: good.sampleRate }));
+  writeFileSync(path.join(dir, "list.json"), entry("attract.json"));
+  runGenerator(dir);
+  const first = readFileSync(path.join(dir, "out", "game-registry.ts"), "utf8");
+  assert.ok(
+    first.includes('attractSound: {"sampleRate":8000,"loopSeconds":0.5,"wave":"square","gain":0.5,"notes":[{"start":0,"end":0.25,"freq":220,"amp":0.5},{"start":0.3,"end":0.5,"freq":440,"amp":0.25}]}'),
+    "the entry embeds the parsed recipe, keys in the generator's fixed order (the asset's key order never leaks into bytes)",
+  );
+  runGenerator(dir);
+  assert.equal(readFileSync(path.join(dir, "out", "game-registry.ts"), "utf8"), first, "byte-identical re-emit with a recipe present");
+
+  writeFileSync(path.join(dir, "list.json"), entry("gone.json"));
+  expectFailure(dir, "attract sound recipe source not found");
+
+  writeFileSync(path.join(dir, "attract.json"), "[]");
+  writeFileSync(path.join(dir, "list.json"), entry("attract.json"));
+  expectFailure(dir, "attract sound recipe must be an object");
+
+  writeFileSync(path.join(dir, "attract.json"), JSON.stringify({ ...good, wafe: "square" }));
+  expectFailure(dir, "unknown attract sound recipe field");
+
+  writeFileSync(path.join(dir, "attract.json"), JSON.stringify({ ...good, sampleRate: 8000.5 }));
+  expectFailure(dir, "sampleRate must be an integer in [8000, 192000]");
+
+  // The browser createBuffer range: a shape-valid but unusable recipe
+  // would throw at BOOT (the workbench path) — the build gate owns it.
+  writeFileSync(path.join(dir, "attract.json"), JSON.stringify({ ...good, sampleRate: 4000 }));
+  expectFailure(dir, "sampleRate must be an integer in [8000, 192000]");
+
+  // A render that rounds to zero samples is the same boot-throw family:
+  // law-conforming legs throughout, the ROUNDED length is the empty one.
+  writeFileSync(
+    path.join(dir, "attract.json"),
+    JSON.stringify({ ...good, loopSeconds: 0.00005, notes: [{ start: 0, end: 0.00005, freq: 220, amp: 0.5 }] }),
+  );
+  expectFailure(dir, "renders an empty buffer");
+
+  writeFileSync(path.join(dir, "attract.json"), JSON.stringify({ ...good, gain: 1.2 }));
+  expectFailure(dir, "gain must be a finite number in [0, 1]");
+
+  writeFileSync(path.join(dir, "attract.json"), JSON.stringify({ ...good, notes: [] }));
+  expectFailure(dir, "notes must be a non-empty array");
+
+  writeFileSync(path.join(dir, "attract.json"), JSON.stringify({ ...good, notes: [{ start: 0, end: 0.25, freq: 220, amp: 0.5, dur: 0.25 }] }));
+  expectFailure(dir, "attract sound note 0: unknown field");
+
+  writeFileSync(path.join(dir, "attract.json"), JSON.stringify({ ...good, notes: [{ start: 0, end: 0.6, freq: 220, amp: 0.5 }] }));
+  expectFailure(dir, "exceeds loopSeconds");
+
+  writeFileSync(path.join(dir, "attract.json"), JSON.stringify({ ...good, notes: [{ start: 0, end: 0.25, freq: -1, amp: 0.5 }] }));
+  expectFailure(dir, "freq must be positive");
+
+  writeFileSync(path.join(dir, "list.json"), JSON.stringify([{ id: "alpha", simPath: "games/alpha/sim/sim.js", attractSoundPat: "attract.json" }]));
+  expectFailure(dir, "unknown field"); // a list-side typo must not silently drop the recipe
+});
+
 test("empty provisional list emits an empty registry", () => {
   const dir = fixtureRoot();
   writeFileSync(path.join(dir, "list.json"), "[]");

@@ -55,6 +55,13 @@ import {
   type CabinetRuntime,
 } from "./room/cabinets.ts";
 import { gameRegistry } from "../generated/game-registry.ts";
+import {
+  createAudioManager,
+  createSilentGraph,
+  createWebAudioGraph,
+  type AudioManager,
+  type AudioGraph,
+} from "./audio/manager.ts";
 
 declare global {
   interface Window {
@@ -70,7 +77,10 @@ declare global {
      * Bests + Patron-run table — the console smoke reads the table, zero
      * UI announces it); 1.9 adds the entry sequence (phase + the
      * timeToPlayableMs measurement + failNow(), the console-only trigger
-     * that drives the workbench swap through the real law). */
+     * that drives the workbench swap through the real law); 2.1 adds the
+     * Core Audio Manager (graph state + per-chain occupancy/occlusion/mix
+     * debug view — the console smoke reads the law's numbers; whether it
+     * SOUNDS right is a by-ear check, never claimed from this surface). */
     arcadeDebug: {
       player: PlayerController;
       loop: KernelLoop;
@@ -81,6 +91,7 @@ declare global {
       containment: Containment;
       storage: StorageService;
       entry: EntrySequence;
+      audio: AudioManager;
     };
   }
 }
@@ -424,6 +435,37 @@ function bootArcade(): void {
   // forwarded; the seat no longer drains the queue itself).
   loop.addSystem("seat", () => seat.step(input.takeCodeView(), patronsRecords));
 
+  // Story 2.1 (AD-7/AD-15): the Core Audio Manager — ONE supervisor-
+  // wrapped system owning the one WebAudio graph, registered AFTER
+  // patrons/seat so each tick mixes against this tick's settled occupancy
+  // (AD-23 order). The single `new AudioContext` inside buildAudioGraph
+  // below is the repo's ONLY construction site (the L0 lint keeps every
+  // game half off the graph, AD-7); browsers hand it out autoplay-blocked,
+  // and until a wired gesture lands requestResume() the room runs silent —
+  // the law path actuates nothing on a suspended context. An insecure
+  // origin (plain http) has NO AudioContext global and construction can
+  // throw outright: both take the silent-graph path, so the room survives
+  // with sound simply absent instead of falling to the workbench (AD-15
+  // posture). The audio clock reaches the graph only inside the labelled
+  // adapter (core/audio/manager.ts); wall time never enters audio at all
+  // (AD-3).
+  function buildAudioGraph(): AudioGraph {
+    if (typeof AudioContext === "undefined") return createSilentGraph();
+    try {
+      return createWebAudioGraph(new AudioContext());
+    } catch {
+      return createSilentGraph();
+    }
+  }
+  const audio = createAudioManager({
+    graph: buildAudioGraph(),
+    registry: gameRegistry,
+    scheduler,
+    player,
+    entry,
+  });
+  loop.addSystem("audio", () => audio.tick());
+
   // Thin browser glue -> device service (AD-7: Core owns capture; the glue
   // only forwards events and (re)arms pointer lock). Silent by construction:
   // no prompt, no style change, no message anywhere on lock denial/loss.
@@ -442,6 +484,14 @@ function bootArcade(): void {
     if (!e.repeat) input.key(e.code, true);
   });
   window.addEventListener("keyup", (e) => input.key(e.code, false));
+  // Story 2.1 (autoplay law): every wired gesture also asks the blocked
+  // audio context to resume — one attempt per gesture, rejections
+  // swallowed inside the manager and retried by the next gesture (no
+  // timer, no retry storm, no prompt). The three existing input pin
+  // substrings above stay byte-unchanged.
+  canvas.addEventListener("click", () => audio.requestResume());
+  window.addEventListener("mousedown", () => audio.requestResume());
+  window.addEventListener("keydown", () => audio.requestResume());
   document.addEventListener("visibilitychange", () => input.visibilityChanged());
   // Window blur (focus to another window, tab still visible) drops pending
   // keyup/mouseup: clear the buffer like a hidden tab, so no walk/drag sticks.
@@ -654,6 +704,7 @@ function bootArcade(): void {
   // smoke reads the table's initials + score keyed by gameId, never any PII
   // beyond the UUID, and the score zone renders these rows read-only);
   // 1.9 adds the entry sequence (phase + timeToPlayableMs + failNow, the
-  // console trigger for the workbench swap — the real law path again).
-  window.arcadeDebug = { player, loop, cabinets, seat, scheduler, presenter, containment, storage, entry };
+  // console trigger for the workbench swap — the real law path again);
+  // 2.1 adds the audio manager (graph state + per-chain mix law numbers).
+  window.arcadeDebug = { player, loop, cabinets, seat, scheduler, presenter, containment, storage, entry, audio };
 }

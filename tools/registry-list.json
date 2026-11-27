@@ -5,6 +5,7 @@
     "seed": 1982,
     "presPath": "games/moon-patrol/presentation/adapter.js",
     "impulsePath": "games/moon-patrol/assets/impulse-mapping.json",
+    "attractSoundPath": "games/moon-patrol/assets/attract-sound.json",
     "controls": {
       "vocab": 1,
       "axes": ["move"],

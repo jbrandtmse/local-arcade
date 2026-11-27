@@ -81,6 +81,39 @@ export interface GameControls {
   aim: string[];
 }
 
+// --- Attract-sound asset seam (Story 2.1, AD-7/AD-18) ------------------------
+// A game supplies its attract loop as an authored plain-data RECIPE, never a
+// binary blob or a runtime fetch: tools/gen-registry.mjs reads the asset,
+// shape-validates it, and embeds the parsed data into the generated entry
+// (the sealed build fetches nothing — the sibling of `impulses`). The Core
+// Audio Manager renders it through core/audio/synth.ts into one owned
+// loop chain per Cabinet; no game half ever builds a node graph.
+
+/** One note leg of an attract-loop recipe — plain data, seconds and hertz. */
+export interface AttractSoundNote {
+  /** Seconds from loop start. */
+  start: number;
+  /** Seconds from loop start (exclusive end). */
+  end: number;
+  /** Frequency, Hz (positive). */
+  freq: number;
+  /** Amplitude in [0, 1]. */
+  amp: number;
+}
+
+/** The whole attract-loop recipe shape (validated at build by gen-registry). */
+export interface AttractSound {
+  /** PCM sample rate of the rendered loop, Hz (positive integer). */
+  sampleRate: number;
+  /** Loop length, seconds (positive). */
+  loopSeconds: number;
+  /** Oscillator shape shared by every note in the recipe. */
+  wave: "square" | "triangle";
+  /** Master gain in [0, 1]. */
+  gain: number;
+  notes: AttractSoundNote[];
+}
+
 /** One entry of the build-generated game registry (AD-11, provisional list). */
 export interface GameRegistryEntry {
   id: string;
@@ -97,6 +130,11 @@ export interface GameRegistryEntry {
    * (sealed build data — the mapping is never fetched at runtime), and
    * validates every value against the library (tools/gen-registry.mjs). */
   impulses?: Record<string, string>;
+  /** Authored attract-loop recipe (Story 2.1, AD-7/AD-18): the generator
+   * embeds the parsed, shape-validated asset (sealed build data, the sibling
+   * of `impulses`); the Core Audio Manager renders it into one owned loop
+   * chain per Cabinet. Absent means that Cabinet's attract is silent. */
+  attractSound?: AttractSound;
 }
 
 /** Kernel-owned instance modes; "play" (visitor-seated, AD-23) is set by the

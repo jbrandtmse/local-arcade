@@ -134,16 +134,113 @@ for (const [i, entry] of list.entries()) {
       Object.entries(mapping).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
     );
   }
+  // Story 2.1 (AD-7/AD-18): the attract-loop RECIPE is authored plain data;
+  // it is shape-validated HERE and embedded into the generated module as
+  // parsed data (the sealed build fetches nothing; a bad recipe fails the
+  // build, never the browser). The sibling of the impulse mapping above.
+  let attractSound;
+  if (entry.attractSoundPath !== undefined) {
+    if (typeof entry.attractSoundPath !== "string" || entry.attractSoundPath === "") {
+      fail(`entry ${i} (${entry.id}): attractSoundPath must be a non-empty string relative to the repo root`);
+    }
+    const recipePath = path.resolve(cwd, entry.attractSoundPath);
+    if (!existsSync(recipePath)) {
+      fail(`entry ${i} (${entry.id}): attract sound recipe source not found: ${entry.attractSoundPath}`);
+    }
+    let recipe;
+    try {
+      recipe = JSON.parse(readFileSync(recipePath, "utf8"));
+    } catch (err) {
+      fail(`entry ${i} (${entry.id}): attract sound recipe is not valid JSON: ${String(err)}`);
+    }
+    if (typeof recipe !== "object" || recipe === null || Array.isArray(recipe)) {
+      fail(`entry ${i} (${entry.id}): attract sound recipe must be an object (sampleRate, loopSeconds, wave, gain, notes)`);
+    }
+    for (const key of Object.keys(recipe)) {
+      if (key !== "sampleRate" && key !== "loopSeconds" && key !== "wave" && key !== "gain" && key !== "notes") {
+        fail(`entry ${i} (${entry.id}): unknown attract sound recipe field ${JSON.stringify(key)} (known: sampleRate, loopSeconds, wave, gain, notes)`);
+      }
+    }
+    // Bounds, not just positivity: createBuffer REJECTS sampleRates
+    // outside the browser range and length 0 at boot — a shape-valid but
+    // unusable recipe must die at the build gate (the fail-fast law), not
+    // turn into a workbench swap in the browser.
+    if (!Number.isInteger(recipe.sampleRate) || recipe.sampleRate < 8000 || recipe.sampleRate > 192000) {
+      fail(`entry ${i} (${entry.id}): attract sound recipe sampleRate must be an integer in [8000, 192000] (the AudioBuffer createBuffer range)`);
+    }
+    if (!Number.isFinite(recipe.loopSeconds) || recipe.loopSeconds <= 0) {
+      fail(`entry ${i} (${entry.id}): attract sound recipe loopSeconds must be a positive finite number`);
+    }
+    if (Math.round(recipe.loopSeconds * recipe.sampleRate) < 1) {
+      fail(`entry ${i} (${entry.id}): attract sound recipe renders an empty buffer (loopSeconds x sampleRate rounds to 0)`);
+    }
+    if (recipe.wave !== "square" && recipe.wave !== "triangle") {
+      fail(`entry ${i} (${entry.id}): attract sound recipe wave must be "square" or "triangle" (known: square, triangle)`);
+    }
+    if (!Number.isFinite(recipe.gain) || recipe.gain < 0 || recipe.gain > 1) {
+      fail(`entry ${i} (${entry.id}): attract sound recipe gain must be a finite number in [0, 1]`);
+    }
+    if (!Array.isArray(recipe.notes) || recipe.notes.length === 0) {
+      fail(`entry ${i} (${entry.id}): attract sound recipe notes must be a non-empty array`);
+    }
+    const notes = [];
+    for (const [n, note] of recipe.notes.entries()) {
+      if (typeof note !== "object" || note === null || Array.isArray(note)) {
+        fail(`entry ${i} (${entry.id}): attract sound note ${n} must be an object (start, end, freq, amp)`);
+      }
+      for (const key of Object.keys(note)) {
+        if (key !== "start" && key !== "end" && key !== "freq" && key !== "amp") {
+          fail(`entry ${i} (${entry.id}): attract sound note ${n}: unknown field ${JSON.stringify(key)} (known: start, end, freq, amp)`);
+        }
+      }
+      for (const leg of ["start", "end", "freq", "amp"]) {
+        if (!Number.isFinite(note[leg])) {
+          fail(`entry ${i} (${entry.id}): attract sound note ${n}: ${leg} must be a finite number`);
+        }
+      }
+      if (note.freq <= 0) {
+        fail(`entry ${i} (${entry.id}): attract sound note ${n}: freq must be positive`);
+      }
+      if (note.start < 0 || note.end <= note.start) {
+        fail(`entry ${i} (${entry.id}): attract sound note ${n}: must satisfy 0 <= start < end`);
+      }
+      if (note.end > recipe.loopSeconds) {
+        fail(`entry ${i} (${entry.id}): attract sound note ${n}: end ${String(note.end)} exceeds loopSeconds ${String(recipe.loopSeconds)}`);
+      }
+      if (note.amp < 0 || note.amp > 1) {
+        fail(`entry ${i} (${entry.id}): attract sound note ${n}: amp must be in [0, 1]`);
+      }
+      // Fixed key order: the asset's key order must not leak into emitted
+      // bytes — the same rule as the controls vocab legs.
+      notes.push({ start: note.start, end: note.end, freq: note.freq, amp: note.amp });
+    }
+    attractSound = {
+      sampleRate: recipe.sampleRate,
+      loopSeconds: recipe.loopSeconds,
+      wave: recipe.wave,
+      gain: recipe.gain,
+      notes,
+    };
+  }
   // Strict schema: a typo like "seeds" would silently drop the seed and the
   // entry would still emit — fail loudly instead.
   for (const key of Object.keys(entry)) {
-    if (key !== "id" && key !== "simPath" && key !== "seed" && key !== "presPath" && key !== "controls" && key !== "impulsePath") {
-      fail(`entry ${i} (${entry.id}): unknown field ${JSON.stringify(key)} (known: id, simPath, seed, presPath, controls, impulsePath)`);
+    if (
+      key !== "id" &&
+      key !== "simPath" &&
+      key !== "seed" &&
+      key !== "presPath" &&
+      key !== "controls" &&
+      key !== "impulsePath" &&
+      key !== "attractSoundPath"
+    ) {
+      fail(`entry ${i} (${entry.id}): unknown field ${JSON.stringify(key)} (known: id, simPath, seed, presPath, controls, impulsePath, attractSoundPath)`);
     }
   }
   // Attach the validated, sorted mapping only after the schema loop, so the
   // generated data field never reads as an unknown list field.
   if (impulses !== undefined) entry.impulses = impulses;
+  if (attractSound !== undefined) entry.attractSound = attractSound;
   entries.push(entry);
 }
 entries.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
@@ -210,6 +307,11 @@ for (const entry of entries) {
     // Parsed mapping data embedded in the module (already sorted at
     // validation time — the asset's key order cannot leak into bytes).
     fields.push(`impulses: ${JSON.stringify(entry.impulses)}`);
+  }
+  if (entry.attractSound !== undefined) {
+    // Parsed attract-loop recipe data embedded in the module (fixed key
+    // order established at validation time).
+    fields.push(`attractSound: ${JSON.stringify(entry.attractSound)}`);
   }
   lines.push(`  { ${fields.join(", ")} },`);
 }

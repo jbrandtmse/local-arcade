@@ -63,7 +63,9 @@ test("clean sim sources pass, and the ban scope is sim-only", () => {
   const dir = fixtureGames({
     "games/clean/sim/ok.js":
       "export function createSim() { return { tick() { const v = 1 + 2 * 3 / 4 - 5; return v < Math.floor(1.5) ? 0 : 1; } }; }\n",
-    // presentation half is NOT linted by this sim-path config (L0 full sweep is Epic 3)
+    // the presentation half IS scanned (Story 2.1) — but only for the
+    // WebAudio graph rule; the wall-clock rules stay sim-path, so a
+    // presentation Math.random stays green here
     "games/pres/presentation/p.js": "export const r = Math.random();\n",
   });
   const result = run(dir);
@@ -254,11 +256,110 @@ test("sanctioned spelling: object-literal property keys named Date/performance s
   assert.equal(result.stderr, "");
 });
 
+// Story 2.1 (AC: the L0 WebAudio ban covers BOTH plugin halves): any
+// AudioContext-family reference in sim OR presentation goes red naming
+// no-webaudio-graph; the sanctioned adapter form (a 2d canvas context) and
+// property keys named AudioContext stay green.
+test("AudioContext-family forms go red in BOTH halves: new, bare, global-receiver dotted and bracket, in sim and presentation", () => {
+  const dir = fixtureGames({
+    "games/wasim/sim/a.js": "const ac = new AudioContext(); export { ac };\n",
+    "games/wasim2/sim/b.js": 'const AC = window.AudioContext; const B = globalThis["OfflineAudioContext"]; const W = webkitAudioContext; export { AC, B, W };\n',
+    "games/wapres/presentation/c.js": "const ctx = new AudioContext(); const g = ctx.createGain(); g.connect(ctx.destination); export { g };\n",
+  });
+  const result = run(dir);
+  assert.equal(result.ok, false);
+  assert.ok(result.stderr.includes("no-webaudio-graph"), "no-webaudio-graph rule");
+  assert.match(result.stderr, /games[/\\]wasim[/\\]sim[/\\]a\.js:1:/); // planted new AudioContext in a SIM half is red (the falsification)
+  assert.match(result.stderr, /games[/\\]wasim2[/\\]sim[/\\]b\.js:1:/);
+  assert.match(result.stderr, /games[/\\]wapres[/\\]presentation[/\\]c\.js:1:/); // the adapter half is covered too
+  const summaries = [...result.stderr.matchAll(/lint-bans: (\d+) banned-API use\(s\)/g)];
+  assert.equal(summaries.length, 1);
+  assert.equal(
+    Number(summaries[0]![1]),
+    5,
+    "five references (new + window dotted + globalThis bracket + bare webkit + new), five single hits \u2014 ctx.createGain()/ctx.destination are not the graph family",
+  );
+});
+
+// The graph ban's receiver set is WIDER than the wall-clock value
+// receivers: self/top/parent/global are global aliases, and the rule's
+// whole guarantee is that no spelling of the global reaches a game half.
+test("AudioContext reached through the other global aliases (self./top./parent./global.) goes red in both halves", () => {
+  const dir = fixtureGames({
+    "games/waself/sim/s.js": "const ac = new self.AudioContext(); export { ac };\n",
+    "games/watop/presentation/t.js": 'const AC = top["OfflineAudioContext"]; const A2 = parent.AudioContext; const G = global.AudioContext; export { AC, A2, G };\n',
+  });
+  const result = run(dir);
+  assert.equal(result.ok, false);
+  assert.ok(result.stderr.includes("no-webaudio-graph"), "self./top./parent./global. receivers are banned too (mutation: drop one from WEBAUDIO_RECEIVERS and its fixture leg goes green \u2014 red here)");
+  assert.match(result.stderr, /games[/\\]waself[/\\]sim[/\\]s\.js:1:/);
+  assert.match(result.stderr, /games[/\\]watop[/\\]presentation[/\\]t\.js:1:/);
+  const summaries = [...result.stderr.matchAll(/lint-bans: (\d+) banned-API use\(s\)/g)];
+  assert.equal(summaries.length, 1);
+  assert.equal(Number(summaries[0]![1]), 4, "four aliased references, four single hits");
+});
+
+test("destructured AudioContext sources go red in both halves; property keys and member access named AudioContext stay green", () => {
+  const dir = fixtureGames({
+    "games/wadest/sim/d.js": "const { AudioContext: AC } = globalThis; export { AC };\n",
+    "games/wadest2/presentation/e.js": "const { OfflineAudioContext } = window; export { OfflineAudioContext };\n",
+  });
+  const result = run(dir);
+  assert.equal(result.ok, false);
+  assert.ok(result.stderr.includes("no-webaudio-graph"), "pulling the graph family out of globalThis/window is aliasing it");
+  assert.match(result.stderr, /games[/\\]wadest[/\\]sim[/\\]d\.js:/);
+  assert.match(result.stderr, /games[/\\]wadest2[/\\]presentation[/\\]e\.js:/);
+  // Dedupe contract: the destructure leg AND the bare leg both OWN the
+  // shorthand `{ OfflineAudioContext }` binding position, but the report
+  // counts ONE violation per position+rule. The shorthand re-export is a
+  // separate bare-leg position and stays a second, distinct hit.
+  const summaries = [...result.stderr.matchAll(/lint-bans: (\d+) banned-API use\(s\)/g)];
+  assert.equal(summaries.length, 1);
+  assert.equal(
+    Number(summaries[0]![1]),
+    3,
+    "renamed binding (destructure leg only) + shorthand binding (merged to one) + shorthand export (own position) = 3 single hits (mutation: drop the dedupe and the shorthand binding double-reports at one position \u2014 red here)",
+  );
+
+  const green = fixtureGames({
+    "games/wagreen/presentation/g.js": [
+      "// comments naming AudioContext and window.AudioContext are trivia, never hits",
+      "export const cfg = { AudioContext: null, webkitAudioContext: 0 };", // property keys name nothing
+      "export const c2d = canvas.getContext(\"2d\"); // a canvas context is not a WebAudio graph",
+    ].join("\n") + "\n",
+    "games/wagreensim/sim/s.js": "export const cfg = { OfflineAudioContext: 1 }; export const off = obj.AudioContext;\n",
+  });
+  const okResult = run(green);
+  assert.equal(okResult.ok, true, okResult.stderr);
+  assert.equal(okResult.stderr, "");
+});
+
+// Scanner contract: a substituted template literal never hides code.
+// Substitution contents scan as code, and normal tokenizing resumes after
+// the closing backtick — every rule stays visible on both sides of the
+// template, in either half.
+test("code after a substituted template stays visible to the bans; so do substitution contents", () => {
+  const dir = fixtureGames({
+    "games/tmplpres/presentation/p.js":
+      "const s = `rgba(1,2,3,${0.5 * 2})`;\nconst ac = new AudioContext(); export { s, ac };\n",
+    "games/tmplsim/sim/s.js":
+      "export const s = `x${Math.sin(1)}y`;\nconst r = Math.random(); export { r };\n",
+  });
+  const result = run(dir);
+  assert.equal(result.ok, false);
+  assert.ok(result.stderr.includes("no-webaudio-graph"), "AudioContext after a substituted template is red");
+  assert.match(result.stderr, /games[/\\]tmplpres[/\\]presentation[/\\]p\.js:2:/);
+  assert.ok(result.stderr.includes("no-engine-transcendental (Math.sin"), "the substitution leg is code: Math.sin inside ${} is red");
+  assert.ok(result.stderr.includes("no-math-random"), "Math.random after the template leg is red too");
+  assert.match(result.stderr, /games[/\\]tmplsim[/\\]sim[/\\]s\.js:2:/);
+});
+
 // Real-repo witness (matrix row 4, the vendored-sim false-red guard): the
-// extended rules run over the shipped games/**/sim/** tree — helpers.js's
-// sanctioned Math-as-value and autoplay.test.js's regex bodies included —
-// and the gate still exits 0. A new rule that false-reds the vendored sim
-// reddens HERE (execFileSync throws on nonzero exit).
+// extended rules run over the shipped games/**/{sim,presentation}/** tree —
+// helpers.js's sanctioned Math-as-value, autoplay.test.js's regex bodies,
+// and the presentation adapter's 2d-canvas work included — and the gate
+// still exits 0. A new rule that false-reds the vendored sim or the real
+// adapter reddens HERE (execFileSync throws on nonzero exit).
 test("the REAL repo tree stays green under the extended rules (vendored-sim false-red guard)", () => {
   execFileSync(process.execPath, [SCRIPT], { cwd: REPO, encoding: "utf8" }); // exit 0
 });
