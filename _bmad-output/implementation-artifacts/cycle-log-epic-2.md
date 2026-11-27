@@ -74,3 +74,4 @@
 2026-11-27T19:14:03Z	Story 2.2	fresh_check	env=recipe-worktree-fresh-24-detached@d1ea9a4 tests=61 result=pass order=forward,reverse note=dirty QA/CR files (manager.ts+3 test files) copied into worktree; node_modules hardlinked; mix+budget+manager 61/61 both orders
 2026-11-27T19:15:55Z	Story 2.2	committed	sha=ae10afd ci=none runs=none submodules=none note=union-join(QA-focus-leg+CR-pins+hygiene+records);pushed-22aba24..ae10afd origin/ARC-1-epic2 verified merge-base-ancestor
 2026-11-27T19:15:55Z	Story 2.2	story_cycle	plan_to_commit_min=568 implement_passes=1 reviews=1 rework=0 first_ci=none
+2026-11-27T19:22:31Z	Story 2.3	stage_spawned	stage=plan spawn_at=2026-11-27T19:22:31Z story=2-3-light-spill-and-atmospheric-depth-the-graphics-rung-works-al agent=2-3-light-spill-plan-1 cycle_iteration=1 baseline=083c96d prompt=C:/tmp/spawn-2-3-plan-1.txt note=Halt after planning; ledger slice empty (verified); epic_context=attempt-5-current
