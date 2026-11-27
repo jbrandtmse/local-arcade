@@ -1,3 +1,28 @@
+# Test Automation Summary — Story 2.2 (QA stage, 2026-11-27)
+
+Target: the implemented deliverable of Story 2.2 (`git diff --name-only 12d71cc..9779d19` — the proximity ladder + seated focus law in `core/audio/mix.ts`, the new pure channel budget `core/audio/budget.ts`, the manager's distance/budget/focus wiring in `core/audio/manager.ts`, and the story's own pins). Acceptance criteria: the spec's Tasks & Acceptance + I/O & Edge-Case Matrix. Framework: the project's existing convention — `node --test` over co-located `*.test.ts` (`npm test`); no new dependency, no browser/audio-runtime harness (frontmatter `deferred` item 1 — fake-graph rig + pure-law literals + source pins are this story's falsifiable tier; no browser-E2E harness until Epic 3).
+
+## Generated Tests
+
+### Seated-volume wiring (existing file, in place)
+- [x] `core/audio/manager.test.ts` (QA addition) — the lead-flagged falsifiability gap: the spec's item "`seatedVolumeId` wired wrong (all chains other) -> the composition pin red" had no manager-tier red — the composition pin lives at the law tier (`mix.test.ts`), and every pre-QA seated fixture seats at the FIRST placement (B0), so a manager that resolves the seated volume to the wrong cabinet behaves identically for all of them. The new pin seats the SECOND placement (B1): B0 lands the focus floor ON its own low rung (symbol product AND literal 0.0078125), the debug record carries `focus` self/other per chain, B1's attract stays gate-silent, and standing up lifts the layer one tick later.
+
+## Gap-hunt result
+The implement pass (15 witnesses) and the lead's 10 Layer-1 witnesses cover AC1-AC8 and the interlock legs — none re-run. The one open leg was the lead's flagged `seatedVolumeId` wiring gap. Closing it at the manager tier required an in-scope patch: `ChainDebug` gains the additive `focus` leg ("self"/"other"/"none") — at the param tier the "self" leg is provably unobservable (2.1's `occupancyGate` zeroes the seated chain's gain for any focus value, as the collapse pin already records), so the debug record is the manager-tier window on the wiring; it already carries the applied tier of every other mix layer (`appliedId`, `ladderApplied`). Purely additive: every existing reader is field-accessed, `deepEqual`-free; full suite green after.
+
+## Verification run (post-QA)
+- `npm test`: 461/461 pass (460 at dev finalize + 1 QA test).
+- `npm run typecheck`: 0. `node ci/depcheck.mjs`: 0. `node ci/lint-bans.mjs`: 0.
+- `node tools/gen-registry.mjs && git diff --exit-code -- generated/`: no drift (test + one debug-field change add no registry field).
+- Hermeticity: reversed-file-order audio run (`manager`, `budget`, `mix`) 59/59 green.
+- Rule 19: 2 QA mutation demonstrations — (1) `seatedVolumeId` resolved to `view.cabinets[0].volumeId` (seating detected, volume mis-resolved): ONLY the new pin reds (the record legs flip, B0's floor reads 0.125), every pre-QA pin green — the new pin's discriminator; (2) `seatedVolumeId` read as `?.gameId` (no chain matches; every chain reads "other"): the record leg reds ('other' !== 'self') while every param-tier pin stays green — the gain tier cannot see the self/other distinction (gate x any multiplier = 0), which is exactly why the record leg closes the gap. Each red observed, reverted, `sha256sum`-verified byte-identical (manager.ts d17c3aa4…), suite re-green 461/461. Recorded in the spec's `## Verification` QA block.
+- `npm run build` not re-run (test + debug-field change; the once-per-story build ran at dev finalize). :5173 untouched; no browser or audio-runtime instance started. The by-ear/browser tiers stay the lead's smoke + Epic-3 harness per frontmatter `deferred` item 1.
+
+## Next Steps
+- Lead commits `core/audio/manager.test.ts` + `core/audio/manager.ts` (the additive `focus` debug leg) + the spec Verification block + this summary (this stage forbids committing), then runs the fresh-environment forward/reverse check and the per-story smoke. The `focus` leg is flagged for the code reviewer: an additive debug field not named in the spec, justified by Rule 19 (no observation window for the "self" leg otherwise).
+
+---
+
 # Test Automation Summary — Story 2.1 (QA stage, 2026-11-26)
 
 Target: the implemented deliverable of Story 2.1 (`git diff --name-only 09a273b..HEAD` — the Core Audio Manager `core/audio/{manager,mix,occlusion,synth}.ts` + suites, the boot/gesture wiring in `core/main.ts` + glue pins, the `attractSound` registry seam (`core/contract/wrapper.ts`, `tools/gen-registry.mjs`, `tools/registry-list.json`, `generated/game-registry.ts`), the moon-patrol recipe, and the both-halves lint ban). Acceptance criteria: the spec's Tasks & Acceptance + I/O & Edge-Case Matrix. Framework: the project's existing convention — `node --test` over co-located `*.test.ts` (`npm test`); no new dependency, no browser/audio-runtime harness (DW-15/DW-44 posture; the story's own frontmatter defers the executed browser tier as DW-47 — fake-graph rig, pure-law literals, and source pins are this story's falsifiable tier).

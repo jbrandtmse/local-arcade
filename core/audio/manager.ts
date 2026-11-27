@@ -321,6 +321,11 @@ interface Chain {
    * arcadeDebug record; the law gets them as fresh numbers each tick). */
   distanceM: number;
   audible: boolean;
+  /** This tick's seated-focus side (debug + the arcadeDebug record; the law
+   * gets the same string fresh each tick). The record carries the applied
+   * tier of every mix layer: occlusion (appliedId), the ladder
+   * (ladderApplied), and the focus layer (focus). */
+  focus: FocusLayer;
 }
 
 export interface ChainDebug {
@@ -338,6 +343,11 @@ export interface ChainDebug {
   ladderApplied: string;
   /** awake && inBudget this tick — false means gain-only silence. */
   audible: boolean;
+  /** This tick's seated-focus side: "self" | "other" | "none" — the
+   * manager's seated-volume -> focus wiring, made observable (the seated
+   * chain's gain is gate-zeroed for any focus value, so the param targets
+   * alone cannot see this wiring). */
+  focus: FocusLayer;
 }
 
 export interface AudioManagerDebug {
@@ -408,6 +418,7 @@ export function createAudioManager(opts: AudioManagerOptions): AudioManager {
       lastOccupancy: "attract",
       distanceM: 0,
       audible: false,
+      focus: "none",
     });
   }
 
@@ -494,6 +505,7 @@ export function createAudioManager(opts: AudioManagerOptions): AudioManager {
       chain.lastOccupancy = occupancy;
       chain.distanceM = distanceM;
       chain.audible = step.audible;
+      chain.focus = focus;
       if (silent) continue;
       chain.gainNode.gain.setTarget(step.target.gain);
       chain.lowpassNode.frequency.setTarget(step.target.lowpassHz);
@@ -524,6 +536,7 @@ export function createAudioManager(opts: AudioManagerOptions): AudioManager {
         distanceM: c.distanceM,
         ladderApplied: c.ladderDwell.appliedId,
         audible: c.audible,
+        focus: c.focus,
       })),
     };
   }

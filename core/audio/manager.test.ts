@@ -702,6 +702,36 @@ test("the seated focus mix at the manager tier: sitting at B0 collapses every OT
   assert.equal(dbg.chains[1]!.audible, true, "near-silent is not budget-silent: the ducked chain stays awake and in budget");
 });
 
+// QA (Story 2.2 gap): the seated-volume -> focus WIRING. Every pre-QA
+// seated fixture seats at the FIRST placement, so a manager that resolves
+// the seated volume to the wrong cabinet (e.g. always the first cabinet of
+// the view) behaves identically for them. This pin seats the SECOND
+// placement (B1): focus resolution must follow the occupancy, not the
+// placement order \u2014 B0 rides the focus floor ON ITS OWN LOW RUNG, and the
+// debug record carries each chain's focus side (the seated chain's gain is
+// gate-zeroed for any focus value, so the record is the only manager-tier
+// window on the "self" leg of the wiring; the multiplier value itself stays
+// the law-tier contract in mix.test.ts).
+test("QA: seated at the SECOND placement \u2014 seatedVolumeId resolves to the seated cabinet itself: B0 lands the focus floor on its low rung, and the record shows self/other per chain", () => {
+  const { rig, manager, occupancy } = buildTwo("running");
+  const [b0Gain, b1Gain] = gainParamsOf(rig);
+  assert.ok(b0Gain !== undefined && b1Gain !== undefined);
+  occupancy.B1 = "visitor-seated";
+  for (let i = 0; i < LADDER_DWELL_TICKS + 5; i++) manager.tick();
+  const dbg = manager.state();
+  assert.equal(dbg.chains[1]!.occupancy, "visitor-seated", "the seat sits on the second placement (the mirror of the B0 collapse pin above)");
+  assert.equal(dbg.chains[1]!.focus, "self", "the manager's focus wiring arms on the SEATED chain's own volumeId, not the first placement's (mutation: seatedVolumeId resolved to view.cabinets[0].volumeId \u2014 this reads 'other', the b0 floor below reads 0.125, and the record legs both flip \u2014 red here, every pre-QA pin stays green)");
+  assert.equal(dbg.chains[0]!.focus, "other", "the unoccupied chain sits on the ducked side of the layer");
+  assert.equal(b0Gain!.targets.at(-1), ATTRACT_BASE_GAIN * LADDER_FAR_DUCK * FOCUS_DUCK, "the collapse composes on top of the ladder rung: base x low rung x focus floor");
+  assert.equal(b0Gain!.targets.at(-1), 0.0078125, "the composed product as a literal (mutation: FOCUS_DUCK -> 1 reads 0.125; the wrong-cabinet resolution above lands 0.125 here too \u2014 red)");
+  assert.equal(b1Gain!.targets.at(-1), 0, "the seated chain's attract stays gate-silent: its FULL multiplier is observable at this tier ONLY through the record's focus leg (the gate zeroes the gain for any focus value \u2014 the multiplier contract itself is pinned in mix.test.ts)");
+  assert.deepEqual(rig.sources.map((s) => s.started), [1, 1], "gain-only at the mirror seat too: both forever-loops stay untouched");
+  occupancy.B1 = "attract";
+  manager.tick();
+  assert.equal(manager.state().chains[0]!.focus, "none", "standing up disarms the layer one tick later: nobody seated, nobody 'self' (mutation: seatedVolumeId armed from the view even with no seat in it \u2014 the layer never lifts \u2014 red here)");
+  assert.equal(b0Gain!.targets.at(-1), ATTRACT_BASE_GAIN * LADDER_FAR_DUCK, "and B0's gain lifts off the floor to its own rung on the same tick");
+});
+
 test("busy is not focus: \"patron-autoplay\" arms nothing \u2014 no chain touches the FOCUS_DUCK floor anywhere in its sequence, and the busy cabinet keeps sounding", () => {
   const { rig, manager, occupancy } = buildTwo("running");
   const [b0Gain, b1Gain] = gainParamsOf(rig);
@@ -735,6 +765,62 @@ test("the manager's own occupancy-to-budget wire: a seated chain stays audible w
   const dbg = manager.state();
   assert.equal(dbg.chains[0]!.audible, true, "awake on the seated leg alone \u2014 the manager passes the settled visitor-seated truth into computeBudget (mutation: visitorOccupied wired false in manager.ts \u2014 red here)");
   assert.equal(dbg.chains[1]!.audible, false, "the unoccupied neighbour fails all three legs at this pose: the seated flag, not the pose, is the discriminator");
+});
+
+// Code review (Story 2.2 pass 2): the rank >= NEAREST_N cut never reached
+// the manager tier. Every pre-review fixture is one or two chains while
+// NEAREST_N = 4, so the cut was pinned only inside budget.ts — projecting
+// the AWAKE set instead of the BUDGET set into each chain (manager.ts:499
+// inBudget.has -> awake.has) kept the whole suite green. Five injected
+// placements on the authored back-row slots B0..B4 (authored slot
+// geometry, synthetic room — the twoPlacements idiom widened): from
+// ENTRY_SPAWN at yaw 0 all five are cone-awake and inside CULL_RADIUS_M,
+// but the ear-distance order is B3 < B2 = B4 < B1 < B0 — exactly four
+// seats, so the widest back-row machine (B0) is rank 5: awake,
+// budget-silent at gain 0, its loop and colour untouched (AD-27).
+const fivePlacements: readonly CabinetPlacement[] = [
+  { volumeId: "cabinet-B0", slotId: "B0", title: "MOON PATROL", screenZones: { attract: "MOON PATROL", next: "NEXT", score: [] }, hue: GLOW_CYAN, marqueeHue: GLOW_MARQUEE, gameId: "moon-patrol", busy: true },
+  { volumeId: "cabinet-B1", slotId: "B1", title: "MOON PATROL", screenZones: { attract: "MOON PATROL", next: "NEXT", score: [] }, hue: GLOW_CYAN, marqueeHue: GLOW_MARQUEE, gameId: "moon-patrol", busy: true },
+  { volumeId: "cabinet-B2", slotId: "B2", title: "MOON PATROL", screenZones: { attract: "MOON PATROL", next: "NEXT", score: [] }, hue: GLOW_CYAN, marqueeHue: GLOW_MARQUEE, gameId: "moon-patrol", busy: true },
+  { volumeId: "cabinet-B3", slotId: "B3", title: "MOON PATROL", screenZones: { attract: "MOON PATROL", next: "NEXT", score: [] }, hue: GLOW_CYAN, marqueeHue: GLOW_MARQUEE, gameId: "moon-patrol", busy: true },
+  { volumeId: "cabinet-B4", slotId: "B4", title: "MOON PATROL", screenZones: { attract: "MOON PATROL", next: "NEXT", score: [] }, hue: GLOW_CYAN, marqueeHue: GLOW_MARQUEE, gameId: "moon-patrol", busy: true },
+];
+
+function buildFive(initialState: GraphState = "running") {
+  const rig = createFakeGraph(initialState);
+  const entryKit = makeEntry("control", 1);
+  const playerKit = makePlayer();
+  const manager = createAudioManager({
+    graph: rig.graph,
+    registry,
+    scheduler: {
+      state: () => ({
+        tick: 0,
+        cabinets: fivePlacements.map((p) => ({ volumeId: p.volumeId, gameId: "moon-patrol", occupancy: "attract" as Occupancy, runCount: 1, lastSeed: 7, queue: [], rearmTick: 0 })),
+      }),
+    },
+    player: playerKit.player,
+    entry: entryKit.entry,
+    placements: fivePlacements,
+  });
+  return { rig, manager, entryKit, playerKit };
+}
+
+test("the NEAREST_N rank cut through the manager's own projection: at the spawn pose with five cone-awake chains, exactly the four nearest read audible; the rank-5 chain (B0) is budget-silent at gain 0 with its loop and colour untouched (AD-27)", () => {
+  const { rig, manager } = buildFive("running");
+  for (let i = 0; i < 3; i++) manager.tick();
+  const dbg = manager.state();
+  assert.equal(dbg.chains.length, 5, "five chains from five injected placements");
+  assert.ok(dbg.chains[0]!.distanceM > spawnDistTo("B1"), "fixture sanity: B0 sits FARTHEST from the spawn ear, so rank 5 comes from the authored geometry, not the cull (CULL_RADIUS_M = 25 keeps all five inside)");
+  assert.equal(dbg.chains[0]!.audible, false, "rank 5 of 5: the four NEAREST_N seats go to B3/B2/B4/B1 and B0 falls out of the manager's inBudget projection while staying AWAKE (mutation: inBudget := awake.has at manager.ts:499 — B0 reads audible true and gain 0.125, red here; every earlier fixture is 1-2 chains, the cut never bit, so no other pin separates the sets)");
+  for (const i of [1, 2, 3, 4]) {
+    assert.equal(dbg.chains[i]!.audible, true, "the four nearer chains hold their seats (chain index " + i + ")");
+  }
+  const b0Gain = gainParamsOf(rig)[0]!;
+  assert.ok(b0Gain.targets.every((t) => t === 0), "rank-silent is a constant gain 0 — no rung leaks through (mutation above reads 0.125 here too)");
+  const b0Lowpass = rig.params.filter((p) => p.label.endsWith(".frequency"))[0]!;
+  assert.ok(b0Lowpass.targets.every((t) => t === OPEN_PROFILE.lowpassHz), "the rank cut never re-colours: the lowpass never moved");
+  assert.deepEqual(rig.sources.map((s) => s.started), [1, 1, 1, 1, 1], "all five forever-loops started exactly once at build: the cut is gain-only, never a start/stop (AD-27)");
 });
 
 test("no-cull-today on the authored one-Cabinet room: the shipped placeholders leave the lone chain audible at the full base gain, ladder clear (Design Notes 5)", () => {

@@ -9,6 +9,8 @@
 // literal where they pin the shipped value (mutation notes inline).
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { math } from "../contract/index.ts";
 import { INTERIOR } from "../room/collision-volumes.ts";
 import {
@@ -24,6 +26,8 @@ import {
 // The default ear for the pins: the movement-plane origin looking down -Z
 // (player.ts's yaw-0 convention).
 const AT_ORIGIN_FACING_BACK: BudgetListener = { x: 0, z: 0, yaw: 0 };
+
+const REPO = path.resolve(import.meta.dirname, "..", "..");
 
 function target(volumeId: string, x: number, z: number, visitorOccupied = false): BudgetTarget {
   return { volumeId, x, z, visitorOccupied };
@@ -73,6 +77,24 @@ test("frustum leg in/out from the authored facing basis (yaw 0 looks -Z; no came
     target("cabinet-ahead-out", 0, -10), // straight -Z: dead-ahead of the OLD facing, out of the turned cone
   ]);
   assert.deepEqual(turned.awakeIds, ["cabinet-left-in"], "yaw feeds the cone (mutation: ignore yaw \u2014 red here)");
+});
+
+// Code review (Story 2.2 pass 2): the Code Map prescribes budget.ts's
+// facing basis as a MIRROR of player.ts's — the basis is a closure inside
+// the controller (player.ts:96), not an export, so the two sites cannot
+// share code. Without a cross-check the mirror drifts silently in the
+// shipped room: every cone pin above exercises budget.ts's OWN basis, so
+// a sign flip on either side stays green at the unit tier and only the
+// real room would notice. Pin both source forms (the AD-3 readdir pin's
+// source-text tier).
+test("the facing-basis mirror is pinned at the source level: budget.ts's fx/fz carry player.ts's signs (yaw 0 -> -Z both sides)", () => {
+  const player = readFileSync(path.join(REPO, "core", "player.ts"), "utf8");
+  const budget = readFileSync(path.join(REPO, "core", "audio", "budget.ts"), "utf8");
+  assert.match(player, /const s = math\.sin\(yaw\);/, "player.ts basis: s = sin(yaw)");
+  assert.match(player, /const c = math\.cos\(yaw\);/, "player.ts basis: c = cos(yaw)");
+  assert.match(player, /fx: -s, fz: -c/, "player.ts: fx = -sin(yaw), fz = -cos(yaw) (yaw 0 looks -Z)");
+  assert.match(budget, /fx = -math\.sin\(listener\.yaw\);/, "budget.ts mirrors fx with the same sign (mutation: flip this sign — red here AND the turned-cone leg above, which no unit pin can see diverge from player.ts otherwise)");
+  assert.match(budget, /fz = -math\.cos\(listener\.yaw\);/, "budget.ts mirrors fz with the same sign (mutation: flip either sign and the shipped cone diverges from the walk with no unit-tier red — this pin is the guard)");
 });
 
 test("cull beyond CULL_RADIUS_M: awake but NOT in budget (gain-only silence at the law tier); the radius itself is kept", () => {

@@ -11,7 +11,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { ENTRY_SPAWN, collisionVolumes, type CollisionVolume } from "../room/collision-volumes.ts";
 import { wallSlots } from "../room/slot-config.ts";
-import type { Occupancy } from "../patrons/scheduler.ts";
 import {
   ATTRACT_BASE_GAIN,
   DWELL_TICKS,
@@ -469,7 +468,8 @@ test("audible = awake && inBudget: outside either is gain 0 \u2014 colour stays 
   assert.equal(inside.target.gain, ATTRACT_BASE_GAIN);
   // The budget multipliers never touch the 2.1 product when inside (the
   // whole room would otherwise land at 0.5 x 0.25 x 0.0625 by accident):
-  assert.equal(inside.target.gain, law({}).target.gain);
+  // the exact literal above IS that guard — an input-identical echo of
+  // `inside` would survive any law change (code review pass 2 removed it).
   // NEAREST_N -> 0 / CULL_RADIUS_M -> 0 lands here at the law tier:
   // inBudget false is what a zero-budget fixture would feed.
 });

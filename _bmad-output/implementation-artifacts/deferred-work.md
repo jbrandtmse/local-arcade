@@ -322,3 +322,8 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: spec-2-2-the-proximity-ladder-and-the-seated-focus-mix-tuned-in | severity: med | fix-risk: med | footprint: in-epic
 - evidence: uniform nearest-N is spec-prescribed and the seated chain's attract is gate-silent today, so no audible harm in shipped data; room growth plus play-mode audio over the focused chain is the authored-law call; mechanism-adjacent to DW-53
 - 2026-11-27T18:33:55Z status=routed owner=3-7-the-l2-room-audit-whole-room-proof-and-the-numbers-that-make by=cr note=address or decline with DW-50/DW-51/DW-53; a focus-priority leg in computeBudget would be the shape if wanted
+
+### DW-55: player.teleport debug seam nulls camera pitch -> black render (pitch stays null; keyboard keeps working; fresh reload renders fine)
+- source: lead-smoke Story 2.2 (browser on :5173) | severity: low | fix-risk: low | footprint: in-epic
+- evidence: chrome-devtools smoke: after player.teleport({x,z,yaw}), player.state.pitch===null persists (keyboard w moves z, bobPhase advances, audio chain records update, graph running) and viewport renders solid black with no console errors; page reload at same URL renders the room correctly - defect only reachable via the debug teleport seam; story diff 12d71cc..9779d19 is audio-only
+- 2026-11-27T19:11:20Z status=routed owner=3-2-the-gate-goes-deterministic-l0-l1-scripts-contract-test-skil by=lead note=pre-existing debug-seam defect, not the 2.2 deliverable; 3.2 carries the browser/audio-runtime harness tier (DW-15 owner) - fix the pitch default or pin a teleport seam test there
