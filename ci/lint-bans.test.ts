@@ -282,21 +282,24 @@ test("AudioContext-family forms go red in BOTH halves: new, bare, global-receive
 });
 
 // The graph ban's receiver set is WIDER than the wall-clock value
-// receivers: self/top/parent/global are global aliases, and the rule's
-// whole guarantee is that no spelling of the global reaches a game half.
-test("AudioContext reached through the other global aliases (self./top./parent./global.) goes red in both halves", () => {
+// receivers: self/top/parent/global/frames/opener are global and
+// window-property aliases, and the rule's whole guarantee is that no
+// spelling of the global reaches a game half.
+test("AudioContext reached through the other global aliases (self./top./parent./global./frames./opener.) goes red in both halves", () => {
   const dir = fixtureGames({
     "games/waself/sim/s.js": "const ac = new self.AudioContext(); export { ac };\n",
     "games/watop/presentation/t.js": 'const AC = top["OfflineAudioContext"]; const A2 = parent.AudioContext; const G = global.AudioContext; export { AC, A2, G };\n',
+    "games/wafr/sim/f.js": "const F = frames.OfflineAudioContext; const O = opener.AudioContext; export { F, O };\n",
   });
   const result = run(dir);
   assert.equal(result.ok, false);
-  assert.ok(result.stderr.includes("no-webaudio-graph"), "self./top./parent./global. receivers are banned too (mutation: drop one from WEBAUDIO_RECEIVERS and its fixture leg goes green \u2014 red here)");
+  assert.ok(result.stderr.includes("no-webaudio-graph"), "self./top./parent./global./frames./opener. receivers are banned too (mutation: drop one from WEBAUDIO_RECEIVERS and its fixture leg goes green \u2014 red here)");
   assert.match(result.stderr, /games[/\\]waself[/\\]sim[/\\]s\.js:1:/);
   assert.match(result.stderr, /games[/\\]watop[/\\]presentation[/\\]t\.js:1:/);
+  assert.match(result.stderr, /games[/\\]wafr[/\\]sim[/\\]f\.js:1:/, "frames. and opener. are window-property aliases like the rest");
   const summaries = [...result.stderr.matchAll(/lint-bans: (\d+) banned-API use\(s\)/g)];
   assert.equal(summaries.length, 1);
-  assert.equal(Number(summaries[0]![1]), 4, "four aliased references, four single hits");
+  assert.equal(Number(summaries[0]![1]), 6, "six aliased references, six single hits");
 });
 
 test("destructured AudioContext sources go red in both halves; property keys and member access named AudioContext stay green", () => {
@@ -344,6 +347,13 @@ test("code after a substituted template stays visible to the bans; so do substit
       "const s = `rgba(1,2,3,${0.5 * 2})`;\nconst ac = new AudioContext(); export { s, ac };\n",
     "games/tmplsim/sim/s.js":
       "export const s = `x${Math.sin(1)}y`;\nconst r = Math.random(); export { r };\n",
+    // NESTED substitution (a template inside a ${}): the scanner must push
+    // a frame per TemplateHead, or the inner literal's parts blind the
+    // scanner the way the single-depth bug did (Spec Change Log witness).
+    // The leg pins both sides: contents inside the nested ${} scan, and
+    // normal tokenizing resumes after the whole nested literal.
+    "games/tmplnest/sim/n.js":
+      "export const s = `a${`b${Math.sin(1)}`}c`;\nconst ac = new AudioContext(); export { s, ac };\n",
   });
   const result = run(dir);
   assert.equal(result.ok, false);
@@ -352,6 +362,11 @@ test("code after a substituted template stays visible to the bans; so do substit
   assert.ok(result.stderr.includes("no-engine-transcendental (Math.sin"), "the substitution leg is code: Math.sin inside ${} is red");
   assert.ok(result.stderr.includes("no-math-random"), "Math.random after the template leg is red too");
   assert.match(result.stderr, /games[/\\]tmplsim[/\\]sim[/\\]s\.js:2:/);
+  // (mutation: stop pushing an open-substitution frame at a nested
+  // TemplateHead — the inner parts lex as opaque text, both nested legs go
+  // green, and the planted AudioContext walks the ban red here)
+  assert.match(result.stderr, /games[/\\]tmplnest[/\\]sim[/\\]n\.js:1:/, "the NESTED leg: Math.sin inside a template inside a ${} is still code");
+  assert.match(result.stderr, /games[/\\]tmplnest[/\\]sim[/\\]n\.js:2:/, "the NESTED leg: planted AudioContext after the whole nested literal is still red");
 });
 
 // Real-repo witness (matrix row 4, the vendored-sim false-red guard): the

@@ -142,6 +142,24 @@ Written by the Registration skill against `ci/manifest-schema.json`; relevant to
 - `busy` — desired busy-presence for the Patron scheduler.
 - `presentationOnly: true` — museum class: still needs a real per-tick sim half (what it shows must be simulated), but no `autoplay()`.
 
+### Attract-loop recipe (`assets/attract-sound.json`, Story 2.1, AD-7)
+
+The Core Audio Manager owns the one WebAudio graph; your Cabinet's attract sound is **plain data** the build inlines into the registry. The optional manifest field `attractSoundPath` points at the file; `tools/gen-registry.mjs` shape-validates it and embeds it (a bad recipe fails the build, never the browser). Shape and enforced bounds:
+
+```json
+{ "sampleRate": 22050, "loopSeconds": 1.6, "wave": "square", "gain": 0.45,
+  "notes": [ { "start": 0, "end": 0.2, "freq": 440, "amp": 0.8 } ] }
+```
+
+- `sampleRate`: integer in [8000, 192000] — the `createBuffer` range.
+- `loopSeconds`: positive finite; `loopSeconds x sampleRate` must round to at least 1 sample (an empty render fails the gate).
+- `wave`: `"square"` or `"triangle"` — shared by every note.
+- `gain`: master gain in [0, 1]; `notes[].amp` in [0, 1].
+- `notes[].start`/`end`: seconds with `0 <= start < end <= loopSeconds`; `freq`: positive — keep it below `sampleRate/2` (Nyquist) or the note renders silently aliased (the gate bounds positivity only).
+- Unknown keys are rejected at every level, with entry-indexed messages.
+
+Worked example: `games/moon-patrol/assets/attract-sound.json`; type: `AttractSound` in `core/contract/wrapper.ts`. Occlusion and level law is Core's (Story 2.1) — you author the loop, the room decides how it reaches each ear.
+
 ## 8. L0 pre-flight checklist
 
 Run before asking for review — every line is a lint rule:

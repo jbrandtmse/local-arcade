@@ -314,6 +314,70 @@ test("simPath law: naming the games/<id>/sim/ directory itself dies naming the l
   assert.ok(!existsSync(path.join(dir, "out", "game-registry.ts")), "a directory-as-simPath entry emits nothing");
 });
 
+// QA (Story 2.1, AC7 gap): the SHIPPED bundle carries the attract loop.
+// The AC claims "the recipe is embedded"; every other attract pin reads
+// the asset file directly, and the regeneration test only proves committed
+// == regenerated - a pipeline that consistently stops carrying the recipe
+// (list leg dropped, regenerated, committed together) keeps the whole
+// pre-QA suite green while the shipped bundle goes silent. This pin walks
+// the whole chain: authored asset -> provisional list -> the embed's
+// parsed content, so the sealed build's attract loop has a suite leg.
+test("the shipped registry embeds the authored attract recipe end to end (asset -> list -> committed module)", () => {
+  const repo = path.resolve(import.meta.dirname, "..");
+  const list = JSON.parse(readFileSync(path.join(repo, "tools", "registry-list.json"), "utf8")) as Array<Record<string, unknown>>;
+  const entry = list.find((e) => e.id === "moon-patrol");
+  assert.ok(entry, "the provisional list carries the moon-patrol entry");
+  assert.equal(entry.attractSoundPath, "games/moon-patrol/assets/attract-sound.json", "the entry names the authored asset: the recipe's only path into the bundle (AD-11/AD-18)");
+  const assetPath = path.resolve(repo, entry.attractSoundPath as string);
+  assert.ok(existsSync(assetPath), "the named asset exists");
+  const authored = JSON.parse(readFileSync(assetPath, "utf8")) as { sampleRate: number; loopSeconds: number; wave: string; gain: number; notes: Array<Record<string, number>> };
+  execFileSync(process.execPath, [GENERATOR], { cwd: repo, encoding: "utf8" }); // byte-identical regeneration (the existing pin proves it)
+  const text = readFileSync(path.join(repo, "generated", "game-registry.ts"), "utf8");
+  const embed = text.match(/attractSound: (\{.*?\}) },/);
+  assert.ok(embed, "the committed module embeds attractSound (mutation: drop attractSoundPath from tools/registry-list.json AND regenerate - the embed vanishes, every other test stays green, red lands here)");
+  assert.deepEqual(
+    JSON.parse(embed[1]!),
+    {
+      sampleRate: authored.sampleRate,
+      loopSeconds: authored.loopSeconds,
+      wave: authored.wave,
+      gain: authored.gain,
+      notes: authored.notes.map((n) => ({ start: n.start, end: n.end, freq: n.freq, amp: n.amp })),
+    },
+    "the embedded recipe equals the authored asset: no drift between the bundle and the game's own data",
+  );
+});
+
+// QA (Story 2.1, matrix row "Malformed attract recipe" gap): the AC pins
+// the FAILURE TEXT's substrings; nothing pinned that the message is
+// ENTRY-INDEXED - the idiom that says WHICH entry reddens the build. A
+// generator that dropped the "entry <i> (<id>): " prefix sailed every
+// substring pin green.
+test("malformed attract recipes fail naming the entry index and id (the entry-indexed message law)", () => {
+  const dir = fixtureRoot();
+  writeFileSync(path.join(dir, "attract.json"), "[]");
+  writeFileSync(
+    path.join(dir, "list.json"),
+    JSON.stringify([
+      { id: "alpha", simPath: "games/alpha/sim/sim.js" },
+      { id: "beta-game", simPath: "games/beta-game/sim/sim.js", attractSoundPath: "attract.json" },
+    ]),
+  );
+  try {
+    runGenerator(dir);
+  } catch (err) {
+    const e = err as { status?: number; stderr?: string };
+    assert.equal(e.status, 1, "generator must exit nonzero");
+    assert.match(
+      e.stderr as string,
+      /entry 1 \(beta-game\): attract sound recipe must be an object/,
+      "the failure names the entry's list position AND its id (index 1, not a hardcoded entry 0)",
+    );
+    return;
+  }
+  assert.fail("generator should have exited nonzero");
+});
+
 test("the repo's own list regenerates the committed registry byte-identically", () => {
   const repo = path.resolve(import.meta.dirname, "..");
   const committedPath = path.join(repo, "generated", "game-registry.ts");

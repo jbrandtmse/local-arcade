@@ -41,7 +41,7 @@ test("the loop seam is silent at both ends and the level stays bounded", () => {
   assert.ok(peak <= recipe.gain, "recipe gain bounds the peak");
 });
 
-test("the output clamp is EXERCISED: overlapping full-amp notes saturate to exactly ±1", () => {
+test("the output clamp is EXERCISED: overlapping full-amp notes saturate to exactly \u00B11", () => {
   // The authored recipe's amps never sum past 1, so the authored render
   // alone leaves the clamp leg dead code. Two identical full-amp triangle
   // notes sum to ~±2 mid-loop: the clamp at the write is what bounds it.
@@ -65,11 +65,15 @@ test("the output clamp is EXERCISED: overlapping full-amp notes saturate to exac
   assert.ok((s[60] ?? 0) === -1, "the trough sample reads clamped -1 (no clamp: ~-2)");
 });
 
-test("wave shapes: square flips sign; triangle passes through the asin law", () => {
+test("wave shapes: crest/trough pins hold for square and triangle; the shape law itself rides the hash pin", () => {
   // One full-amplitude note spanning the loop: 100 Hz at 8000 Hz
   // sampling. samples[60] sits at phase 3pi/2 (trough), samples[100] at
   // phase 5pi/2 (crest) — both clear of the note ramps (fade is 40, the
-  // ramp-free window is samples 40..119).
+  // ramp-free window is samples 40..119). Honesty note: BOTH wave shapes
+  // read the same +/- extremes at exactly these two samples, so these
+  // pins hold the amplitude law, not the shape law — a square<->triangle
+  // swap reddens the authored-recipe hash pin above, where the
+  // intermediate samples differ.
   const triangle: AttractSound = {
     sampleRate: 8000,
     loopSeconds: 0.02,

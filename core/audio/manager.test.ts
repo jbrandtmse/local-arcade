@@ -7,7 +7,7 @@
 // deferred to the Epic 3 harness — never claimed from this suite.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import type { AttractSound, GameRegistryEntry } from "../contract/wrapper.ts";
 import { ENTRY_STREET_VIEW, type EntryPhase, type EntryPose, type EntryState } from "../entry.ts";
@@ -316,6 +316,9 @@ test("the listener follows the ear on running ticks (the panner law: positional 
   entryKit.setPhase("door");
   manager.tick();
   assert.deepEqual(rig.listenerMoves.at(-1), { x: ENTRY_STREET_VIEW.x, y: EYE_HEIGHT, z: ENTRY_STREET_VIEW.z }, "pre-control the entry beat owns the ear (the same handover rule as the ray origin)");
+  entryKit.setPhase("workbench");
+  manager.tick();
+  assert.deepEqual(rig.listenerMoves.at(-1), { x: spawn.x + 2, y: EYE_HEIGHT, z: spawn.z }, "the workbench page keeps the PLAYER ear: entry.pose() freezes at the last street pose there, so an ear that fell back to it would localize the attract from the street while the visitor stands elsewhere (mutation: drop the workbench leg in ear() and every other phase pin stays green \u2014 red here)");
 });
 
 test("the browser adapter maps a shadowed raw context onto the seam: looped source, lowpass type, panner law on the real node, stamped params, copied samples", () => {
@@ -471,6 +474,27 @@ test("autoplay-blocked context: ticks actuate no params; each gesture attempts e
   assert.equal(rig.resumeAttempts(), 3, "a running context gets no further resume attempts");
 });
 
+test("interrupted and closed states hold the autoplay posture: interrupted is silent but gesture-recoverable, closed is terminal (the GraphState mirror's iOS/closed legs)", () => {
+  const { rig, manager } = build("suspended");
+  const gainParam = rig.params.find((p) => p.label.endsWith(".gain"))!;
+  rig.allowResume();
+  manager.requestResume();
+  manager.tick();
+  assert.equal(gainParam.targets.length, 2, "running: the chain-build write plus one actuation");
+  rig.forceState("interrupted");
+  for (let i = 0; i < 5; i++) manager.tick();
+  assert.equal(gainParam.targets.length, 2, "interrupted blocks actuation exactly like suspended (mutation: silent = state() === \"suspended\" \u2014 the interrupted ticks actuate, red here)");
+  manager.requestResume();
+  assert.equal(rig.resumeAttempts(), 2, "interrupted is recoverable: the gesture still attempts resume (mutation: add interrupted to requestResume's terminal early-return \u2014 red here)");
+  manager.tick();
+  assert.equal(gainParam.targets.length, 3, "the gesture resurrected the graph: the law actuates again");
+  rig.forceState("closed");
+  manager.tick();
+  assert.equal(gainParam.targets.length, 3, "closed blocks actuation too");
+  manager.requestResume();
+  assert.equal(rig.resumeAttempts(), 2, "closed is terminal: no resume attempt against a dead graph (mutation: drop the closed early-return \u2014 red here)");
+});
+
 test("law end-to-end + dwell: line-of-sound from the spawn reads base gain; a pillar applies only after DWELL_TICKS", () => {
   const { rig, manager, playerKit } = build("running");
   const gainParam = rig.params.find((p) => p.label.endsWith(".gain"))!;
@@ -537,8 +561,65 @@ test("determinism twin: two identical rigs over a scripted listener walk record 
   assert.deepEqual(a.rig.connects, b.rig.connects);
 });
 
+// QA (Story 2.1 gap): AD-23's consumption law + the 2.0 continuity line.
+// Every other rig above feeds the manager fresh per-call objects, so a
+// manager that wrote back into kernel state or the authored volume list
+// was invisible. This pin hands STABLE state objects, snapshots them,
+// runs ticks across the occlusion/actuation paths, and proves the manager
+// left every input byte-identical (occupancy, player pose, entry state,
+// the recipe, and collisionVolumes - the list is read, never edited).
+test("the manager mutates no kernel state (AD-23: occupancy is scheduler-owned; the volume list and every input stay read-only)", () => {
+  const stableScheduler = {
+    state: () => ({
+      tick: 0,
+      cabinets: [
+        { volumeId: "cabinet-B0", gameId: "moon-patrol", occupancy: "patron-autoplay" as Occupancy, runCount: 1, lastSeed: 7, queue: [], rearmTick: 0 },
+      ],
+    }),
+  };
+  const rig = createFakeGraph("running");
+  const entryKit = makeEntry("control", 1);
+  const playerKit = makePlayer();
+  const manager = createAudioManager({
+    graph: rig.graph,
+    registry,
+    scheduler: stableScheduler,
+    player: playerKit.player,
+    entry: entryKit.entry,
+  });
+  // Park the listener behind pillar-1 so the ticks exercise the raycast,
+  // the dwell, the profile apply, and the param actuation - every path
+  // where a stray write-back could live. The last write before the
+  // snapshot is the RIG's; from here on only the manager runs.
+  const spot = behindPillar1();
+  playerKit.state.x = spot.x;
+  playerKit.state.z = spot.z;
+  const before = {
+    scheduler: JSON.stringify(stableScheduler.state()),
+    player: JSON.stringify(playerKit.state),
+    entryState: JSON.stringify(entryKit.entry.state()),
+    entryPose: JSON.stringify(entryKit.entry.pose()),
+    volumes: JSON.stringify(collisionVolumes),
+    recipe: JSON.stringify(registry[0]!.attractSound),
+  };
+  for (let i = 0; i < DWELL_TICKS + 5; i++) manager.tick();
+  assert.equal(JSON.stringify(stableScheduler.state()), before.scheduler, "occupancy is scheduler-owned: the manager reads state() and writes nothing back (AD-23)");
+  assert.equal(JSON.stringify(playerKit.state), before.player, "the listener pose is player-owned: the manager never touches it");
+  assert.equal(JSON.stringify(entryKit.entry.state()), before.entryState, "the beat state is entry-owned");
+  assert.equal(JSON.stringify(entryKit.entry.pose()), before.entryPose, "the beat pose is entry-owned");
+  assert.equal(JSON.stringify(collisionVolumes), before.volumes, "the authored volume list is read, never edited (the 2.0 continuity line)");
+  assert.equal(JSON.stringify(registry[0]!.attractSound), before.recipe, "the registry recipe is data: the synth renders it, nothing writes into it");
+});
+
 test("AD-3: no wall-clock identifiers in core/audio; the audio clock stays confined to the labelled adapter", () => {
-  const files = ["occlusion.ts", "mix.ts", "synth.ts", "manager.ts"];
+  // READDIR, not a hand-list: a hand-picked four files would silently stop
+  // covering the scan the moment a fifth lands under core/audio/ (Story
+  // 2.2's focus-mix does). The pin enumerates the live source set and
+  // pins it non-empty; new sources join the wall-clock scan for free.
+  const files = readdirSync(path.join(REPO, "core", "audio"))
+    .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"))
+    .sort();
+  assert.ok(files.includes("manager.ts") && files.length >= 4, "the enumeration sees the real sources");
   for (const file of files) {
     const src = readFileSync(path.join(REPO, "core", "audio", file), "utf8")
       .replace(/\/\/[^\n]*/g, "")

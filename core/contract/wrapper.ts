@@ -95,7 +95,9 @@ export interface AttractSoundNote {
   start: number;
   /** Seconds from loop start (exclusive end). */
   end: number;
-  /** Frequency, Hz (positive). */
+  /** Frequency, Hz; positive, and keep it below sampleRate/2 (Nyquist) —
+   * a note above the Nyquist rate renders (silently aliased), the build
+   * gate bounds freq positive only. */
   freq: number;
   /** Amplitude in [0, 1]. */
   amp: number;
@@ -103,7 +105,9 @@ export interface AttractSoundNote {
 
 /** The whole attract-loop recipe shape (validated at build by gen-registry). */
 export interface AttractSound {
-  /** PCM sample rate of the rendered loop, Hz (positive integer). */
+  /** PCM sample rate of the rendered loop, Hz; an integer in
+   * [8000, 192000] — the AudioBuffer createBuffer range, enforced by
+   * tools/gen-registry.mjs at the build gate. */
   sampleRate: number;
   /** Loop length, seconds (positive). */
   loopSeconds: number;

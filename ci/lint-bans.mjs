@@ -393,7 +393,7 @@ const WEBAUDIO_NAMES = new Set(["AudioContext", "webkitAudioContext", "OfflineAu
 // of the global reaches a game half, so self./top./parent./global. are
 // banned receivers here even where they stay sanctioned Math-as-value
 // paths for the wall-clock rules.
-const WEBAUDIO_RECEIVERS = new Set(["globalThis", "window", "self", "top", "parent", "global"]);
+const WEBAUDIO_RECEIVERS = new Set(["globalThis", "window", "self", "top", "parent", "global", "frames", "opener"]);
 
 function webaudioHits(toks) {
   const hits = [];

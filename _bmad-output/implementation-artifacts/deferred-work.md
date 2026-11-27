@@ -100,6 +100,7 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - 2026-11-23T23:39:02Z occurrence=1-5-moon-patrol-plays-in-place-vendored-wrapped-alive by=cr note=the 1.5 drawFrame/compositeScreen chain adds real-THREE legs with no executed browser coverage; source-pin tier until the Epic-3 browser harness
 - 2026-11-24T06:44:33Z occurrence=1-6-one-busy-machine-a-patron-actually-plays
 - 2026-11-25T10:56:59Z owner=3-2-the-gate-goes-deterministic-l0-l1-scripts-contract-test-skil by=burndown note=same_browser-harness_tier_as_DW-12;bullet_in_epics.md_3.2
+- 2026-11-27T08:07:29Z occurrence=2-1-core-audio-manager-attract-sound-that-occludes-and-swells by=lead note=audio-glue legs (AudioContext construction, gesture-resume, live param actuation) pinned only at source/fake tier; lead smoke walk is this story's runtime check
 
 ### DW-16: Front wall open above the door head: no lintel volume over the door gap (visible see-through band y 2.1-3.0 when looking up at the door; 13cm recess behind the panel)
 - source: spec-1-3-the-arcade-room-slots-pillars-zones-and-the-roadmap-wall.md | severity: med | fix-risk: med | footprint: in-story
@@ -282,3 +283,24 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: 2-1 implement harvest | severity: low | fix-risk: med | footprint: core/main.ts glue + Epic-3 browser harness tier
 - evidence: spec-2-1 frontmatter deferred:; pinned in core/main-glue.test.ts source pins; same posture as DW-15 (renderer glue) — executed browser tier lands with the Epic-3 harness (3.2/3.15)
 - 2026-11-27T03:22:12Z status=routed owner=2-1-core-audio-manager-attract-sound-that-occludes-and-swells by=harvest note=lead smoke walk is this story's runtime check; Epic-3 harness closes
+- 2026-11-27T08:07:58Z status=dropped by=lead note=duplicate-of-DW-15 same Epic-3 browser-harness tier; occurrence trailer recorded on DW-15; executed tier closes with 3-2-the-gate... harness
+
+### DW-48: The repo's one-graph law has no repo-wide guard: nothing reddens an AudioContext/node-factory reference in core/ files outside core/audio/ and core/main.ts
+- source: spec-2-1-core-audio-manager-attract-sound-that-occludes-and-swells.md | severity: low | fix-risk: med | footprint: in-story
+- evidence: Glue pin counts new AudioContext( only in main.ts; the no-webaudio-graph ban scans games/<id>/{sim,presentation}/**; the AD-3 pin scans core/audio/ only - a graph in a later core/ file walks all three green while manager.ts's header asserts the law.
+- 2026-11-27T07:45:46Z status=wontfix-accepted owner=2-1-core-audio-manager-attract-sound-that-occludes-and-swells by=cr note=reopen_if=a second new AudioContext( or node factory under core/ outside core/audio+main.ts; Epic-3 L0 data-flow pass subsumes
+
+### DW-49: Attract recipe bounds beyond the build gate: no upper bound on loopSeconds x sampleRate (huge boot AudioBuffer), no Nyquist bound on note freq (silent aliasing)
+- source: spec-2-1-core-audio-manager-attract-sound-that-occludes-and-swells.md | severity: low | fix-risk: low | footprint: in-story
+- evidence: gen-registry validates sampleRate in [8000,192000] + non-empty render + positive freq only; the authored recipe is 1.6 s at 22050 Hz with max note 659.25 Hz - far inside both bounds.
+- 2026-11-27T07:45:46Z status=wontfix-theoretical owner=2-1-core-audio-manager-attract-sound-that-occludes-and-swells by=cr note=makes it real: an authored recipe rendering >~10^6 samples or a note above sampleRate/2; contract + builder doc now warn Nyquist
+
+### DW-50: Occlusion slab clip inverts for an injected volume thinner than 2 x DEADBAND_M: phantom or missed occlusion via the injectable volumes seam
+- source: spec-2-1-core-audio-manager-attract-sound-that-occludes-and-swells.md | severity: low | fix-risk: low | footprint: in-epic
+- evidence: occlusion.ts segEntryT shrinks each slab without a max-clamp; the authored list is safe (thinnest leg door-front z 0.120); dev review named the general clamp a 3.7 pass but the injectable seam carries no pin.
+- 2026-11-27T07:46:05Z status=routed owner=3-7-the-l2-room-audit-whole-room-proof-and-the-numbers-that-make by=cr note=general thin-occluder clamp lands with 3.7's authored audio pass; the invariant pin keeps the authored list honest until then
+
+### DW-51: Story 2.1's 3.7 hand-offs were prose-only, invisible to the drain: final profile/smoothing/dwell/dead-band/panner numbers, overlapping-recipe amp-sum build note, 1.3/2.1 rayclip unification
+- source: spec-2-1-core-audio-manager-attract-sound-that-occludes-and-swells.md | severity: low | fix-risk: med | footprint: in-epic
+- evidence: The Auto Run Result follow-up recommendation lists them; deferred-work.md received only DW-47 at dev_complete, so the burn-down drain could not see the rest.
+- 2026-11-27T07:46:05Z status=routed owner=3-7-the-l2-room-audit-whole-room-proof-and-the-numbers-that-make by=cr note=3.7's plan spawn receives these via its ledger slice and must address or decline each leg (Rule 17)

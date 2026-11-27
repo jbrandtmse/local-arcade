@@ -1,3 +1,29 @@
+# Test Automation Summary — Story 2.1 (QA stage, 2026-11-26)
+
+Target: the implemented deliverable of Story 2.1 (`git diff --name-only 09a273b..HEAD` — the Core Audio Manager `core/audio/{manager,mix,occlusion,synth}.ts` + suites, the boot/gesture wiring in `core/main.ts` + glue pins, the `attractSound` registry seam (`core/contract/wrapper.ts`, `tools/gen-registry.mjs`, `tools/registry-list.json`, `generated/game-registry.ts`), the moon-patrol recipe, and the both-halves lint ban). Acceptance criteria: the spec's Tasks & Acceptance + I/O & Edge-Case Matrix. Framework: the project's existing convention — `node --test` over co-located `*.test.ts` (`npm test`); no new dependency, no browser/audio-runtime harness (DW-15/DW-44 posture; the story's own frontmatter defers the executed browser tier as DW-47 — fake-graph rig, pure-law literals, and source pins are this story's falsifiable tier).
+
+## Generated Tests
+
+### Gap-hunt additions (existing files, in place)
+- [x] `core/audio/manager.test.ts` (QA addition) — the AD-23 consumption pin: every pre-QA rig feeds the manager fresh per-call state objects, so a manager writing back into scheduler occupancy, player pose, entry state/pose, the registry recipe, or the authored collisionVolumes list (the 2.0 continuity line: "read the list, never edit") had no observable leg. The pin feeds stable objects, snapshots six inputs, runs 35 ticks across the raycast/dwell/actuation paths, and proves every input byte-identical.
+- [x] `tools/gen-registry.test.ts` (QA additions) — (1) the SHIPPED bundle carries the attract loop: authored asset -> `tools/registry-list.json` leg -> parsed content of the embed in `generated/game-registry.ts` (the AC's "the recipe is embedded" claim had no pin on the shipped artifact — every other attract test reads the asset file directly, and the regeneration test only proves committed == regenerated); (2) the entry-indexed failure-message law (matrix row 6, "entry-indexed message (the impulsePath idiom)"): the malformed-recipe failure names `entry <i> (<id>)` with a real list index (a second-entry fixture — a hardcoded or dropped prefix sailed every substring pin).
+
+## Gap-hunt result
+The other AC and matrix legs were already executed with recorded mutations (25 witnesses: 9 implement + 16 review pass; the lead separately re-verified the AD-1/AD-2 depcheck legs, the lint-bans RED in both plugin halves, the gen-registry drift leg, and the dwell/deadband law swaps — no re-demonstration needed). The three additions above are the only unpinned binding legs found. Discriminators: the silent-drop witness (list leg removed AND regenerated) reddens ONLY the embed pin while the byte-identical-regeneration pin and the whole pre-QA suite stay green — the shipped bundle would go silent with everything else passing; the prefix-strip witness reddens only the entry-index pin; the bobPhase write-back reddens only the AD-23 pin.
+
+## Verification run (post-QA)
+- `npm test`: 428/428 pass (425 at dev finalize + 3 QA tests).
+- `npm run typecheck`: 0. `node ci/depcheck.mjs`: 0. `node ci/lint-bans.mjs`: 0.
+- `node tools/gen-registry.mjs && git diff --exit-code -- generated/`: byte-identical.
+- Hermeticity: `core/audio/manager.test.ts` + `tools/gen-registry.test.ts` run together forward AND in reverse order: 25/25 green both orders; the embed test's regeneration leaves the committed module byte-identical (no state left behind).
+- Rule 19: 3 QA mutation demonstrations (AD-23 write-back `bobPhase = 7` in `tick()`; `attractSoundPath` drop + regen; `entry ${i} (${entry.id}): ` prefix strip). Each red observed with attribution, reverted, file sha256-verified byte-identical to the pre-mutation baseline (manager.ts d1b03743…, gen-registry.mjs 65cf221a…, registry-list.json cb12cfb6…, generated/game-registry.ts f4e1053a…), suite re-green 428/428. Recorded in the spec's `## Verification` QA block.
+- `npm run build` not re-run (test-only change; the story's once-per-story build already ran at dev finalize). :5173 untouched; no browser or audio-runtime instance started. The by-ear / browser tiers stay the lead's smoke + Epic-3 harness per DW-47.
+
+## Next Steps
+- Lead commits `core/audio/manager.test.ts` + `tools/gen-registry.test.ts` + the spec Verification block + this summary (this stage forbids committing), then runs the fresh-environment forward/reverse check and the per-story smoke.
+
+---
+
 # Test Automation Summary — Story 2.0 (QA stage, 2026-11-26)
 
 Target: the implemented deliverable of Story 2.0 (`git diff --name-only fbe9ce2..HEAD` — the DW-29 cabinet rebuild in `core/room/` (profiles, per-cabinet group assembly, seam extension, tokens, three new painters), the DW-24 yaw-wrap law in `core/player.ts`, the DW-23 exposure re-derivation + ACES posture in `core/main.ts`, the cap split, and the story's own pins). Acceptance criteria: the spec's Tasks & Acceptance + I/O & Edge-Case Matrix. Framework: the project's existing convention — `node --test` over co-located `*.test.ts` (`npm test`); no new dependency; no browser harness (DW-15 precedent — the executed renderer-posture tier lands Epic 3, the source-pin tier stands).

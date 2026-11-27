@@ -18,7 +18,7 @@ import {
   type DwellState,
 } from "./mix.ts";
 
-function entryAt(phase: "boot-check" | "door" | "ready-handle" | "open" | "control", bleedFraction: number) {
+function entryAt(phase: "boot-check" | "door" | "ready-handle" | "open" | "control" | "workbench", bleedFraction: number) {
   return { phase, bleedFraction };
 }
 
@@ -121,6 +121,9 @@ test("swell: the entry beat's bleedFraction IS the swell; control is full level"
   assert.equal(mixStep({ entry: entryAt("open", 1), occupancy: "attract", sampleIds: [], dwell: INITIAL_DWELL }).target.gain, 0.5);
   // control: even a stale low bleedFraction cannot duck the room.
   assert.equal(mixStep({ entry: entryAt("control", 0.25), occupancy: "attract", sampleIds: [], dwell: INITIAL_DWELL }).target.gain, ATTRACT_BASE_GAIN);
+  // workbench (the failNow handover): the beat is over, so a stale partial
+  // bleed can never duck the attract on the workbench page either.
+  assert.equal(mixStep({ entry: entryAt("workbench", 0.25), occupancy: "attract", sampleIds: [], dwell: INITIAL_DWELL }).target.gain, ATTRACT_BASE_GAIN, "control/workbench are both outside SWEEP_PHASES: full level (mutation: add workbench to SWEEP_PHASES and a failNow from the door beat freezes the workbench attract at the stale bleed \u2014 red here)");
 });
 
 test("occupancy gate: silent ONLY while a visitor sits; a busy cabinet keeps playing", () => {
