@@ -57,3 +57,4 @@
 2026-11-27T08:37:19Z	Story 2.1	committed	sha=3ff2beb ci=none submodules=
 2026-11-27T08:37:19Z	Story 2.1	story_cycle	plan_to_commit_min=702 implement_passes=1 reviews=1 rework=0 first_ci=none
 2026-11-27T08:53:47Z	Epic 2	planning_artifacts_amended	item=rule-20-spine-conventions-row commit=22aba24 by=Planner-via-bmad-architecture files=ARCHITECTURE-SPINE.md+architecture.memlog.md note=additive Conventions row (game audio asset recipe -> gen-registry inline embed; GameRegistryEntry.attractSound); no AD touched; context cache invalidated - recompile (attempt 5) before 2-2 plan spawn; pushed by lead
+2026-11-27T08:54:53Z	Epic 2	epic_context_compile_spawned	attempt=5 agent=epic-2-context-compile-5 reason=rule-20-spine-row-22aba24 prompt=C:/tmp/spawn-epic2-context-compile-5.txt
