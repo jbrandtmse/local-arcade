@@ -277,3 +277,8 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: lead AD-verification mutation witness (story 2.0 adr gate) | severity: med | fix-risk: med | footprint: small
 - evidence: probe pair: core/__probe_a.ts (template then games import) not cited vs core/__probe_b.ts (import then template) cited red; same miss for import appended after toCss template in core/room/tokens.ts; scan walk at ci/depcheck.mjs:70-96 does not track template-literal mode
 - 2026-11-26T15:46:32Z status=routed owner=burndown by=lead-ad-verification note=AD-1 leg sound for template-free files and before-template positions; found while witnesses required; no current source violates AD-1 - verified by post-revert green + full-suite posture
+
+### DW-47: Browser wiring this story adds (real AudioContext construction, gesture-resume glue, live param actuation in core/main.ts) has no executed test host — Node has no WebAudio; pinned by fake-graph + pure-law + source-text tiers only
+- source: 2-1 implement harvest | severity: low | fix-risk: med | footprint: core/main.ts glue + Epic-3 browser harness tier
+- evidence: spec-2-1 frontmatter deferred:; pinned in core/main-glue.test.ts source pins; same posture as DW-15 (renderer glue) — executed browser tier lands with the Epic-3 harness (3.2/3.15)
+- 2026-11-27T03:22:12Z status=routed owner=2-1-core-audio-manager-attract-sound-that-occludes-and-swells by=harvest note=lead smoke walk is this story's runtime check; Epic-3 harness closes
