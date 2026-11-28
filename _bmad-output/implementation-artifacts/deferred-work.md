@@ -327,13 +327,21 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: lead-smoke Story 2.2 (browser on :5173) | severity: low | fix-risk: low | footprint: in-epic
 - evidence: chrome-devtools smoke: after player.teleport({x,z,yaw}), player.state.pitch===null persists (keyboard w moves z, bobPhase advances, audio chain records update, graph running) and viewport renders solid black with no console errors; page reload at same URL renders the room correctly - defect only reachable via the debug teleport seam; story diff 12d71cc..9779d19 is audio-only
 - 2026-11-27T19:11:20Z status=routed owner=3-2-the-gate-goes-deterministic-l0-l1-scripts-contract-test-skil by=lead note=pre-existing debug-seam defect, not the 2.2 deliverable; 3.2 carries the browser/audio-runtime harness tier (DW-15 owner) - fix the pitch default or pin a teleport seam test there
+- 2026-11-28T05:43:19Z occurrence=2-3-light-spill-and-atmospheric-depth-the-graphics-rung-works-al
 
 ### DW-56: no executed visual/browser tier for by-sight claims (haze depth, spill bleed, gradient ordering) — pure-law pins, fake-rig settle pins, real-three anchor tier are the falsifiable tier this epic
 - source: harvest Story 2.3 (spec frontmatter deferred) | severity: low | fix-risk: low | footprint: cross-epic
 - evidence: no browser-E2E harness until Epic 3 (same posture as 2.1/2.2 deferred items); a law-value edit keeping every literal pin green changes what is seen — only the smoke walk sees it; pinned in core/room/atmosphere.test.ts, scene.test.ts, cabinets.test.ts real-three tier
 - 2026-11-28T00:39:10Z status=open owner=2-3-light-spill-and-atmospheric-depth-the-graphics-rung-works-al by=harvest note=
+- 2026-11-28T05:52:45Z status=routed owner=3-7-the-l2-room-audit-whole-room-proof-and-the-numbers-that-make by=adjudication note=residual: by-sight visual read of the 2.3 haze/bleed/gradient stays unexecuted; lead smoke reads arcadeDebug.atmosphere numbers only; 3.7 L2 whole-room audit owns the authored-numbers pass, executed browser harness lands Epic 3
 
 ### DW-57: atmosphere/spill tier authored against the shipped room (one placement B0 + authored pillar pair); multi-cabinet legs pinned only via synthetic injected placements at authored slot ids — behavior under final authored room contents is Story 3.7's call
 - source: harvest Story 2.3 (spec frontmatter deferred) | severity: low | fix-risk: low | footprint: cross-epic
 - evidence: atmosphere.test.ts fixtures + spillAnchors consumers; room growth is the ledger's job (AD-9/AD-10); mirrors 2.2's review-upheld injected-B0/B1 posture
 - 2026-11-28T00:39:10Z status=open owner=2-3-light-spill-and-atmospheric-depth-the-graphics-rung-works-al by=harvest note=
+- 2026-11-28T05:52:46Z status=routed owner=3-7-the-l2-room-audit-whole-room-proof-and-the-numbers-that-make by=adjudication note=residual: tier mounts from placement/volume records; behavior under final authored room contents (multi-cabinet, wider occluder sets) unpinned beyond synthetic legs; 3.7 authored-data pass owns room-growth call and reach retune (DW-58 distinctness rides)
+
+### DW-58: Boot-tier light attribution needs CABINET_LIGHT_REACH and SPILL_REACH_M to stay distinct
+- source: spec-2-3-light-spill-and-atmospheric-depth-the-graphics-rung-works-al.md | severity: low | fix-risk: low | footprint: in-story
+- evidence: main-boot-qa.test.ts pairLights filters distance===CABINET_LIGHT_REACH, bleedLights slices the trailing 8 PointLights; a retune equalizing the reaches shifts attribution
+- 2026-11-28T05:43:10Z status=routed owner=3-7-the-l2-room-audit-whole-room-proof-and-the-numbers-that-make by=cr note=QA harvest candidate: 3.7 re-tunes reaches together - keep distinct or rework the attribution idiom

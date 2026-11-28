@@ -542,7 +542,7 @@ test("2.3 atmosphere wiring: the spill tier builds exactly once from the volume 
   assert.ok(body.includes("const distanceM = Math.sqrt(dx * dx + dz * dz);"), "the metric is pinned: XZ Euclidean (mutation: Manhattan sums red this while every law/rig suite stays green — the shipped haze would silently reshape)");
   assert.ok(body.includes("const glow = CABINET_LIGHT_INTENSITY * pulseApplied * haze;"), "nominal x pulse x haze — the authored nominal is multiplied, never retyped (the haze tier acts on point lights only)");
   assert.ok(body.includes("const spillGlow = SPILL_INTENSITY * pulseApplied * haze;"), "each bleed node rides the same law on its SOURCE cabinet's nominal — the gradient carries into the blind spots (AC3)");
-  // cr-1 lesson: pin EVERY assignment — a droppable line is an unwired law.
+  // Pin EVERY assignment — a droppable line is an unwired law.
   assert.ok(
     body.includes("rig.pair.halo.intensity = glow;") &&
       body.includes("rig.pair.spill.intensity = glow;") &&
@@ -569,7 +569,7 @@ test("2.3 atmosphere wiring: the spill tier builds exactly once from the volume 
   const audioImports = MAIN.match(/from "\.\/audio\/[^"]+"/g) ?? [];
   assert.equal(audioImports.length, 1, 'main.ts imports exactly ONE core/audio module (2.1\'s "./audio/manager.ts") — the atmosphere wiring adds none');
   const noComments = body.replace(/\/\/[^\n]*/g, "").replace(/\/\*[\s\S]*?\*\//g, "");
-  for (const banned of ["occlusion", "segHitsRect", "audio", "Panner", "emissive", "emissiveIntensity"]) {
+  for (const banned of ["occlusion", "segHitsRect", "audio", "Panner", "emissive"]) {
     assert.ok(!noComments.includes(banned), `the glow ramp in frame() carries no ${banned} surface — AC2 asymmetry by design, and AC6's other half: the frame's light leg writes point-light intensity only, emissive faces are NEVER ramped (the DW-23 exposure budget and screen-stays-brightest law ride build-tier only)`);
   }
 });
