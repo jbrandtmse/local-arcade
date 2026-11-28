@@ -95,3 +95,4 @@
 2026-11-28T06:01:30Z	Story 2.3	fresh_check	env=fresh-25-recipe:detached-worktree+dirty-overlay+cp-R-l-node_modules tests=6 result=pass order=forward,reverse note=84/84-both-directions;boot-shim-portable-in-fresh-env
 2026-11-28T06:02:45Z	Story 2.3	committed	sha=7550250 submodules= ci=none runs=none amendments=none
 2026-11-28T06:02:45Z	Story 2.3	story_cycle	plan_to_commit_min=639 implement_passes=1 reviews=1 rework=0 first_ci=none note=cr-stage-relayed-twice-prematurely(cr-1-lost-relay;cr-2-interim-return-rejected);cr-2-final-return-verified-on-disk;QA-added-boot-tier-rig-accepted
+2026-11-28T06:06:25Z	Story 2.4	stage_spawned	stage=plan spawn_at=2026-11-28T06:06:25Z agent_name=2-4-settings-plan-1 cycle_iteration=1 prompt=C:/tmp/spawn-2-4-plan-1.txt note=Halt after planning; ledger slice empty (verified); epic-2-context fresh (no planning artifact newer)
