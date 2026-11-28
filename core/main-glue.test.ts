@@ -190,10 +190,12 @@ test("1.4 cabinet wiring: the phase advances as a kernel system, coin doors togg
   assert.ok(body.includes("three.markTextureUpdated(s.texture)"), "a repaint marks the SAME texture dirty (no second canvas)");
   // 1.9 moved pin: the arcadeDebug line gains the entry sequence (phase +
   // timeToPlayableMs + failNow) beside the rest — console-only, zero UI.
-  // 2.1 moved it again: the line gains the Core Audio Manager.
+  // 2.1 moved it again: the line gains the Core Audio Manager. 2.3 moved it
+  // once more: the line gains the atmosphere leg (per-cabinet haze/pulse/
+  // glow rows the frame writes — plain data for the smoke walk).
   assert.ok(
-    MAIN.includes("window.arcadeDebug = { player, loop, cabinets, seat, scheduler, presenter, containment, storage, entry, audio };"),
-    "the console smoke can read the cabinet runtime, the seat cycle (1.5), the Patron scheduler + figure presenter (1.6), the containment handle with injectFault (1.7 — the smoke drives a REAL fault chain), the storage/identity service (1.8 — the smoke reads visitorId + rowsFor), and the entry sequence (1.9 — phase, the timeToPlayableMs measurement, and failNow to drive the workbench swap through the real law) — console-only, zero UI (AD-24)",
+    MAIN.includes("window.arcadeDebug = { player, loop, cabinets, seat, scheduler, presenter, containment, storage, entry, audio, atmosphere: atmosphereLegs };"),
+    "the console smoke can read the cabinet runtime, the seat cycle (1.5), the Patron scheduler + figure presenter (1.6), the containment handle with injectFault (1.7 — the smoke drives a REAL fault chain), the storage/identity service (1.8 — the smoke reads visitorId + rowsFor), the entry sequence (1.9 — phase, the timeToPlayableMs measurement, and failNow to drive the workbench swap through the real law), and the atmosphere leg (2.3 — per-cabinet distanceM / hazeFactor / pulseApplied / glowIntensity) — console-only, zero UI (AD-24)",
   );
   for (const banned of ["performance.now", "Date.now", "Math.random", "tickCount"]) {
     assert.ok(!body.includes(banned), `the 1.4 frame legs must not read ${banned} either (liveness derives from tick state)`);
@@ -517,4 +519,57 @@ test("2.1 audio wiring: one AudioContext construction, audio after seat, gesture
   // Debug surface carries the manager (mix numbers are plain data; the
   // by-ear claim is browser-tier, never made from here).
   assert.ok(MAIN.includes("audio: AudioManager;"), "the arcadeDebug type carries the audio manager");
+});
+
+// Story 2.3 (AC1-AC4 wiring): the glow-ramp pins. The executed gradient
+// lives in core/room/atmosphere.test.ts (laws) and the fake-rig pin in
+// core/room/scene.test.ts (handles observable in the recorded graph);
+// these pins prove the SHIPPED entry routes the frame's light tier through
+// the laws and the handles (DW-12 tier), and that the wiring stays
+// asymmetric by construction: no audio surface anywhere in the glow ramp.
+test("2.3 atmosphere wiring: the spill tier builds exactly once from the volume + placement records at scene assembly, frame() applies nominal x pulse x haze onto the cabinet light handles AND every bleed node AND the debug legs, the glow block sits between the figure re-pose and the draw legs, arcadeDebug carries the additive atmosphere leg, and the wiring touches no audio/occlusion surface (AC1-AC4 wiring)", () => {
+  assert.ok(MAIN.includes('} from "./room/atmosphere.ts";'), "the tier is imported at the device edge");
+  assert.equal((MAIN.match(/buildSpillNodes\(/g) ?? []).length, 1, "exactly ONE spill-tier build site — boot scope, the buildRoomScene idiom (a per-frame build would rebuild the graph 60x/s)");
+  assert.ok(MAIN.includes("buildSpillNodes(three, scene, collisionVolumes, cabinetPlacements);"), "the build rides the REAL volume list + authored placements through the injected seam (the same three/scene the room build got — one geometry source, AC2)");
+  assert.ok(MAIN.includes("handles.cabinetLights"), "the glow ramp's source is the RoomHandles.cabinetLights pair — the SAME two lights 2.0 built, no new face lights");
+  assert.ok(MAIN.includes("center: placementGeometry(placementByVolumeId(pair.volumeId).slotId).center,"), "the haze rig measures from the placement's AUTHORED body centre — mutation: center to {x:0,z:0} reddens HERE while the law suites stay green (the shipped gradient would flatten to distance-from-origin, AC1)");
+  assert.ok(MAIN.includes("rigsByVolumeId.set(pair.volumeId, rig);"), "the rig map keys by the handle's volumeId — the pairing the bleed loop rides (mutation: delete -> red here)");
+  assert.ok(MAIN.includes("rig.bleed.push(node);"), "every built bleed node lands on its source cabinet's rig — an ungrouped node ships dark forever, the inert-tier bug this story exists to fix (mutation: delete -> red here)");
+  const body = frameBody(MAIN);
+  assert.ok(body.includes("glowPulse(cabinets.phase)"), "the pulse rides the cabinet phase counter (kernel tick state, AD-3/AD-15)");
+  assert.ok(body.includes("hazeFactor(distanceM)"), "the haze rides this frame's camera distance (the pose the camera branch above just wrote from tick state)");
+  assert.ok(body.includes("camera.position.x - rig.center.x") && body.includes("camera.position.z - rig.center.z"), "distance is camera pose minus the authored body centre — no new per-frame pose state (AC1)");
+  assert.ok(body.includes("const distanceM = Math.sqrt(dx * dx + dz * dz);"), "the metric is pinned: XZ Euclidean (mutation: Manhattan sums red this while every law/rig suite stays green — the shipped haze would silently reshape)");
+  assert.ok(body.includes("const glow = CABINET_LIGHT_INTENSITY * pulseApplied * haze;"), "nominal x pulse x haze — the authored nominal is multiplied, never retyped (the haze tier acts on point lights only)");
+  assert.ok(body.includes("const spillGlow = SPILL_INTENSITY * pulseApplied * haze;"), "each bleed node rides the same law on its SOURCE cabinet's nominal — the gradient carries into the blind spots (AC3)");
+  // cr-1 lesson: pin EVERY assignment — a droppable line is an unwired law.
+  assert.ok(
+    body.includes("rig.pair.halo.intensity = glow;") &&
+      body.includes("rig.pair.spill.intensity = glow;") &&
+      body.includes("for (const node of rig.bleed) node.light.intensity = spillGlow;") &&
+      body.includes("rig.leg.distanceM = distanceM;") &&
+      body.includes("rig.leg.hazeFactor = haze;") &&
+      body.includes("rig.leg.pulseApplied = pulseApplied;") &&
+      body.includes("rig.leg.glowIntensity = glow;"),
+    "every glow-ramp ASSIGNMENT is pinned: drop a handle line and one of the two 2.0-built lights stays dark-built forever (the inert-tier bug this story exists to fix); drop the bleed line and the spill tier ships as dark nodes; drop a leg line and the smoke walk loses its gradient readout (mutation: delete any one — red here)",
+  );
+  const figuresAt = body.indexOf("for (const f of figures)");
+  const glowAt = body.indexOf("const pulseApplied = glowPulse(");
+  const paintAt = body.indexOf("const paintStep = screenPaintStep(cabinets);");
+  const renderAt = body.indexOf("renderer.render(scene, camera);");
+  assert.ok(
+    figuresAt >= 0 && glowAt > figuresAt && glowAt < paintAt && paintAt < renderAt,
+    "the glow ramp is the frame's light leg: after the figure re-pose, before the draw legs and the render (the frontDoorRamp posture — render READS kernel state, never paces it)",
+  );
+  assert.ok(MAIN.includes("atmosphere: AtmosphereDebug[];"), "the arcadeDebug TYPE carries the additive atmosphere leg (console-only, zero UI, AD-24)");
+  // AC4 at the wiring level: the 2.3 wiring imports nothing from
+  // core/audio/ (the sole audio import is 2.1's manager), and the glow
+  // ramp in frame() names no audio/occlusion surface (comments stripped —
+  // the law is about mechanism, not prose).
+  const audioImports = MAIN.match(/from "\.\/audio\/[^"]+"/g) ?? [];
+  assert.equal(audioImports.length, 1, 'main.ts imports exactly ONE core/audio module (2.1\'s "./audio/manager.ts") — the atmosphere wiring adds none');
+  const noComments = body.replace(/\/\/[^\n]*/g, "").replace(/\/\*[\s\S]*?\*\//g, "");
+  for (const banned of ["occlusion", "segHitsRect", "audio", "Panner", "emissive", "emissiveIntensity"]) {
+    assert.ok(!noComments.includes(banned), `the glow ramp in frame() carries no ${banned} surface — AC2 asymmetry by design, and AC6's other half: the frame's light leg writes point-light intensity only, emissive faces are NEVER ramped (the DW-23 exposure budget and screen-stays-brightest law ride build-tier only)`);
+  }
 });

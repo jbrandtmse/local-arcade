@@ -42,7 +42,8 @@ import {
   toggleCoinDoor,
   type CabinetRuntime,
 } from "./cabinets.ts";
-import { ENTRY_SPAWN, collisionVolumes } from "./collision-volumes.ts";
+import { ENTRY_SPAWN, WALL_TOP, collisionVolumes } from "./collision-volumes.ts";
+import { SPILL_CEILING_INSET_M, SPILL_FLOOR_MOUNT_M, SPILL_OFFSET_M, buildSpillNodes } from "./atmosphere.ts";
 import { wallSlots } from "./slot-config.ts";
 import { GLOW_CYAN, GLOW_MARQUEE } from "./tokens.ts";
 import { createGameInstance, math, type TickInput } from "../contract/index.ts";
@@ -1028,5 +1029,42 @@ test("verification 8 (brief 8): the whole cabinet \u2014 group children plus the
     // 928 triangles (three 0.187.0, exact primitive counts), so a re-tune
     // that silently inflates primitives toward the 1500 budget reddens here.
     assert.ok(tris > 0 && tris < 1200, `the whole cabinet draws ${tris} triangles \u2014 inside the brief's 1500 budget with real margin (measured 928, pinned under 1200)`);
+  }
+});
+
+test("verification 9 (Story 2.3 AC2, real three): every built pillar-bleed node sits OUTSIDE each authored pillar AABB in matrixWorld space, at exactly SPILL_OFFSET_M past one far face (face-centred on the other axis) and at the labelled mount heights \u2014 no cabinet internals touched", () => {
+  const spillScene = new THREE.Scene();
+  const nodes = buildSpillNodes(buildThree(), spillScene as unknown as RoomScene, collisionVolumes, cabinetPlacements);
+  spillScene.updateMatrixWorld(true);
+  const pillars = collisionVolumes.filter((v) => v.kind === "pillar");
+  assert.equal(pillars.map((v) => v.id).join(","), "pillar-1,pillar-2", "the authored blocker pair the anchors derive from");
+  assert.ok(nodes.length > 0, "the tier builds nodes for the authored pillar pair");
+  for (const n of nodes) {
+    const light = n.light as unknown as THREE.PointLight;
+    assert.ok(light.isPointLight, "the node handle wraps a REAL THREE.PointLight \u2014 pointLight is the tier's only seam vocabulary");
+    assert.equal(light.intensity, 0, "BUILT DARK in real three too \u2014 the frame's glow ramp lights it from tick state");
+    const pos = new THREE.Vector3();
+    light.getWorldPosition(pos);
+    for (const v of pillars) {
+      const box = new THREE.Box3(
+        new THREE.Vector3(v.min.x, v.min.y, v.min.z),
+        new THREE.Vector3(v.max.x, v.max.y, v.max.z),
+      );
+      assert.ok(!box.containsPoint(pos), `the "${n.mount}" node at (${pos.x}, ${pos.y}, ${pos.z}) sits OUTSIDE ${v.id}'s AABB \u2014 an anchor INSIDE the blocker is the falsifiable sign-flip bug`);
+    }
+    let anchored = false;
+    for (const v of pillars) {
+      const cx = (v.min.x + v.max.x) / 2;
+      const cz = (v.min.z + v.max.z) / 2;
+      anchored =
+        anchored ||
+        ((near(pos.x, v.max.x + SPILL_OFFSET_M) || near(pos.x, v.min.x - SPILL_OFFSET_M)) && near(pos.z, cz)) ||
+        ((near(pos.z, v.max.z + SPILL_OFFSET_M) || near(pos.z, v.min.z - SPILL_OFFSET_M)) && near(pos.x, cx));
+    }
+    assert.ok(anchored, `the "${n.mount}" node sits exactly SPILL_OFFSET_M (${SPILL_OFFSET_M} m) past one pillar face, face-centred on the other axis \u2014 proved via matrixWorld, the same tier that proves the shell containment`);
+    assert.ok(
+      near(pos.y, SPILL_FLOOR_MOUNT_M) || near(pos.y, WALL_TOP - SPILL_CEILING_INSET_M),
+      "the mount height is the labelled floor-sheen or ceiling-bounce level",
+    );
   }
 });

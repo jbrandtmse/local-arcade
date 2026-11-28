@@ -43,6 +43,15 @@ import {
   placementGeometry,
 } from "./cabinets.ts";
 import {
+  HAZE_FLOOR,
+  SPILL_CEILING_INSET_M,
+  SPILL_FLOOR_MOUNT_M,
+  SPILL_REACH_M,
+  buildSpillNodes,
+  glowPulse,
+  hazeFactor,
+} from "./atmosphere.ts";
+import {
   FRONT_DOOR_AWNING,
   FRONT_DOOR_BLEED_REACH_MIN,
   FRONT_DOOR_FURNITURE_MESHES,
@@ -384,6 +393,28 @@ function fakeWorld(): {
 }
 
 const built = (() => {
+  const f = fakeThree();
+  const w = fakeWorld();
+  const handles = buildRoomScene(f.three, w.scene, w.factory);
+  return { ...f, ...w, handles };
+})();
+
+// Story 2.3: the spill tier through the SAME fake seam — its own clean rig
+// (main.ts builds it into the room's own scene; a fresh recorder keeps the
+// census unambiguous). No fakeThree extension: pointLight is the tier's
+// only seam primitive.
+const atmo = (() => {
+  const f = fakeThree();
+  const w = fakeWorld();
+  const nodes = buildSpillNodes(f.three, w.scene, collisionVolumes, cabinetPlacements);
+  return { ...f, ...w, nodes };
+})();
+
+// Story 2.3 (AC1 ramp walk): a THIRD rig — the walk WRITES light
+// intensities, so it rides its own recorded scene and leaves the shared
+// `built` recorder's values at their built state for every other test
+// (hermeticity: each pin creates the state it perturbs).
+const walk = (() => {
   const f = fakeThree();
   const w = fakeWorld();
   const handles = buildRoomScene(f.three, w.scene, w.factory);
@@ -1208,4 +1239,95 @@ test("token hue home: every hex literal exported by tokens.ts appears in NO othe
       assert.ok(!re.test(src), `${path.relative(coreDir, file)} carries the token hex ${hex} as a literal — its single home is tokens.ts (reference the token by name, derive css via toCss)`);
     }
   }
+});
+
+// --- Story 2.3: the atmosphere tier through the same fake seam ----------------
+
+test("Story 2.3 (AC2/AC6): the spill tier emits exactly the FORMULA count of bare point lights over the volume records — zero meshes, zero materials, zero emissive nodes; every node BUILT DARK, in its source cabinet's marquee family, at SPILL_REACH_M, mounted at the labelled floor/ceiling heights, OUTSIDE every pillar AABB, scene.add'd exactly once", () => {
+  const pillars = collisionVolumes.filter((v) => v.kind === "pillar");
+  assert.equal(pillars.length, 2, "the authored blocker pair the tier authors around");
+  let expected = 0;
+  for (const p of cabinetPlacements) {
+    const g = placementGeometry(p.slotId);
+    for (const v of pillars) {
+      const cx = (v.min.x + v.max.x) / 2;
+      const cz = (v.min.z + v.max.z) / 2;
+      const relevantEdges = (g.center.x === cx ? 0 : 1) + (g.center.z === cz ? 0 : 1);
+      expected += 2 * relevantEdges; // floor sheen + ceiling bounce per relevant edge
+    }
+  }
+  assert.equal(expected, 8, "the authored shape: 1 placement x 2 pillars x 2 relevant edges x 2 mounts — the formula's INPUT pinned, so drift in the authored data reddens the formula leg too");
+  assert.equal(atmo.nodes.length, expected, "node count IS the formula over the volume records (the scene-build count idiom, never a magic number)");
+  const expectedIds: string[] = [];
+  for (const p of cabinetPlacements) {
+    const pg = placementGeometry(p.slotId);
+    for (const v of pillars) {
+      const vcx = (v.min.x + v.max.x) / 2;
+      const vcz = (v.min.z + v.max.z) / 2;
+      const edges = (pg.center.x === vcx ? 0 : 1) + (pg.center.z === vcz ? 0 : 1);
+      for (let i = 0; i < 2 * edges; i++) expectedIds.push(p.volumeId);
+    }
+  }
+  assert.deepEqual(atmo.nodes.map((n) => n.volumeId), expectedIds, "every node carries its SOURCE cabinet's volumeId in build order — the key the frame-side rig pairing rides (mutation: key nodes by slotId in buildSpillNodes and boot throws over the mismatch with every law suite green — this census reddens here)");
+  assert.equal(atmo.lights.length, expected, "one seam pointLight per node — no other node kind (no painted glow sheets, no cone geometry)");
+  assert.equal(atmo.objects.length, expected, "every node scene.add'd exactly once — an unattached light never renders (the buildRoomScene attach idiom)");
+  assert.equal(atmo.meshes.length, 0, "the tier adds no meshes");
+  assert.equal(atmo.geos.length, 0);
+  assert.equal(atmo.mats.length, 0, "no materials at all: the atmosphere tier contributes ZERO emissive/painted-glow nodes — the 2.0 emissive census stays exactly 2 per Cabinet, byte-preserved (AC6)");
+  const marqueeHues = new Set(cabinetPlacements.map((p) => p.marqueeHue));
+  for (const l of atmo.lights) {
+    assert.ok(marqueeHues.has(l.color), `the bleed rides the source cabinet's marquee family (${l.color.toString(16)}) — light-from-a-machine, no new hue to home (UX-DR1)`);
+    assert.equal(l.intensity, 0, "BUILT DARK — the frame's glow ramp lights them from tick state (the frontDoor street-pair posture)");
+    assert.equal(l.distance, SPILL_REACH_M, "the authored reach");
+    assert.ok(l.y === SPILL_FLOOR_MOUNT_M || l.y === WALL_TOP - SPILL_CEILING_INSET_M, "mount height is the labelled floor-sheen or ceiling-bounce mount (ceiling derives from WALL_TOP, never a retyped 3.0)");
+  }
+  assert.equal(atmo.lights.filter((l) => l.y === SPILL_FLOOR_MOUNT_M).length, expected / 2, "every relevant edge carries BOTH mounts: half floor sheen, half ceiling bounce");
+  for (const l of atmo.lights) {
+    for (const v of pillars) {
+      const inside = l.x > v.min.x && l.x < v.max.x && l.z > v.min.z && l.z < v.max.z;
+      assert.ok(!inside, `the ${String(l.y)}-high node at (${l.x}, ${l.z}) sits OUTSIDE ${v.id} — an anchor INSIDE the blocker is the falsifiable sign-flip bug`);
+    }
+  }
+});
+
+// Consumer Integration pin (spec Tasks line 4): the handles are observable
+// end to end — same objects the build put in the recorded graph, settled by
+// the frame's law formula (the shipped call sites are main-glue's 2.3 pins;
+// the real-three adapter identity is cabinets.test.ts's tier).
+test("Story 2.3 (AC1, consumer Integration): handles.cabinetLights names each placement's built halo/spill pair IN the recorded graph, and the frame law settles their intensities by camera pose — the authored far corner settles them strictly below nominal yet NEVER 0 (distant machines dim toward Room Black, never read dead, UX-DR17), and a scripted camera walk toward B0 raises the recorded values monotonically", () => {
+  assert.equal(walk.handles.cabinetLights.length, cabinetPlacements.length, "one cabinetLights handle per placement");
+  assert.deepEqual(walk.handles.cabinetLights.map((c) => c.volumeId), cabinetPlacements.map((p) => p.volumeId), "handles key by the authored volume ids, placement order");
+  for (const cl of walk.handles.cabinetLights) {
+    assert.ok(walk.objects.includes(cl.halo) && walk.objects.includes(cl.spill), `the ${cl.volumeId} pair are nodes OF the recorded scene graph (the frame can only ramp lights that are IN the graph)`);
+    assert.notStrictEqual(cl.halo, cl.spill, "halo and spill stay the two distinct 2.0-built lights — the handles expose them, no third light appears");
+  }
+  const p = cabinetPlacements[0]!;
+  const pair = walk.handles.cabinetLights.find((c) => c.volumeId === p.volumeId)!;
+  const center = placementGeometry(p.slotId).center;
+  // The frame's glow law, applied through the handles exactly as the
+  // shipped glow block does: nominal x pulse x haze (pose from tick state).
+  const settle = (x: number, z: number): { halo: number; spill: number } => {
+    const glow = CABINET_LIGHT_INTENSITY * glowPulse(0) * hazeFactor(Math.sqrt((x - center.x) * (x - center.x) + (z - center.z) * (z - center.z)));
+    pair.halo.intensity = glow;
+    pair.spill.intensity = glow;
+    return { halo: pair.halo.intensity!, spill: pair.spill.intensity! };
+  };
+  const far = { x: INTERIOR.width / 2, z: INTERIOR.depth / 2 }; // the authored farthest corner
+  const atFar = settle(far.x, far.z);
+  assert.ok(atFar.halo > 0 && atFar.spill > 0, "the far corner settles NEVER 0 — dim toward Room Black, never READ dead (UX-DR17)");
+  const nominalPulsed = CABINET_LIGHT_INTENSITY * glowPulse(0);
+  assert.ok(atFar.halo < nominalPulsed, "far strictly below nominal x pulse (the haze pulled the glow down — the AC1 far leg in the graph)");
+  assert.ok(atFar.halo >= nominalPulsed * HAZE_FLOOR, "and no lower than nominal x pulse x HAZE_FLOOR (the law's never-zero floor, not a fade to black)");
+  const atBody = settle(center.x, center.z);
+  assert.equal(atBody.halo, nominalPulsed, "at the authored body the pair sit at nominal x pulse EXACTLY (haze is 1 inside HAZE_NEAR_M — the I/O matrix Near-source leg in the graph)");
+  let prev = atFar.halo;
+  const steps = 10;
+  for (let i = 1; i <= steps; i++) {
+    const x = far.x + ((center.x - far.x) * i) / steps;
+    const z = far.z + ((center.z - far.z) * i) / steps;
+    const v = settle(x, z).halo;
+    assert.ok(v >= prev, `walk step ${i} toward B0 RAISES the recorded halo intensity (non-decreasing; the shipped frame() produces exactly this read in the recorded graph)`);
+    prev = v;
+  }
+  assert.ok(prev > atFar.halo, "and strictly so across the walk — the proximity gradient is a real ramp, not a flat line");
 });

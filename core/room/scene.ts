@@ -283,9 +283,24 @@ export interface FrontDoorHandle {
   glassLight: Placed;
 }
 
+/** Story 2.3 (AC1): the per-cabinet glow pair's handles — the SAME two
+ * point lights the build hangs on the face mounts — so the frame side can
+ * ramp their intensity from kernel tick state (the frontDoorRamp idiom,
+ * AD-3/AD-15). The builder still never reads state: these are handles, not
+ * behaviour, and the pair stays exactly the two lights 2.0 pinned. */
+export interface CabinetLightHandle {
+  volumeId: string;
+  /** The screen-family halo (hue from placement.hue). */
+  halo: Placed;
+  /** The marquee-family spill (hue from placement.marqueeHue). */
+  spill: Placed;
+}
+
 export interface RoomHandles {
   screens: ScreenHandle[];
   doors: DoorHandle[];
+  /** Story 2.3: one handle per placement, in placement order. */
+  cabinetLights: CabinetLightHandle[];
   frontDoor: FrontDoorHandle;
 }
 
@@ -296,8 +311,8 @@ export interface RoomHandles {
  * onto an injected canvas, the authored stand-up shells' parts + glow
  * lights, the provisional zone/roadmap/door glow lighting, and the 1.9
  * street-side front-door furniture (awning, glazing, handle) with its two
- * dark street lights. Returns the coin-door, screen, and front-door
- * handles the frame side animates.
+ * dark street lights. Returns the coin-door, screen, cabinet-light, and
+ * front-door handles the frame side animates.
  */
 export function buildRoomScene(
   THREE: Three,
@@ -444,6 +459,7 @@ export function buildRoomScene(
   // the frame side re-poses from coinDoorPose every frame.
   const screens: ScreenHandle[] = [];
   const doors: DoorHandle[] = [];
+  const cabinetLights: CabinetLightHandle[] = [];
 
   // Brief section 7: every geometry and every non-textured material is
   // created ONCE, outside the placements loop, and reused for every
@@ -689,6 +705,11 @@ export function buildRoomScene(
     const halo = THREE.pointLight(p.hue, CABINET_LIGHT_INTENSITY, CABINET_LIGHT_REACH);
     halo.position.set(g.front.x + g.facing.x * CABINET_LIGHT_STANDOFF_M, SHELL.screen.centerY, g.front.z + g.facing.z * CABINET_LIGHT_STANDOFF_M);
     scene.add(halo);
+    // Story 2.3 (AC1): hand the pair out as handles — the frame's glow
+    // ramp (haze x pulse, atmosphere.ts laws) writes their intensity from
+    // tick state. No new light is created here: the census stays exactly
+    // two point lights per Cabinet (the scene.test count formulas).
+    cabinetLights.push({ volumeId: p.volumeId, halo, spill });
   }
 
   // Story 1.9: the street-side front-door furniture. The awning (Wall
@@ -760,5 +781,5 @@ export function buildRoomScene(
   scene.add(doorGlow);
   scene.add(THREE.ambientLight(ROOM_BLACK, AMBIENT_INTENSITY));
 
-  return { screens, doors, frontDoor: { panel: frontDoorPanel, glass, handle, bleedLight, glassLight } };
+  return { screens, doors, cabinetLights, frontDoor: { panel: frontDoorPanel, glass, handle, bleedLight, glassLight } };
 }

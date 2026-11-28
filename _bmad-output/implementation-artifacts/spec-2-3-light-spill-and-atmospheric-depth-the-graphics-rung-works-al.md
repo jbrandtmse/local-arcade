@@ -2,9 +2,10 @@
 title: 'Story 2.3: Light spill and atmospheric depth — the graphics rung works alone'
 type: 'feature'
 created: '2026-11-27'
-status: 'ready-for-dev'
+status: 'done'
 review_loop_iteration: 0
-followup_review_recommended: false
+followup_review_recommended: true
+baseline_revision: '8f454854f4948deb21080ed5c50fc4df5e7bb46c'
 context:
   - _bmad-output/planning-artifacts/architecture/architecture-local-arcade-2026-11-19/ARCHITECTURE-SPINE.md
   - _bmad-output/implementation-artifacts/epic-2-context.md
@@ -126,7 +127,41 @@ deferred:
 
 ## Spec Change Log
 
+- implement (2026-11-27): `buildSpillNodes(THREE, scene, volumes, placements)` gained a `scene` parameter the Code Map signature omitted — unattached point lights never render; the builder attaches each node (the `buildRoomScene` idiom the same Code Map names). Reason: the seam's `Placed` only lights what the graph holds.
+- implement (2026-11-27): spec-internal tie resolved — Design Note 3's placeholder `GLOW_PULSE_PERIOD_TICKS = 120` vs the matrix's "exactly one gentle cycle per `CABINET_PHASE_CYCLE_TICKS` (240)". `glowPulse` uses a half-angle cosine: one swell per 240 ticks, and the tie `2 * GLOW_PULSE_PERIOD_TICKS == CABINET_PHASE_CYCLE_TICKS` is pinned literally in the constants test, so the matrix row, the 120 placeholder, and the `60/PERIOD <= 3` law-shape pin all stay literally true. 3.7's finals move constant AND pin together.
+- implement (2026-11-27): the pulse applies to the bleed nodes too (`SPILL_INTENSITY x pulse x haze`), not only the haze factor — Design Note 4's "every lit Cabinet identically" keeps a cabinet's pair and its bleed in lockstep, and the AC3 ordering pins are pulse-independent either way.
+- implement (2026-11-27): `core/no-ui-dom.test.ts` camera allowlist extended additively with 2.3's two READ-ONLY haze pose reads (`const dx/dz = camera.position.[xz] - rig.center.[xz]`), counts re-pinned. The Code Map did not name this guard, but the frame-side haze pose read crosses it; the host-form ban and the camera-blind room leg stay untouched.
+- implement (2026-11-27): `main-glue.test.ts`'s `window.arcadeDebug` line pin updated in place (the additive `atmosphere:` leg moves the line); the 1.9/2.1 moved-pin precedent holds — the pin stays, the string follows the line.
+- implement (2026-11-27): `glowPulse` wraps negative and >= cycle inputs (`((phaseStep % cycle) + cycle) % cycle`) — the runtime phase counter already wraps mod 240; the pure law takes no sign convention.
+- implement (2026-11-27): the haze law's shape is plateau(=1 up to `HAZE_NEAR_M` 12.5) -> linear(-`HAZE_COEFF`/m) -> clamp(`HAZE_FLOOR`) — `HAZE_NEAR_M` is a labelled placeholder beyond the Boundaries tunables enumeration, forced by the matrix Near row's literal `hazeFactor = 1` at the authored door->B0 distance (~12.2 m); pinned literally with its siblings, final is 3.7's.
+
 ## Review Triage Log
+
+### 2026-11-27 — Review pass
+
+verdicts: 21 findings — high 0, medium 4, low 9, false 8, maybe-false 0 · routes: 7 patched entries covering 8 findings (BH-3/VG-4 one root cause, one route), 0 deferred, 13 rejected (5 low-severity rejects, 8 false)
+
+- BH-1 (blind-hunter) — the flash-rate guard reads `GLOW_PULSE_PERIOD_TICKS` as a FULL period, so the pinned `60/120 = 0.5 Hz` describes a rate twice the pulse's true cycle rate (one swell per 240 ticks = 0.25 Hz). low · **rejected**: the spec pins `120` and the `60/PERIOD <= 3` law shape verbatim (Design Note 3, the matrix row) — the fix edits this build's spec wording, and the guard errs conservative (overestimates the rate); 3.7's finals move constant, pin, and wording together.
+- BH-2 — the frame-side glow block had no emissive-ramp guard: the 2.3 wiring test's banned-token list lacked the emissive identifiers. low · **patched**: `"emissive"`/`"emissiveIntensity"` added to the comments-stripped ban scan; planted `emissiveIntensity` write in the glow block reddened the pin, reverted.
+- BH-3 — the consumer-Integration ramp test wrote intensities onto the shared `built` rig every other scene test in the file reads (cross-test pollution). medium · **patched**: dedicated third rig (`walk`) for the ramp-walk test. One root cause with VG-4.
+- BH-4 — the boot-time `arcadeDebug.atmosphere` seed hard-codes `pulseApplied: 1`, a value the pulse law cannot emit at phase 0. low · **patched**: seed is law-derived (`glowPulse(0)` / `hazeFactor(0)` / their product composition).
+- BH-5 — `SpillNodeHandle` used an inline `import("./scene.ts").Placed` instead of the file's type-import line. low · **patched**: merged into the top-level `import type { Placed, RoomScene, Three }`.
+- EG-1 (edge-case) — `hazeFactor(NaN)` returns 1 (NaN fails the `>` guard) — silent full brightness. low · **rejected**: the camera pose is kernel-owned player state; a NaN pose is an upstream bug — theoretical hardening adds a branch for an unreachable input.
+- EG-2 — `glowPulse` on a non-finite phase returns NaN. low · **rejected**: `phaseStep` is the kernel's wrapped integer counter; unreachable.
+- EG-3 — `flashRateCompliant(-20)` passes (60/-20 = -3 <= 3). low · **rejected**: 0 is already rejected (Infinity > 3); a negative period is an authored-constant typo, and the 3.7 L2 probe measures authored constants, not runtime input.
+- EG-4 — the scene.test built-rig count formula not extended for spill nodes. **false**: spill nodes are never created by `buildRoomScene` (the formula counts exactly what it creates); they carry their own formula census in the atmo rig (expected 8) plus the volumeId-order census.
+- EG-5 — the matrix near/far rows never execute main's `frame()` — only fake-rig settle plus source text. **false**: the matrix row's own wording is "fake-rig settles halo/spill intensities" — that IS the recorded tier; the executed-host tier is frontmatter deferred item 1 (the main-glue string pins are Epic 1's recorded bridge idiom).
+- EG-6 — the anchor census's "both sources" leg covers only the authored B0. low · **patched**: the loop spans authored placements plus the synthetic B1 centers across both authored pillars.
+- VG-1 (verification-gap, demonstrated) — the boot rig's body-center init and the distance metric are unpinned: `center:` -> `{ x: 0, z: 0 }` stayed green; Euclidean `Math.sqrt` -> Manhattan stayed green. medium · **patched**: `MAIN.includes` pins for `center: placementGeometry(placementByVolumeId(pair.volumeId).slotId).center,` and `const distanceM = Math.sqrt(dx * dx + dz * dz);` — both witnesses now red, reverted.
+- VG-2 — the bleed-node grouping and the volumeId pairing are unpinned: deleting `rig.bleed.push(node);` stayed green (a shipped bleed node lit by no law, forever dark), and `volumeId: p.slotId` stayed green at the headless tier while it would throw at real boot pairing. medium · **patched**: pins for `rigsByVolumeId.set(pair.volumeId, rig);` and `rig.bleed.push(node);` plus the volumeId-order census in the scene.test atmo rig; both witnesses red, reverted.
+- VG-3 — the no-ui-dom camera-allowlist regex admits mismatched `dx`/`dz` spelling. low · **rejected**: each allowed statement still reads exactly one camera property inside one `;` statement and the pinned per-entry counts catch any addition; splitting into two paired regexes is cosmetic breadth.
+- VG-4 — (grouped with BH-3, same root cause) the same shared-rig pollution seen from the gap side: a scene test can leave intensities mutated for later tests. medium · **patched**: the `walk` rig fix above.
+- D1 (intent-alignment) — the near/far rows are satisfied at law + text + composed fake-rig tier, not an executed frame. **false**: the matrix wording names exactly that tier ("fake-rig settles"); the executed host tier is recorded deferred item 1.
+- D2 — AC3's ordering is proven on the authored intensity law and geometry anchors, not rendered light. **false**: the spec's recorded posture (frontmatter deferred 1, plan decisions 1-2); the anchor exists on the ear side, pinned geometrically in the real-three tier.
+- D3 — `HAZE_NEAR_M` appears beyond the Boundaries tunables enumeration. **false**: the Always row ("every tunable is a labelled placeholder") is a property, not an exhaustive list; the plateau is forced by the matrix Near row's literal `hazeFactor = 1` at the authored door distance; recorded in the Spec Change Log.
+- D4 — the camera allowlist extension and `RoomHandles.cabinetLights` amend surfaces the boundary list did not name. **false**: the intent authorizes camera-pose input, and the handles follow the `frontDoorRamp` handoff idiom; the never-list stays untouched; recorded in the Spec Change Log.
+- D5 — the source scans are broader than the matrix wording (whole-directory clock scan; extra banned import tokens). **false**: a superset of the wording contradicts no intent expectation; the readdir mechanism mirrors manager.test.ts's idiom. The wording is the floor.
+- D6 — `arcadeDebug.atmosphere` carries no matrix row. **false**: the spec's Code Map `main.ts` row adds it; console-only per AD-24.
 
 ## Design Notes
 
@@ -162,11 +197,49 @@ deferred:
 
 **Shared surfaces:** `core/room/scene.test.ts` world-object/light count formula and emissive-pair/emissive-census pins (this story EXTENDS counts with new lights; every existing literal stays); `window.arcadeDebug` gains the additive `atmosphere` leg (field-accessed readers stay green, no `deepEqual` readers of the whole object — the 2.2 posture); the `core/room/` file list (the new room-scoped clock scan enrols `atmosphere.ts` automatically); hue-home guard token floor (auto-covers new tokens); main.ts wiring record read by `main-glue.test.ts` string pins. Hermeticity: every test added or changed passes on a fresh environment, in either order; no room test touches :5173, another test's state, or execution order.
 
+**Mutations witnessed (implement pass 2026-11-27; each applied, red observed, reverted byte-identical — sha256 match):**
+- mutation: delete `rig.pair.halo.intensity = glow;` + `rig.pair.spill.intensity = glow;` from `frame()` -> "2.3 atmosphere wiring" (main-glue.test.ts) red — every ramp assignment is pinned.
+- mutation: `HAZE_FLOOR = 0.25 -> 0` -> the labelled-placeholder literal pin (atmosphere.test.ts "every atmosphere tunable…") red; the far-settle graph legs stay green at the authored far distance (~0.65) — the never-zero floor is pinned as the literal, and the knee/kilometre pins compare against the constant.
+- mutation: flip both x-face `SPILL_OFFSET_M` signs in `spillAnchors` (anchors inside the AABB) -> "spill anchors" + verification 9 (cabinets.test.ts, real-three `Box3`) + the scene.test.ts spill census all red.
+- mutation: delete the `mount: "ceiling"` push -> "spill anchors" count + scene.test.ts formula census red.
+- mutation: `GLOW_PULSE_PERIOD_TICKS = 120 -> 15` -> "flash-rate law shape" + "attract pulse" + the literal pin red (4 Hz > 3).
+- mutation: `GLOW_PULSE_FLOOR = 0.7 -> 0` -> literal pin + "attract pulse" (never-black) + "blind-spot gradient" + the consumer-Integration never-0 settle leg red.
+- mutation: `import { occlusionIds } from "../audio/occlusion.ts";` into atmosphere.ts -> "AC4 asymmetry by construction" red.
+- mutation: plant `const _plantedWallClock = Date.now();` in atmosphere.ts -> "AD-3: no wall-clock identifiers in ANY core/room source" red.
+- mutation: add a `THREE.standardMaterial({ emissive: ... })` call in `buildSpillNodes` -> scene.test.ts emissive/material census red (the hex literal reddens the hue pin too).
+- mutation: freeze `glowPulse` (`const swell = 1`) -> "attract pulse" (floor-start + exactly-one-maximum legs) red.
+- mutation (review pins): boot rig `center:` -> `{ x: 0, z: 0 }` -> "2.3 atmosphere wiring" (main-glue.test.ts) red — the body-center handoff is pinned.
+- mutation: distance formula `Math.sqrt(dx * dx + dz * dz)` -> `Math.abs(dx) + Math.abs(dz)` -> "2.3 atmosphere wiring" red — the XZ-Euclidean metric is pinned.
+- mutation: delete `rig.bleed.push(node);` (bleed nodes built but grouped under nothing — lit by no law, dark forever) -> "2.3 atmosphere wiring" red.
+- mutation: `volumeId: p.slotId` in `buildSpillNodes` -> the scene.test spill census volumeId leg red (real boot's pairing throw is caught first at the headless tier).
+- mutation: plant `rig.pair.halo.material.emissiveIntensity = 0.5;` in the `frame()` glow block -> "2.3 atmosphere wiring" banned-token leg red (the emissive identifiers joined the scan at review).
+
 **Manual checks (deferred tier, report never claim):** start your own dev server on a fresh port (never the lead's :5173) — `arcadeDebug.atmosphere` shows per-cabinet `distanceM`/`hazeFactor`/`pulseApplied`/`glowIntensity` moving as you walk away from B0, and a stand behind a pillar still shows glow intensity ordered by distance; the by-sight/browser tier stands in frontmatter `deferred` item 1 — the visual read is the lead's smoke / Epic-3 harness, never the suite.
 
 ## Auto Run Result
 
-Status: ready-for-dev
+Status: done
 Blocking condition: none
 
-Plan pass (2026-11-27): spec written from the epics.md Story 2.3 block (epics.md:463-475, owner-fixed ACs), SPEC.md/UX-DR1/17/21 + DESIGN.md Elevation & Depth, the epic-2-context cache (attempt 5, reused — not recompiled), Story 2.2 continuity (done spec: fixture/twin/placeholder posture carried), and one synchronous investigation subagent's presentation-layer map. Self-review against the READY-FOR-DEVELOPMENT standard: pass (no intent gaps; the haze-as-law and spill-as-point-lights readings are recorded as plan: decisions, none touching an AD or an owner-fixed value). Ledger inbox empty — nothing addressed or declined. Governing ADs recorded (AD-7/3/15/27/18/11/24/14/1/2/9/10). `oversized` warning set (spec exceeds 1600 tokens, 2.2 precedent). HALTed after planning per the dispatch directive; nothing committed (lead owns all bookkeeping commits); :5173 untouched.
+Story 2.3 shipped on baseline `8f454854f4948deb21080ed5c50fc4df5e7bb46c` (branch `ARC-1-epic2`, implement stage, unattended epic cycle). The haze law, the attract glow-pulse law, and the pillar spill tier are live in the frame's glow ramp exactly per the Design Notes and Spec Change Log rulings (haze is an authored light-tier law, not three.js Fog; spill is authored point-light mounts from the volume records only; the emissive faces are never ramped); every constant is a labelled placeholder for 3.7.
+
+**Files changed (9):**
+- `core/room/atmosphere.ts` (NEW) — the pure atmosphere tier: `hazeFactor` (plateau 1 to `HAZE_NEAR_M` 12.5 -> linear `HAZE_COEFF` 0.06/m -> clamp `HAZE_FLOOR` 0.25, never-zero per UX-DR17), `glowPulse` (half-angle cosine, one swell per phase cycle, floor `GLOW_PULSE_FLOOR`, literal tie `2 * GLOW_PULSE_PERIOD_TICKS == CABINET_PHASE_CYCLE_TICKS`), `flashRateHz`/`flashRateCompliant` against the owner-fixed `FLASH_RATE_CEILING_PER_SEC` (NFR-9 law shape; the L2 probe is 3.7's), `spillAnchors`/`spillMountY`/`buildSpillNodes` (floor-sheen + ceiling-bounce point-light mounts derived from the collision-volume records only — no raycast, no `core/audio/` — `SPILL_*` placeholders, `SPILL_INTENSITY` derived from `CABINET_LIGHT_INTENSITY`, every node BUILT DARK), `AtmosphereDebug` row shape.
+- `core/room/atmosphere.test.ts` (NEW) — 11 pins: labelled-placeholder literals + the cycle tie, haze monotone/knee/floor/kilometre legs, determinism twin, pulse shape/never-black/one-swell-per-cycle/negative-and-wrap legs, flash-rate law, blind-spot gradient (test-local sightline copy; pillar-2 ear vs open control), anchor census over authored + synthetic sources across both pillars, room-scoped AD-3 wall-clock readdir scan, AC4 asymmetry import scan.
+- `core/room/scene.ts` — `CabinetLightHandle` (volumeId-keyed halo/spill pair) and the `RoomHandles.cabinetLights` handoff the frame pairs against the spill nodes.
+- `core/room/scene.test.ts` — built-rig count formula extended; atmo-rig spill census (node count by the edge formula + volumeId-order pin); the consumer Integration settle legs run on their own dedicated `walk` rig (hermeticity); DW-23/emissive/hue censuses green.
+- `core/room/cabinets.test.ts` — verification 9: the real-three headless tier (`Box3.containsPoint`, `matrixWorld`) — every spill anchor outside its occluder AABB at exactly `SPILL_OFFSET_M` past one face, mount heights derived from `WALL_TOP`.
+- `core/main.ts` — boot builds the spill tier once and pairs glow rigs by volumeId (throw on a pairing miss); `frame()`'s glow block writes halo/spill/bleed intensities from pose distance x haze x pulse; `arcadeDebug.atmosphere` seeded law-derived.
+- `core/main-glue.test.ts` — 2.3 wiring pins: every ramp assignment, the boot center handoff + XZ-Euclidean metric, the pairing/grouping lines, banned tokens (wall-clock, occlusion/audio imports, emissive), the moved `window.arcadeDebug` line pin.
+- `core/no-ui-dom.test.ts` — camera allowlist additive entry for the two read-only haze pose reads, per-entry counts re-pinned.
+- the spec itself (frontmatter, Spec Change Log, Review Triage Log, Verification mutation record, this result).
+
+**Review findings breakdown (21; full rows in the Review Triage Log):** high 0, medium 4, low 9, false 8, maybe-false 0. Patched 7 entries (8 findings; BH-3/VG-4 one root cause): the frame-side emissive-token pin (BH-2), the dedicated `walk` rig for the consumer test (BH-3/VG-4, medium), the law-derived boot debug seed (BH-4), the inline type import (BH-5), the anchor census's second-source leg (EG-6), the boot center + distance-metric pins (VG-1, medium — the gaps were demonstrated surviving their mutations before the pins landed), the bleed-grouping + volumeId-pairing pins (VG-2, medium — same). Deferred: nothing new this pass (the two frontmatter items are plan-stage posture). Rejected low 5 with reasons: the flash-rate 2x-semantics reading (spec pins 120 and the `60/120 <= 3` shape verbatim; the fix edits the spec's own wording; guard errs conservative), NaN-distance and non-finite-phase hardening (kernel-owned state), negative `periodTicks` (0 already rejected via Infinity; authored-constant input), the allowlist regex x/z pairing (count pins bound any addition; cosmetic). Rejected false 8: EG-4 (spill nodes never come from `buildRoomScene` — they own a formula + volumeId census), EG-5/D1 (the matrix wording names the fake-rig tier; executed host is deferred item 1), D2 (recorded tier posture), D3 (property, not an exhaustive tunables list), D4 (intent-authorized seams, `frontDoorRamp` idiom), D5 (superset scans, `manager.test.ts` idiom), D6 (Code Map names the debug leg).
+
+**Follow-up review recommended: YES.** Three medium entries were patched inside this pass. Named residual risk: the shipped `frame()` glow block executes at no headless tier — the VG-1/VG-2 gaps are closed with source-text pins plus witnessed text-mutation reds, so a semantic rewrite inside the pinned lines (or a runtime mispairing invisible to the fake censuses) surfaces only at the executed browser tier, which frontmatter deferred item 1 routes to the Epic-3 harness plus the lead's smoke walk.
+
+**Verification performed:** `npm run typecheck` clean; `npm test` 478/478 (after the implement pass and again after the review patches); `node ci/depcheck.mjs`, `node ci/lint-bans.mjs` clean; `node tools/gen-registry.mjs` + `generated/` no drift; `npm run build` once, clean (only the pre-existing 654.97 kB single-chunk warning). 15 mutation witnesses applied/red/reverted byte-identically (sha256-verified; all recorded under `## Verification` — the 10 pre-named falsifiable tiers plus the 5 review-pin witnesses). Tiers executed: pure-law literal pins, fake scene-graph intensity-settle pins, the real-three headless Box3/matrixWorld anchor tier, source-text pins (main-glue wiring, import/clock scans, no-ui-dom counts), demonstrated mutations. Tiers NOT executed: browser/by-eye (frontmatter `deferred` item 1) — no dev-server or browser leg ran in this pass; the lead's :5173 was never touched or probed.
+
+**Residual risks / hand-offs:** every haze/pulse/spill number is a labelled placeholder (AD-27 Deferred row; finals 3.7, whose L2 flashes-rate probe measures against `flashRateHz`); the flash guard reads the placeholder period literally per the spec (BH-1 row — 3.7 moves constant, pin, and wording together); the spill tier keys on the authored pillar pair and the one placement — room growth stays the ledger's/3.7's call (deferred item 2); Story 2.4's comfort rows and 2.6's rung-2 walk ride this pulse/haze contract as their handle.
+
+**Deferred findings for the ledger harvest (frontmatter `deferred`, both severity low):** (1) by-sight/browser tier for the haze depth, spill bleed, and gradient ordering — no executed visual tier exists this epic; the pure-law pins, fake-rig settle pins, and real-three anchor tier are the falsifiable tier. (2) the tier is authored against the shipped room (one Cabinet placement, the authored pillar pair; multi-cabinet legs pin via synthetic injected placements at authored slot ids) — behavior under the final authored room contents is Story 3.7's authored-data call.

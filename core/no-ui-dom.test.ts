@@ -156,8 +156,12 @@ test("1.8 single storage owner: only core/storage.ts touches the device store, a
 // is never a content host. Source-text tier (Epic 1's recorded verification
 // arrangement for the main glue; the executed-host tier is the 3-2/3-15
 // browser harness, DW-12/DW-15 re-owned at the burn-down gate): the camera
-// references surviving in core/main.ts code ride an allowlist — exactly the
-// six forms 1.9 shipped, checked per `;`-delimited statement so an allowed
+// references surviving in core/main.ts code ride an allowlist — the six
+// forms 1.9 shipped PLUS 2.3's two read-only haze pose reads (the glow ramp
+// MEASURES the camera pose the frame just wrote from player state; reading
+// a pose is not hosting content — the host forms stay banned and the
+// statement-level allowlist still reddens any new FORM), checked per
+// `;`-delimited statement so an allowed
 // line smuggles no second use — every `camera.add`/`camera.attach` FORM
 // (chain, subscript, dotted prefix) appears nowhere in
 // core non-test code, and the pose/room modules (core/room/*.ts, entry.ts,
@@ -174,6 +178,12 @@ test("the camera never hosts content: main.ts camera refs ride the allowlist, ca
     ["aspect", /^camera\.aspect = /],
     ["updateProjectionMatrix", /^camera\.updateProjectionMatrix\(\)$/],
     ["render(scene, camera)", /renderer\.render\(scene, camera\)$/],
+    // 2.3 (AC1): the haze law measures distance FROM the camera pose this
+    // frame wrote from player tick state. A READ, per statement — no
+    // content may ever hang off the camera (the host-form ban below holds),
+    // and the pose/room modules stay camera-blind (the third leg): the
+    // camera's pose enters the law here, at the glue, nowhere else.
+    ["pose reads (2.3 haze)", /^const d[xz] = camera\.position\.[xz] - rig\.center\.[xz]$/],
   ];
   const counts: Record<string, number> = {};
   // Segment-level: every `;`-delimited statement that names the camera
@@ -192,8 +202,8 @@ test("the camera never hosts content: main.ts camera refs ride the allowlist, ca
   }
   assert.deepEqual(
     counts,
-    { construction: 1, "rotation.order": 1, "pose sets": 4, aspect: 1, updateProjectionMatrix: 1, "render(scene, camera)": 1 },
-    "exactly the six surviving camera forms the 1.9 entry shipped remain — nothing may join them",
+    { construction: 1, "rotation.order": 1, "pose sets": 4, aspect: 1, updateProjectionMatrix: 1, "render(scene, camera)": 1, "pose reads (2.3 haze)": 2 },
+    "the six surviving 1.9 camera forms plus 2.3's two READ-ONLY haze pose reads are ALL the camera ever does in the glue — no new FORM may join silently (host forms stay banned in the leg below)",
   );
 
   // The host-call FORMS, not the two spellings: dot, optional chain, and

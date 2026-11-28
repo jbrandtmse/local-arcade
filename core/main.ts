@@ -35,11 +35,20 @@ import { createPatronScheduler, type PatronScheduler } from "./patrons/scheduler
 import { createFigurePresenter, type FigurePresenter } from "./patrons/presenter.ts";
 import { createStorageService, type StorageService } from "./storage.ts";
 import { ENTRY_SPAWN, collisionVolumes } from "./room/collision-volumes.ts";
-import { buildRoomScene, type Three } from "./room/scene.ts";
+import { buildRoomScene, type CabinetLightHandle, type Three } from "./room/scene.ts";
 import { frontDoorHandleYaw, frontDoorOpenPose, frontDoorRamp } from "./room/door.ts";
+import {
+  SPILL_INTENSITY,
+  buildSpillNodes,
+  glowPulse,
+  hazeFactor,
+  type AtmosphereDebug,
+  type SpillNodeHandle,
+} from "./room/atmosphere.ts";
 import { ROOM_BLACK, WALL_WARM, toCss } from "./room/tokens.ts";
 import { compositeScreen, repaintScreen, type CanvasFactory } from "./room/surfaces.ts";
 import {
+  CABINET_LIGHT_INTENSITY,
   SHELL,
   SCREEN_ATTRACT_CAP_M,
   SCREEN_NEXT_CAP_M,
@@ -80,7 +89,11 @@ declare global {
      * that drives the workbench swap through the real law); 2.1 adds the
      * Core Audio Manager (graph state + per-chain occupancy/occlusion/mix
      * debug view — the console smoke reads the law's numbers; whether it
-     * SOUNDS right is a by-ear check, never claimed from this surface). */
+     * SOUNDS right is a by-ear check, never claimed from this surface);
+     * 2.3 adds the atmosphere leg — per-cabinet distanceM / hazeFactor /
+     * pulseApplied / glowIntensity rows the frame writes from tick state
+     * every frame (the smoke walk reads the gradient's NUMBERS; the
+     * by-sight visual read stays the deferred browser tier). */
     arcadeDebug: {
       player: PlayerController;
       loop: KernelLoop;
@@ -92,6 +105,7 @@ declare global {
       storage: StorageService;
       entry: EntrySequence;
       audio: AudioManager;
+      atmosphere: AtmosphereDebug[];
     };
   }
 }
@@ -175,6 +189,49 @@ function bootArcade(): void {
     },
   };
   const handles = buildRoomScene(three, scene, makeCanvas);
+
+  // Story 2.3 (AC2): the pillar-bleed tier — authored spill point lights
+  // around the occluder volumes' FAR edges, built ONCE from the SAME
+  // collision-volume records the audio raycasts ride (AD-7) but read as
+  // plain data, never through core/audio/: the visual law is authored
+  // around the same blockers, asymmetrically by design (the
+  // atmosphere.test.ts source scan pins the asymmetry). The tier names no
+  // shell part or mesh — placements + volumes + authored constants only —
+  // so any cabinet rebuild re-mounts it untouched (DW-29 separation).
+  // BUILT DARK; the frame ramps them (the frontDoor street-pair posture).
+  const spillNodes = buildSpillNodes(three, scene, collisionVolumes, cabinetPlacements);
+
+  // Story 2.3 (AC1/AC3): per-cabinet glow rigs — each built halo/spill
+  // pair, the authored body centre the haze measures camera distance from,
+  // this cabinet's bleed nodes, and one console-smoke row. All precomputed
+  // at boot; frame() only WRITES these rows from tick state (no new
+  // per-frame allocation).
+  interface CabinetGlowRig {
+    pair: CabinetLightHandle;
+    center: { x: number; z: number };
+    bleed: SpillNodeHandle[];
+    leg: AtmosphereDebug;
+  }
+  const glowRigs: CabinetGlowRig[] = [];
+  const rigsByVolumeId = new Map<string, CabinetGlowRig>();
+  for (const pair of handles.cabinetLights) {
+    const rig: CabinetGlowRig = {
+      pair,
+      center: placementGeometry(placementByVolumeId(pair.volumeId).slotId).center,
+      bleed: [],
+      leg: { volumeId: pair.volumeId, distanceM: 0, hazeFactor: hazeFactor(0), pulseApplied: glowPulse(0), glowIntensity: CABINET_LIGHT_INTENSITY * glowPulse(0) * hazeFactor(0) },
+    };
+    glowRigs.push(rig);
+    rigsByVolumeId.set(pair.volumeId, rig);
+  }
+  for (const node of spillNodes) {
+    const rig = rigsByVolumeId.get(node.volumeId);
+    if (rig == null) {
+      throw new Error(`buildSpillNodes: node for volume "${node.volumeId}" has no cabinet light handle (placements and scene handles out of sync)`);
+    }
+    rig.bleed.push(node);
+  }
+  const atmosphereLegs = glowRigs.map((r) => r.leg);
 
   // The kernel loop drives instances from the build-generated registry plus
   // the player system; wall-clock only feeds the accumulator (AD-3).
@@ -598,6 +655,35 @@ function bootArcade(): void {
       f.torso.position.set(f.base.x + leanX, FIGURE_PARTS.torso.centerY + off.torsoY, f.base.z + leanZ);
       f.head.position.set(f.base.x + leanX, FIGURE_PARTS.head.centerY + off.headY, f.base.z + leanZ);
     }
+    // Story 2.3 (AC1/AC3): the glow ramp — the frontDoorRamp idiom on the
+    // cabinet light tier. Every lit Cabinet's halo/spill pair and its
+    // pillar-bleed nodes ride nominal x pulse x haze from tick state only
+    // (AD-3/AD-15): the pulse is the attract phase's one gentle swell
+    // (the law and the NFR-9 flash ceiling live in atmosphere.ts), and the
+    // haze dims distant machines toward Room Black by the camera pose this
+    // frame just wrote from player state — a never-zero floor, so far
+    // machines dim but never read dead (UX-DR17), and every bleed node
+    // rides its SOURCE cabinet's numbers, carrying the proximity gradient
+    // into the pillar shadows where sound dies (AC2/AC3). The emissive
+    // faces are never touched here: 2.0's exactly-two-emissive census and
+    // the DW-23 exposure budget (screen stays the brightest face) stay
+    // byte-preserved.
+    const pulseApplied = glowPulse(cabinets.phase);
+    for (const rig of glowRigs) {
+      const dx = camera.position.x - rig.center.x;
+      const dz = camera.position.z - rig.center.z;
+      const distanceM = Math.sqrt(dx * dx + dz * dz);
+      const haze = hazeFactor(distanceM);
+      const glow = CABINET_LIGHT_INTENSITY * pulseApplied * haze;
+      rig.pair.halo.intensity = glow;
+      rig.pair.spill.intensity = glow;
+      const spillGlow = SPILL_INTENSITY * pulseApplied * haze;
+      for (const node of rig.bleed) node.light.intensity = spillGlow;
+      rig.leg.distanceM = distanceM;
+      rig.leg.hazeFactor = haze;
+      rig.leg.pulseApplied = pulseApplied;
+      rig.leg.glowIntensity = glow;
+    }
     // 1.5 paint-step gate: the fallback painters cover every face NOT
     // actively compositing (a game-driven face repaints every frame below).
     // 1.7: "actively compositing" is now the full face gate — a face takes
@@ -705,6 +791,8 @@ function bootArcade(): void {
   // beyond the UUID, and the score zone renders these rows read-only);
   // 1.9 adds the entry sequence (phase + timeToPlayableMs + failNow, the
   // console trigger for the workbench swap — the real law path again);
-  // 2.1 adds the audio manager (graph state + per-chain mix law numbers).
-  window.arcadeDebug = { player, loop, cabinets, seat, scheduler, presenter, containment, storage, entry, audio };
+  // 2.1 adds the audio manager (graph state + per-chain mix law numbers);
+  // 2.3 adds the atmosphere leg (the per-cabinet haze/pulse/glow rows the
+  // frame writes — the smoke walk reads the gradient's numbers).
+  window.arcadeDebug = { player, loop, cabinets, seat, scheduler, presenter, containment, storage, entry, audio, atmosphere: atmosphereLegs };
 }
