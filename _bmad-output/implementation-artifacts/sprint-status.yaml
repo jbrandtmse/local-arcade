@@ -29,7 +29,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 11-20-2026 20:55
-last_updated: 11-27-2026 23:02
+last_updated: 11-28-2026 14:03
 project: local-arcade
 project_key: NOKEY
 tracking_system: file-system
@@ -53,7 +53,7 @@ development_status:
   2-1-core-audio-manager-attract-sound-that-occludes-and-swells: done
   2-2-the-proximity-ladder-and-the-seated-focus-mix-tuned-in: done
   2-3-light-spill-and-atmospheric-depth-the-graphics-rung-works-al: done
-  2-4-the-settings-page-comfort-presets-on-at-first-visit: in-progress
+  2-4-the-settings-page-comfort-presets-on-at-first-visit: review
   2-5-the-site-page-and-honest-disclosures: backlog
   2-6-the-m1-walk-sm-1-in-both-variants-honestly-measured: backlog
   epic-2-retrospective: optional

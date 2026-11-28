@@ -345,3 +345,23 @@ See _bmad/custom/skill-rules.md Rule 15 (entry grammar) and Rule 17 (the drain).
 - source: spec-2-3-light-spill-and-atmospheric-depth-the-graphics-rung-works-al.md | severity: low | fix-risk: low | footprint: in-story
 - evidence: main-boot-qa.test.ts pairLights filters distance===CABINET_LIGHT_REACH, bleedLights slices the trailing 8 PointLights; a retune equalizing the reaches shifts attribution
 - 2026-11-28T05:43:10Z status=routed owner=3-7-the-l2-room-audit-whole-room-proof-and-the-numbers-that-make by=cr note=QA harvest candidate: 3.7 re-tunes reaches together - keep distinct or rework the attribution idiom
+
+### DW-59: no executed browser/AT tier for Settings-page rendered claims (panel overlay layout/scroll/stacking, focus ring as rendered, real matchMedia, real pointer-lock release, assistive-tech read) — structure/style-literal + boot tier is the falsifiable tier this story
+- source: harvest Story 2.4 (spec frontmatter deferred) | severity: low | fix-risk: low | footprint: cross-epic
+- evidence: same posture as 2.1/2.2/2.3 deferred items; browser-E2E harness lands Epic 3, M1 walk 2.6; pinned in core/settings-ui.test.ts style/aria pins + core/main-boot-qa.test.ts matchMedia/localStorage fakes; BH-2 panel-visibility fix rides this gap
+- 2026-11-28T14:02:48Z status=open owner=2-4-the-settings-page-comfort-presets-on-at-first-visit by=harvest note=
+
+### DW-60: comfort numbers provisional per UX-DR20 [ASSUMPTION]: preset bob ladder (off 0.04/low half/full 0), sensitivity slider law (value/50 x MOUSE_SENSITIVITY), arrow-look rate, calm tempo cadence (1 tick per 2) — law shapes pinned, finals wait the L3 vestibular test
+- source: harvest Story 2.4 (spec frontmatter deferred) | severity: low | fix-risk: low | footprint: cross-epic
+- evidence: UX-DR20 'baselines provisional — tune at the L3 vestibular test'; defaults byte-preserve shipped behaviour at default sliders (master 100->gain 1.0, strength 100->exact FOCUS_DUCK, FOV 60); labelled constants in core/settings.ts consumed by player.ts/input/index.ts/main.ts
+- 2026-11-28T14:02:49Z status=open owner=2-4-the-settings-page-comfort-presets-on-at-first-visit by=harvest note=
+
+### DW-61: focus-mix strength has no executed boot-tier composition pin through shipped glue: row reaches manager/mix only via live getter in main.ts, pinned by injected-getter unit tier + MAIN.includes text pin
+- source: harvest Story 2.4 (spec frontmatter deferred, review pass VG-1) | severity: medium | fix-risk: med | footprint: core
+- evidence: VG-1 falsifier: deleting focusStrength option from shipped createAudioManager call leaves every executed test green; a committed non-default strength observed on a seated chain needs a boot-tier seat cycle beyond this story's boot scope; core/main.ts getter wiring + main-boot-qa live-getters test
+- 2026-11-28T14:02:49Z status=open owner=2-4-the-settings-page-comfort-presets-on-at-first-visit by=harvest note=
+
+### DW-62: Story 2.4 boot-tier legs share main-boot-qa.test.ts boot narrative (boot-2 handle, boot2AtPump, absolute panelCount/matchMedia counters) instead of per-test hermetic legs — deterministic in declaration order only
+- source: harvest Story 2.4 (spec frontmatter deferred, review pass VG-o1) | severity: low | fix-risk: low | footprint: core
+- evidence: established 2.3 single-narrative idiom extended; solo run of a later boot test would read earlier narrative state; relative counters + self-captured handle re-tune the whole file's pins — QA-tier work; core/main-boot-qa.test.ts #settings-at-load + accommodations-never-fork legs
+- 2026-11-28T14:02:49Z status=open owner=2-4-the-settings-page-comfort-presets-on-at-first-visit by=harvest note=

@@ -6,6 +6,7 @@ status: 'done'
 review_loop_iteration: 0
 followup_review_recommended: true
 baseline_revision: '0eccd503a3206c8a64f2920e2d5f7bc59af67c7a'
+baseline_commit: '0eccd503a3206c8a64f2920e2d5f7bc59af67c7a'
 context:
   - _bmad-output/planning-artifacts/architecture/architecture-local-arcade-2026-11-19/ARCHITECTURE-SPINE.md
   - _bmad-output/implementation-artifacts/epic-2-context.md
