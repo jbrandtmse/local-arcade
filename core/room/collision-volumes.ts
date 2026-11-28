@@ -111,12 +111,16 @@ export const collisionVolumes: readonly CollisionVolume[] = [
     targetable: false,
     kind: "wall",
   },
-  // The street-side door, closed (the door-open beat is Story 1.9).
+  // The street-side door. Story 2.4 (Design Notes item 2): the walk-out
+  // exit — the panel volume stays authored (it still draws the door and
+  // the door glow anchors to it) but no longer blocks movement: crossing
+  // it outward opens the settings panel (the crossing detector is core/
+  // main.ts's pose dead-band read; the street-wall bounds the strip).
   {
     id: "door-front",
     min: { x: -DOOR_HALF_W, y: 0, z: HALF_Z },
     max: { x: DOOR_HALF_W, y: DOOR_TOP, z: HALF_Z + DOOR_T },
-    blocksMovement: true, // closed: walking forward presses against it, never through
+    blocksMovement: false, // open to walking through (Story 2.4; was closed in 1.x)
     targetable: false,
     kind: "door",
   },

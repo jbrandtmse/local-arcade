@@ -87,7 +87,11 @@ test("authored id set, envelope faces, closed door in the bottom-center gap, str
   assert.equal(vol("wall-front-left").max.x, -DOOR_HALF_W);
   assert.equal(vol("wall-front-right").min.x, DOOR_HALF_W);
   assert.equal(vol("wall-front-right").max.x, INTERIOR.width / 2 + WALL_T);
-  // Door closed in the gap, blocking.
+  // Door in the gap. Story 2.4 (Design Notes item 2): the panel volume
+  // stays authored (door geometry + glow anchor) but no longer blocks —
+  // walking through it opens the settings page (the ONLY 2.4 volume-list
+  // edit; every other volume's bit is untouched, pinned by the grammar
+  // pin below).
   const door = vol("door-front");
   assert.equal(door.kind, "door");
   assert.equal(door.min.x, -DOOR_HALF_W);
@@ -96,7 +100,7 @@ test("authored id set, envelope faces, closed door in the bottom-center gap, str
   assert.ok(Math.abs(door.max.z - (INTERIOR.depth / 2 + DOOR_T)) < EPS, "panel thickness derived, not retyped");
   assert.equal(door.min.y, 0);
   assert.equal(door.max.y, DOOR_TOP);
-  assert.equal(door.blocksMovement, true);
+  assert.equal(door.blocksMovement, false, "walk-out exit (Story 2.4; 1.x pinned this true — moved deliberately)");
   assert.equal(door.targetable, false);
   // Street side beyond the front wall.
   const floor = vol("street-floor");
@@ -130,12 +134,14 @@ test("occluder pillars: authored ids, centers (+-3.5, 2.1), 0.5m squares, and th
   assert.deepEqual(occluders, ["pillar-1", "pillar-2"]);
 });
 
-test("authored grammar: min<max everywhere; all block except the street floor; only 1.4's cabinet shells are targetable (the E-openable coin door rides that leg); entry spawn just inside the door", () => {
+test("authored grammar: min<max everywhere; all block except the street floor and the walk-out door; only 1.4's cabinet shells are targetable (the E-openable coin door rides that leg); entry spawn just inside the door", () => {
   for (const v of collisionVolumes) {
     assert.ok(v.min.x < v.max.x && v.min.y < v.max.y && v.min.z < v.max.z, `${v.id} min<max`);
     // Volume-kind grammar (1.4): "cabinet" is the one targetable kind.
     assert.equal(v.targetable, v.kind === "cabinet", `${v.id} targetable`);
-    const expected = v.id === "street-floor" ? false : true;
+    // Story 2.4: door-front joins the non-blocking pair — the walk-out
+    // exit. Mutation guard: flipping any OTHER volume's bit reddens here.
+    const expected = v.id === "street-floor" || v.id === "door-front" ? false : true;
     assert.equal(v.blocksMovement, expected, `${v.id} blocksMovement`);
   }
   assert.deepEqual({ ...ENTRY_SPAWN }, { x: 0, z: 5.6, yaw: 0 });

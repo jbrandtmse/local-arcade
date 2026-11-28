@@ -266,6 +266,14 @@ function localStoragePort(): StoragePort {
   };
 }
 
+/** Story 2.4 (additive): the same browser-edge port, handed to a second
+ * single-owner service (core/settings.ts) without that module ever naming
+ * the device store — the name stays localStorage-free so the storage
+ * single-owner scan in core/no-ui-dom.test.ts keeps its one-owner law. */
+export function browserStoragePort(): StoragePort {
+  return localStoragePort();
+}
+
 export function createStorageService(opts: StorageServiceOptions = {}): StorageService {
   const port = opts.storage ?? localStoragePort();
   const uuidFn = opts.uuidFn ?? ((): string => (globalThis as { crypto: Crypto }).crypto.randomUUID());

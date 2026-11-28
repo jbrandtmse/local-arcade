@@ -18,6 +18,9 @@ import { GLOW_CYAN, GLOW_MARQUEE } from "../room/tokens.ts";
 import { EYE_HEIGHT, type PlayerState } from "../player.ts";
 import type { Occupancy } from "../patrons/scheduler.ts";
 import {
+  MASTER_GAIN_DEFAULT,
+  MASTER_GAIN_MAX,
+  MASTER_GAIN_MIN,
   PANNER_SETUP,
   SMOOTHING_S,
   SPEAKER_HEIGHT_M,
@@ -242,19 +245,37 @@ function behindPillar1(): { x: number; z: number } {
 
 // --- Pins ------------------------------------------------------------------
 
-test("one owned chain per Cabinet: fake graph shows one source/lowpass/gain/panner, connected source->lowpass->gain->panner->destination", () => {
+test("one owned chain per Cabinet: fake graph shows one source/lowpass/gain/panner plus the 2.4 master gain, connected source->lowpass->gain->panner->MASTER->destination", () => {
   const { rig } = build("suspended");
   const placements = 1; // the authored cabinetPlacements list (B0)
   assert.equal(rig.labels.sources.length, placements);
   assert.equal(rig.labels.lowpasses.length, placements);
-  assert.equal(rig.labels.gains.length, placements);
+  assert.equal(rig.labels.gains.length, placements + 1, "the per-chain gains PLUS the one master gain (Story 2.4; the master is the LAST gain node — created after every chain)");
   assert.equal(rig.labels.panners.length, placements);
+  const master = rig.labels.gains[placements]!;
   assert.deepEqual(rig.connects, [
     `${rig.labels.sources[0]}->${rig.labels.lowpasses[0]}`,
     `${rig.labels.lowpasses[0]}->${rig.labels.gains[0]}`,
     `${rig.labels.gains[0]}->${rig.labels.panners[0]}`,
-    `${rig.labels.panners[0]}->${rig.labels.destination}`,
-  ]);
+    `${rig.labels.panners[0]}->${master}`,
+    `${master}->${rig.labels.destination}`,
+  ], "no panner reaches the destination directly anymore: the master sits between (falsifiability: master built but never wired before destination reds here)");
+});
+
+test("Story 2.4 master gain: created once (never per chain), settled to 1.0 at build, and setMasterGain lands on the SAME node's param — out-of-range setters clamp (AC2: fake audio graph master gain settles to the slider fraction)", () => {
+  const { rig, manager } = build("suspended");
+  assert.equal(MASTER_GAIN_DEFAULT, 1, "default 1.0 = 2.1's byte-identical product");
+  const master = rig.labels.gains.at(-1)!;
+  const masterParam = rig.params.find((p) => p.label === `${master}.gain`)!;
+  assert.deepEqual(masterParam.targets, [1], "the build actuation settles 1.0");
+  manager.setMasterGain(0.4);
+  assert.deepEqual(masterParam.targets.slice(-1), [0.4], "the SAME node's param receives the setter (mutation: setter mutates only the debug value -> red here)");
+  manager.setMasterGain(-3);
+  manager.setMasterGain(9);
+  assert.deepEqual(masterParam.targets.slice(-2), [MASTER_GAIN_MIN, MASTER_GAIN_MAX], "clamped to [0,1] (labelled homes)");
+  assert.equal(manager.state().masterGain, MASTER_GAIN_MAX, "state() reads back the clamped set value");
+  manager.setMasterGain(0.4);
+  assert.equal(manager.state().masterGain, 0.4);
 });
 
 test("the chain carries the recipe as PCM: one buffer sized to the render, written once, looped source started once even while suspended", () => {
@@ -290,13 +311,15 @@ test("the Cabinet with no recipe keeps its full chain but starts no source (sile
   assert.deepEqual(rig.sources, [], "no source is started for a recipe-less Cabinet");
   assert.deepEqual(rig.buffers, [], "no buffer is rendered from a missing recipe");
   assert.equal(rig.labels.lowpasses.length, 1);
-  assert.equal(rig.labels.gains.length, 1);
+  assert.equal(rig.labels.gains.length, 2, "one chain gain + the one master (2.4); recipe-less does not skip the master");
   assert.equal(rig.labels.panners.length, 1);
+  const master = rig.labels.gains[1]!;
   assert.deepEqual(rig.connects, [
     `${rig.labels.lowpasses[0]}->${rig.labels.gains[0]}`,
     `${rig.labels.gains[0]}->${rig.labels.panners[0]}`,
-    `${rig.labels.panners[0]}->${rig.labels.destination}`,
-  ], "the room services stay uniform: one chain, only the source leg is absent");
+    `${rig.labels.panners[0]}->${master}`,
+    `${master}->${rig.labels.destination}`,
+  ], "the room services stay uniform: one chain, only the source leg is absent — and the master still sits before the destination");
   manager.tick();
   const chain = manager.state().chains[0]!;
   assert.equal(chain.hasRecipe, false, "the debug record carries the truth (mutation: drop the hasRecipe guard and renderAttractLoop(undefined) throws at boot \u2014 red here)");
@@ -702,6 +725,34 @@ test("the seated focus mix at the manager tier: sitting at B0 collapses every OT
   assert.equal(dbg.chains[1]!.audible, true, "near-silent is not budget-silent: the ducked chain stays awake and in budget");
 });
 
+test("Story 2.4 strength-getter wiring at the manager tier: the settings focusStrength getter rides into the law FRESH per tick — getter 0 keeps the un-seated chain at its rung FULL while a visitor sits, getter 1 lands the exact 2.2 floor on the NEXT tick, and flipping back recovers — no rebuild, no reload (matrix 'Slider commit' live leg)", () => {
+  const rig = createFakeGraph("running");
+  const entryKit = makeEntry("control", 1);
+  const occupancy: { B0: Occupancy; B1: Occupancy } = { B0: "attract", B1: "attract" };
+  const playerKit = makePlayer();
+  let strength = 0;
+  const manager = createAudioManager({
+    graph: rig.graph,
+    registry,
+    scheduler: makeSchedulerTwo(occupancy),
+    player: playerKit.player,
+    entry: entryKit.entry,
+    placements: twoPlacements,
+    focusStrength: () => strength,
+  });
+  occupancy.B0 = "visitor-seated";
+  for (let i = 0; i < LADDER_DWELL_TICKS + 5; i++) manager.tick();
+  const [b0Gain, b1Gain] = gainParamsOf(rig);
+  assert.ok(b0Gain !== undefined && b1Gain !== undefined);
+  assert.equal(b1Gain!.targets.at(-1), ATTRACT_BASE_GAIN, "strength 0: no collapse — the far machine keeps its clear rung (mutation: manager ignores the getter -> 0.03125 here, red)");
+  strength = 1;
+  manager.tick();
+  assert.equal(b1Gain!.targets.at(-1), ATTRACT_BASE_GAIN * FOCUS_DUCK, "strength 1 lands the 2.2 floor on the very next tick (live apply)");
+  strength = 0;
+  manager.tick();
+  assert.equal(b1Gain!.targets.at(-1), ATTRACT_BASE_GAIN, "back again — the getter is read fresh every tick, the graph untouched");
+});
+
 // QA (Story 2.2 gap): the seated-volume -> focus WIRING. Every pre-QA
 // seated fixture seats at the FIRST placement, so a manager that resolves
 // the seated volume to the wrong cabinet (e.g. always the first cabinet of
@@ -854,9 +905,9 @@ test("two Placements, one graph, still exactly one looping chain each: no new no
   const placements = 2;
   assert.equal(rig.labels.sources.length, placements);
   assert.equal(rig.labels.lowpasses.length, placements);
-  assert.equal(rig.labels.gains.length, placements);
+  assert.equal(rig.labels.gains.length, placements + 1, "per-chain gains PLUS exactly ONE master gain (Story 2.4) — the master is graph-wide, never per-chain");
   assert.equal(rig.labels.panners.length, placements);
-  assert.equal(rig.connects.length, 4 * placements, "every leg is source->lowpass->gain->panner->destination, twice: the ladder, the focus layer, and the budget add NO node to the graph (mutation: a per-chain duck node lands here as a 9th connect and a 5th kind)");
+  assert.equal(rig.connects.length, 4 * placements + 1, "every leg is source->lowpass->gain->panner->master, twice, plus the one master->destination leg: the ladder, the focus layer, the budget, and the master add NO per-chain node (mutation: a per-chain duck node lands here as a 5th kind)");
 });
 
 test("determinism twin over the two-chain walk: identical rigs with a scripted pose walk and a mid-walk seat record identical param sequences and identical debug records", () => {

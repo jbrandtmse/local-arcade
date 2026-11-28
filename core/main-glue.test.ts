@@ -144,7 +144,12 @@ test("the authored room reaches the page once: buildRoomScene through the real T
 });
 
 test("1.4 cabinet wiring: the phase advances as a kernel system, coin doors toggle ONLY through the player-routed E handler, the frame poses doors and repaints screens from state (never wall-clock), the texture-update leg maps through, and arcadeDebug carries the runtime (1.4 AC3/AC4/AC5)", () => {
-  assert.ok(MAIN.includes('loop.addSystem("cabinets", () => stepCabinetPhase(cabinets, 1));'), "attract phase mutates inside the tick only (AD-15)");
+  // 2.4 pin move (moved-pin precedent, 1.9/2.1/2.3): the calm-cabinets
+  // tempo wrap sits AT this call site, so the body is no longer a one-
+  // liner — the phase-law call itself survives byte-unchanged inside.
+  assert.ok(MAIN.includes('loop.addSystem("cabinets", () => {'), "attract phase mutates inside the tick only (AD-15)");
+  assert.ok(MAIN.includes("stepCabinetPhase(cabinets, 1)"), "the phase-law call survives byte-unchanged (the 2.4 calm wrap wraps the call site, it never touches the law body)");
+  assert.ok(MAIN.includes("cabinetsTick % tempoEveryN(settings.rows()) === 0"), "the calm tempo wrap is TICK-counted (AD-3) and advances every tick when calm is off (tempoEveryN = 1 = today's law)");
   assert.ok(MAIN.includes("for (const p of cabinetPlacements)"), "interactables register per placement record, never hand-typed ids");
   assert.ok(
     MAIN.includes("player.registerInteractable(p.volumeId, (id) => toggleCoinDoor(cabinets, id));"),
@@ -193,9 +198,13 @@ test("1.4 cabinet wiring: the phase advances as a kernel system, coin doors togg
   // 2.1 moved it again: the line gains the Core Audio Manager. 2.3 moved it
   // once more: the line gains the atmosphere leg (per-cabinet haze/pulse/
   // glow rows the frame writes — plain data for the smoke walk).
+  // 2.4 moved it again: the line gains the settings service (device rows +
+  // stored/degraded flags) and the guarded instances map (the boot tier's
+  // stateHash-identity pin reads the LIVE instances — settings never
+  // fork a seeded run).
   assert.ok(
-    MAIN.includes("window.arcadeDebug = { player, loop, cabinets, seat, scheduler, presenter, containment, storage, entry, audio, atmosphere: atmosphereLegs };"),
-    "the console smoke can read the cabinet runtime, the seat cycle (1.5), the Patron scheduler + figure presenter (1.6), the containment handle with injectFault (1.7 — the smoke drives a REAL fault chain), the storage/identity service (1.8 — the smoke reads visitorId + rowsFor), the entry sequence (1.9 — phase, the timeToPlayableMs measurement, and failNow to drive the workbench swap through the real law), and the atmosphere leg (2.3 — per-cabinet distanceM / hazeFactor / pulseApplied / glowIntensity) — console-only, zero UI (AD-24)",
+    MAIN.includes("window.arcadeDebug = { player, loop, cabinets, seat, scheduler, presenter, containment, storage, entry, audio, atmosphere: atmosphereLegs, settings, instances };"),
+    "the console smoke can read the cabinet runtime, the seat cycle (1.5), the Patron scheduler + figure presenter (1.6), the containment handle with injectFault (1.7 — the smoke drives a REAL fault chain), the storage/identity service (1.8 — the smoke reads visitorId + rowsFor), the entry sequence (1.9 — phase, the timeToPlayableMs measurement, and failNow to drive the workbench swap through the real law), the atmosphere leg (2.3 — per-cabinet distanceM / hazeFactor / pulseApplied / glowIntensity), the settings service (2.4 — the effective device rows, device-layer only), and the live game instances (2.4 — the identity pin's read side) — console-only, zero UI (AD-24)",
   );
   for (const banned of ["performance.now", "Date.now", "Math.random", "tickCount"]) {
     assert.ok(!body.includes(banned), `the 1.4 frame legs must not read ${banned} either (liveness derives from tick state)`);
@@ -216,7 +225,9 @@ test("1.5 seat wiring (1.6/1.7-moved pins): the seat service owns the game-cabin
   // 1.9 moved pin: the entry gate composes OUTSIDE the seat law — the
   // player system consumes the seat's view through the entry's input gate
   // (seated -> zeroed axes/aim, E kept; pre-control -> everything quiet).
-  assert.ok(MAIN.includes("player.step(1, entry.playerView(seat.playerView(input.takeView())));"), "the player system consumes the seat's view under the entry gate (1.9 composition law; the seat's own law byte-unchanged)");
+  // 2.4 moved it again: the third argument is the preset's EFFECTIVE bob
+  // scalar (at the shipped default rows the 1.2 bob law is byte-identical).
+  assert.ok(MAIN.includes("player.step(1, entry.playerView(seat.playerView(input.takeView())), bobAmplitude(settings.rows()));"), "the player system consumes the seat's view under the entry gate (1.9 composition law; the seat's own law byte-unchanged) plus the comfort preset's effective bob amplitude (2.4)");
   assert.ok(MAIN.includes('loop.addSystem("seat", () => seat.step(input.takeCodeView(), patronsRecords));'), "the seat maps raw codes onto declared slots inside the tick, AFTER the patrons dispatch, on the records the patrons system drained (1.6 pin move: the seat no longer drains — AD-23)");
   assert.ok(MAIN.includes("seat.setEventSink((rec) => presentations.get(rec.gameId)?.onEvent?.(rec.event));"), "the seat's drained records ride to the presentation half (sole M0 consumer)");
   assert.match(
@@ -404,8 +415,8 @@ test("1.7 containment wiring: the boot body lives behind attachGameEntries with 
 // handle exposure (console-only read-back, AC4's smoke half).
 test("1.8 storage wiring (AD-16): the service is a core import created with browser-edge defaults, the identity is generated EAGERLY at boot before loop.start, and the debug type carries the service", () => {
   assert.ok(
-    MAIN.includes('import { createStorageService, type StorageService } from "./storage.ts";'),
-    "storage is a core module consumed by the glue (AD-1 import direction: core -> core, games import nothing)",
+    MAIN.includes('import { browserStoragePort, createStorageService, type StorageService } from "./storage.ts";'),
+    "storage is a core module consumed by the glue (AD-1 import direction: core -> core, games import nothing); 2.4 widens the import with browserStoragePort — STILL the only route to the device store, the glue names no localStorage itself (moved-pin precedent)",
   );
   assert.ok(MAIN.includes("const storage = createStorageService();"), "the service is created with its browser-edge defaults (the localStorage port + crypto.randomUUID live behind the service's own try/catch — the glue reaches no device API directly)");
   // Same comment-stripped scan posture as the no-ui-dom single-owner scan:
@@ -572,4 +583,44 @@ test("2.3 atmosphere wiring: the spill tier builds exactly once from the volume 
   for (const banned of ["occlusion", "segHitsRect", "audio", "Panner", "emissive"]) {
     assert.ok(!noComments.includes(banned), `the glow ramp in frame() carries no ${banned} surface — AC2 asymmetry by design, and AC6's other half: the frame's light leg writes point-light intensity only, emissive faces are NEVER ramped (the DW-23 exposure budget and screen-stays-brightest law ride build-tier only)`);
   }
+});
+
+// Story 2.4 (Code Map: "wiring pins for the new boot block"): the settings
+// tier's boot posture — eager service, getters as the live seam into every
+// consumer, the crossing-detector system, and the panel/vignette built
+// OVER THERE (core/settings-ui.ts + the no-ui-dom leg counts its DOM; this
+// file grows no markup, and the DOM-growth pins above stay byte-unchanged).
+test("2.4 settings/exit boot block: eager service before consumers, scalars ride live getters, the crossing system reads only tick state, and the panel/vignette/hash legs land with no markup grown here", () => {
+  assert.ok(MAIN.includes("const settings = createSettingsService({"), "the settings service is created eagerly (the storage.visitorId pattern — the seed lands before the door opens)");
+  assert.ok(MAIN.includes("storage: browserStoragePort(),"), "the device store is reached ONLY through storage.ts's browser-port factory (the single-owner scan binds this)");
+  assert.ok(MAIN.includes('prefersReducedMotion: () => matchMedia("(prefers-reduced-motion: reduce)").matches'), "the first-visit seed port is the LOCAL reduced-motion read (AD-18: the sealed bundle stays sealed)");
+  assert.ok(
+    MAIN.indexOf("const settings = createSettingsService({") < MAIN.indexOf("const camera = new THREE.PerspectiveCamera("),
+    "settings boots BEFORE its first consumer — FOV feeds camera construction (mutation: build the camera at 60 and a stored 90 is ignored forever)",
+  );
+  assert.ok(MAIN.includes("new THREE.PerspectiveCamera(fov(settings.rows())"), "the camera opens at the stored FOV (defaults = 60 = the 1.x construction, byte-identical)");
+  assert.ok(MAIN.includes("bindingTable: () => bindingTable(settings.rows()),"), "the remap table rides the input service as a live getter (no service rebuild — AD-7)");
+  assert.ok(MAIN.includes("lookSource: () => settings.rows().lookSource,"), "the look-source gate rides live too");
+  assert.ok(MAIN.includes("lookEnabled: () => !exitViewOpen,"), "the settings page owns the keyboard while it is up: the LOOK channel is gated (arrows navigate the page, stray drags turn nothing) while MOVEMENT stays live — the walk-back law, AC7 (mutation: drop the wiring -> the boot tier's gate leg is red)");
+  assert.ok(MAIN.includes("aimMultiplier: () => aimMultiplier(settings.rows()),"), "the sensitivity multiplier rides live too (50 -> 1.0 = the 1.2 law byte-unchanged)");
+  assert.ok(MAIN.includes("focusStrength: () => focusStrength(settings.rows()),"), "the focus-mix strength rides the audio manager as a live getter into mix.ts");
+  assert.ok(MAIN.includes("audio.setMasterGain(masterGain(settings.rows()));"), "the master gain boots at the row's gain (100 -> 1.0 = the 2.1 graph unchanged at defaults)");
+  assert.ok(MAIN.includes("camera.fov = fov(rows);"), "a slider commit lands on the LIVE camera (matrix Slider-commit row — projection update right behind it)");
+  assert.ok(MAIN.includes('loop.addSystem("exit", () => {'), "the crossing detector is a kernel system: pure tick pose state, no wall clock, no DOM pointer events");
+  assert.ok(MAIN.includes("p.z >= streetEdgeZ && Math.abs(p.x) <= doorFront.max.x"), "the open condition derives from the AUTHORED volume records, never retyped literals");
+  assert.ok(MAIN.includes("p.z <= doorFront.min.z"), "the door's inner face is the close side — the volume gap IS the dead-band (no per-tick flapping)");
+  assert.ok(
+    MAIN.includes('if (entry.phase() !== "control") return;'),
+    "the detector is CONTROL-phase law: defensive guard over the entry window (matrix #settings-at-load row; the boot tier falsifies the never-auto-close LAW through the openedByCrossing arm — the entry dolly is view-side, so this line alone is text-tier-pinned)",
+  );
+  assert.ok(MAIN.includes("document.exitPointerLock();"), "opening the exit view releases the pointer lock SILENTLY (no prompt, no message — UX-DR18 posture)");
+  assert.ok(MAIN.includes("player.teleport({ ...ENTRY_SPAWN, pitch: 0 });"), "Back to the arcade re-enters at the authored spawn, same document — no navigation, no reload (and no claim restored: the absence laws already ran)");
+  assert.ok(MAIN.includes("mountSettingsPanel({"), "the panel is BUILT by core/settings-ui.ts (the injected-doc module); main.ts itself grows no markup");
+  assert.ok(MAIN.includes("vignetteOverlay = mountVignetteOverlay(document);"), "the vignette overlay is created ONCE at boot, by settings-ui (off at rest, display-only toggle)");
+  assert.ok(MAIN.includes('if (location.hash === "#settings") openExitView();'), "the deep link boots straight into the exit view over the street/entry context (matrix #settings row; 2.5's skip-link hook)");
+  assert.ok(
+    (MAIN.match(/input\.visibilityChanged\(\)/g) ?? []).length === 4,
+    "exactly four call sites: the two 1.2 listener sites (visibilitychange, blur) stay, plus panel open + close (the buffer-drop idiom — no held key walks through the panel)",
+  );
+  assert.ok(MAIN.includes("settings: SettingsService;") && MAIN.includes("instances: Map<string, GameInstance>;"), "the arcadeDebug TYPE carries the additive 2.4 legs (the boot tier's stateHash-identity read side)");
 });

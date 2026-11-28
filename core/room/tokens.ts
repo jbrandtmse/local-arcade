@@ -64,6 +64,18 @@ export const UI_BORDER = 0x2e2e2e;
  * Same hex as GLOW_CYAN by mockup design — the guard binds the hex to this
  * file, not to one name. */
 export const UI_FOCUS = 0x5bc8ff;
+// Story 2.4 (settings page, mockup --ui-muted / focus-accent roles): the
+// settings page's secondary text and its accent ring/marker family. Same
+// hex-home law: settings-ui.ts references these NAMES through toCss, never
+// a literal.
+/** UI Muted: secondary/hint text on the settings page (mockup --ui-muted
+ * #9A9A9A). */
+export const UI_MUTED = 0x9a9a9a;
+/** UI Accent: the settings page's accent (focus ring, checked marker) —
+ * same hex as GLOW_CYAN/UI_FOCUS by mockup design; the guard binds the hex
+ * to this file, not to one name. */
+export const UI_ACCENT = 0x5bc8ff;
+
 /** Glass Dark / Glass Dim: the door glazing's two-tone sheet (mockup .glass
  * gradient #3a2c20 -> #2a2018) — painted, never emissive (1.3's identity
  * law holds from the street side too). */

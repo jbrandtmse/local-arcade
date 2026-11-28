@@ -101,13 +101,47 @@ test("1.9 entry.ts is DOM-free; workbench.ts's DOM surface is exactly the narrow
   const wb = readFileSync(path.join(REPO, "core", "workbench.ts"), "utf8");
   // Call sites are pinned by their dotted call form (the injected-doc
   // interface declarations name the methods without a receiver dot).
-  assert.equal((wb.match(/\.createElement\(/g) ?? []).length, 1, "exactly one createElement call in core/workbench.ts (the only element-creating module; the per-module createElement bans in this scan cover the rest of the core tree)");
+  assert.equal((wb.match(/\.createElement\(/g) ?? []).length, 1, "exactly one createElement call in core/workbench.ts (the boot-failure panel's one element; 2.4's settings-ui.ts joins as the second allowed element module with its own pinned narrow leg below — everything else in the core tree stays createElement-banned)");
   assert.ok(wb.includes('createElement("canvas")'), "and it creates only ever a canvas");
   assert.equal((wb.match(/\.body\.appendChild\(/g) ?? []).length, 1, "exactly one append call");
   assert.equal((wb.match(/\.body\.removeChild\(/g) ?? []).length, 1, "exactly one remove call");
   assert.equal((wb.match(/\.addEventListener\(/g) ?? []).length, 1, "exactly one listener call (the Reload wiring)");
   for (const banned of ["document.", "window.", "innerHTML", "textContent", "insertAdjacentHTML", "document.write", "querySelector", "style.", "localStorage"]) {
     assert.ok(!wb.includes(banned), `core/workbench.ts must not use ${banned} — the panel is PAINTED onto its canvas, never marked up`);
+  }
+});
+
+// Story 2.4 (Rule 2, extending the workbench precedent): the Settings page
+// is the SECOND core module allowed real elements — WCAG 2.2 AA structure
+// (24px hit targets, focus rings, role="switch"/aria-checked, radiogroups)
+// is unservable on a painted canvas, so settings-ui.ts takes real DOM over
+// an injected doc slice instead of workbench's painting. The allowance is
+// pinned exactly as narrow, reading CODE (comments stripped — the module
+// may document its own bans): a per-tag createElement census whose sum
+// equals the total call count (no dynamic tag), body mounts ONLY the panel
+// root + the vignette overlay, unmount is the one removal, and every
+// listener/style/textContent write counted — a new surface node is a loud
+// census edit, never a silent grow. No host global, device store, or
+// navigation primitive appears in the code at all (the spec's
+// falsifiability: planting `location.reload` here reds the ban leg).
+test("2.4 settings-ui.ts's DOM surface is exactly the pinned allowlist: per-tag createElement census, body mounts only the panel + vignette, and no host global/store/navigation in code", () => {
+  const ui = strip(readFileSync(path.join(REPO, "core", "settings-ui.ts"), "utf8"));
+  const census: Record<string, number> = {};
+  for (const m of ui.matchAll(/\.createElement\("([a-z0-9]+)"\)/g)) census[m[1]] = (census[m[1]] ?? 0) + 1;
+  assert.deepEqual(
+    census,
+    { div: 8, span: 12, input: 3, button: 3, h1: 1, p: 2, section: 3, h2: 3, label: 2, ul: 1, li: 2 },
+    "the element families the page may grow, exactly (rows are div[data-row], groups are section[role=group], sliders are input[range], the remap list is ul>li — a new tag family is loud)",
+  );
+  assert.equal((ui.match(/\.createElement\(/g) ?? []).length, 40, "the per-tag census sums to EVERY createElement call — no variable/dynamic tag smuggles a family past the census");
+  assert.equal((ui.match(/\.appendChild\(/g) ?? []).length, 54, "every tree edge is counted (an extra append is a new surface node — census edit or red)");
+  assert.equal((ui.match(/\.body\.appendChild\(/g) ?? []).length, 2, "exactly two page mounts ever: the panel root and the vignette overlay");
+  assert.equal((ui.match(/\.body\.removeChild\(/g) ?? []).length, 1, "unmount() is the single page-level removal — the page closes same-document, never by reload");
+  assert.equal((ui.match(/\.addEventListener\(/g) ?? []).length, 13, "listener census: back, the two radio-loop change sites (look + preset), rebind/vignette/calm/reset clicks, four slider inputs, and the focusin/focusout ring pair");
+  assert.equal((ui.match(/\.style\./g) ?? []).length, 97, "styling is per-element style writes ONLY — no class/stylesheet surface (what those writes SAY is bound by settings-ui.test.ts: copy law, colour law, WCAG structure; 2.4 review pass +7: the fixed-overlay root law and the preset-label real-border cue)");
+  assert.equal((ui.match(/\.textContent/g) ?? []).length, 25, "every text write goes through textContent — never innerHTML — and the count makes a new text-bearing node a census edit");
+  for (const banned of ["document", "window", "location", "localStorage", "navigator", "innerHTML", "insertAdjacentHTML", "querySelector", "classList", "cssText", "insertRule"]) {
+    assert.ok(!ui.includes(banned), `settings-ui.ts code must not name ${banned} — the injected doc slice is the WHOLE DOM surface (workbench precedent widened), the device store has one owner, and the page never navigates`);
   }
 });
 
@@ -157,7 +191,9 @@ test("1.8 single storage owner: only core/storage.ts touches the device store, a
 // arrangement for the main glue; the executed-host tier is the 3-2/3-15
 // browser harness, DW-12/DW-15 re-owned at the burn-down gate): the camera
 // references surviving in core/main.ts code ride an allowlist — the six
-// forms 1.9 shipped PLUS 2.3's two read-only haze pose reads (the glow ramp
+// forms 1.9 shipped PLUS 2.3's two read-only haze pose reads PLUS 2.4's
+// fov scalar set (the Settings FOV row lands on the camera's own
+// projection STATE — state, never a content host) (the glow ramp
 // MEASURES the camera pose the frame just wrote from player state; reading
 // a pose is not hosting content — the host forms stay banned and the
 // statement-level allowlist still reddens any new FORM), checked per
@@ -177,6 +213,11 @@ test("the camera never hosts content: main.ts camera refs ride the allowlist, ca
     ["pose sets", /^camera\.(position|rotation)\.set\(/],
     ["aspect", /^camera\.aspect = /],
     ["updateProjectionMatrix", /^camera\.updateProjectionMatrix\(\)$/],
+    // 2.4 (matrix: Slider-commit live apply): the FOV row writes the
+    // camera's OWN projection scalar, then updates the matrix — camera
+    // STATE, not content on the camera (the host-form ban below still
+    // reddens anything parented to it; no game ever sees this write).
+    ["fov set (2.4)", /^camera\.fov = /],
     ["render(scene, camera)", /renderer\.render\(scene, camera\)$/],
     // 2.3 (AC1): the haze law measures distance FROM the camera pose this
     // frame wrote from player tick state. A READ, per statement — no
@@ -202,8 +243,8 @@ test("the camera never hosts content: main.ts camera refs ride the allowlist, ca
   }
   assert.deepEqual(
     counts,
-    { construction: 1, "rotation.order": 1, "pose sets": 4, aspect: 1, updateProjectionMatrix: 1, "render(scene, camera)": 1, "pose reads (2.3 haze)": 2 },
-    "the six surviving 1.9 camera forms plus 2.3's two READ-ONLY haze pose reads are ALL the camera ever does in the glue — no new FORM may join silently (host forms stay banned in the leg below)",
+    { construction: 1, "rotation.order": 1, "pose sets": 4, aspect: 1, updateProjectionMatrix: 2, "fov set (2.4)": 1, "render(scene, camera)": 1, "pose reads (2.3 haze)": 2 },
+    "the six surviving 1.9 camera forms, 2.3's two READ-ONLY haze pose reads, and 2.4's fov set + its second projection update are ALL the camera ever does in the glue — no new FORM may join silently (host forms stay banned in the leg below)",
   );
 
   // The host-call FORMS, not the two spellings: dot, optional chain, and
@@ -307,6 +348,8 @@ test("dev serve (real HTTP): the served body is unchanged, the 1.2 shell modules
       "/core/patrons/scheduler.ts",
       "/core/patrons/presenter.ts",
       "/core/storage.ts",
+      "/core/settings.ts",
+      "/core/settings-ui.ts",
       "/core/entry.ts",
       "/core/workbench.ts",
       "/core/room/door.ts",

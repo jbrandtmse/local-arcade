@@ -1216,7 +1216,7 @@ test("1.9 street composition: the door-front extrusion becomes the poseable pane
 test("token hue home: every hex literal exported by tokens.ts appears in NO other core non-test source (AC6; mutation: a cabinet-hex literal in scene.ts reddens here)", () => {
   const tokensSrc = readFileSync(path.join(import.meta.dirname, "tokens.ts"), "utf8");
   const hexes = [...tokensSrc.matchAll(/0x[0-9a-fA-F]{6}\b/g)].map((m) => m[0]);
-  assert.ok(hexes.length >= 28, `the full token set exists to scan (found ${hexes.length}) \u2014 the 2.0 cabinet pair + button trio raised the floor 22 -> 28`);
+  assert.ok(hexes.length >= 30, `the full token set exists to scan (found ${hexes.length}) \u2014 the 2.0 cabinet pair + button trio raised the floor 22 -> 28; the 2.4 UI_MUTED + UI_ACCENT pair raised it 28 -> 30`);
   const walk = (dir: string): string[] => {
     const out: string[] = [];
     for (const ent of readdirSync(dir, { withFileTypes: true })) {

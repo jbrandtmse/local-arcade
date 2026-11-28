@@ -1,8 +1,9 @@
 // Story 1.9 (AC5/AC6): the front door's street-side furniture and swing
 // law — the geometry half of the entry beat. The collision volume for
-// "door-front" stays TRUE-blocking and extruded as ONE mesh (the movement
-// law is untouched); this module adds what the STREET view sees and how the
-// panel poses when the beat opens it:
+// "door-front" stays authored and extruded as ONE mesh (Story 2.4 flipped
+// its blocksMovement bit to false — the walk-out exit — but this module's
+// geometry/pose law is untouched); this module adds what the STREET view
+// sees and how the panel poses when the beat opens it:
 //
 //   - frontDoorOpenPose: the panel (and the glass sheet + handle riding
 //     it, the coinDoorPose precedent where the coin slot rides the door)
@@ -35,10 +36,11 @@ const HALF_Z = INTERIOR.depth / 2; // 6.25 — derived, never retyped
 // line x = -DOOR_HALF_W through the panel's mid-plane z. The panel rotates
 // about it into the room (-Z side), so at fraction 1 the panel lies flat
 // against... the inside of the opening's left jamb region, fully clear of
-// the gap — and the collision volume never moves (walking into the doorway
-// still presses against the closed volume; opening the door visually while
-// it still blocks is this story's accepted fiction, AC5's "blocksMovement
-// stays TRUE").
+// the gap — and the collision volume never moves. 1.9's fiction that the
+// closed volume blocked walking through the doorway was superseded by
+// Story 2.4 (door-front.blocksMovement false: crossing it outward opens
+// the settings panel); the pose law itself is unchanged — at fraction 0
+// the panel is byte-identical to the authored extrusion.
 export const FRONT_DOOR_HINGE_X = -DOOR_HALF_W;
 export const FRONT_DOOR_HINGE_Z = HALF_Z + DOOR_T / 2;
 

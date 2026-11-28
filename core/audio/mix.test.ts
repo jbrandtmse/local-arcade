@@ -18,6 +18,7 @@ import {
   INITIAL_DWELL,
   INITIAL_LADDER_DWELL,
   LADDER_DWELL_TICKS,
+  FOCUS_STRENGTH_NEUTRAL,
   LADDER_FAR_DUCK,
   OCCLUSION_PROFILES,
   OPEN_PROFILE,
@@ -54,6 +55,7 @@ function law(over: Partial<MixInput>): MixStep {
     awake: over.awake ?? true,
     inBudget: over.inBudget ?? true,
     ...(over.volumes !== undefined ? { volumes: over.volumes } : {}),
+    ...(over.focusStrength !== undefined ? { focusStrength: over.focusStrength } : {}),
   });
 }
 
@@ -436,6 +438,19 @@ test("focus three-way: self/none keep full level, every other chain ducks to the
   assert.equal(selfBusy.target.gain, ATTRACT_BASE_GAIN, "the focused chain's multiplier is FULL (mutation: seat detection wired wrong \u2014 all chains 'other' \u2014 the composition pin goes red)");
   const none = law({ focus: "none" });
   assert.equal(none.target.gain, ATTRACT_BASE_GAIN, "nobody seated: neutral everywhere (FOCUS_DUCK -> 1 cannot red a neutral pin \u2014 the floor pins above carry it)");
+});
+
+test("Story 2.4 focus-strength input (mix.ts widening): effective = 1 - s*(1-FOCUS_DUCK) \u2014 s=0 no duck at all, s=0.5 exactly half the distance, s=1 the byte-exact 2.2 floor; self/none ignore strength; the OPTIONAL arity's neutral default keeps every pin above byte-unchanged (matrix 'Slider commit' focus leg; falsifiability: strength-0 leg reddens if the input is ignored while identity stays green)", () => {
+  assert.equal(FOCUS_STRENGTH_NEUTRAL, 1, "settings row 100 -> strength 1 -> the 2.2 floor (Code Map default identity)");
+  assert.equal(focusMultiplierFor("other", 0), 1, "strength 0: the mix never collapses around the seated machine");
+  assert.equal(focusMultiplierFor("other", 0.5), 1 - 0.5 * (1 - FOCUS_DUCK), "the straight-line law as a product, never a re-typed midpoint");
+  assert.equal(focusMultiplierFor("other", 1), FOCUS_DUCK, "strength 1 reproduces FOCUS_DUCK EXACTLY \u2014 0.0625 is a power of two, the arithmetic is binary-exact");
+  assert.equal(focusMultiplierFor("self", 0.25), 1, "the focused chain's contract is FULL at any strength");
+  assert.equal(focusMultiplierFor("none", 0.25), 1, "neutral stays neutral at any strength");
+  // The MixInput leg carries through to the product:
+  assert.equal(law({ focus: "other", focusStrength: 0 }).target.gain, ATTRACT_BASE_GAIN, "strength 0 keeps every non-focus chain at full attract level");
+  assert.equal(law({ focus: "other", focusStrength: 0.5 }).target.gain, ATTRACT_BASE_GAIN * (1 - 0.5 * (1 - FOCUS_DUCK)));
+  assert.equal(law({ focus: "other", focusStrength: 1 }).target.gain, law({ focus: "other" }).target.gain, "explicit s=1 === the absent-input floor: the optional arity IS the byte-identity");
 });
 
 test("seated composition (Design Notes 1): the focused chain's multiplier stays FULL while 2.1's seated gate keeps its attract silent \u2014 neither law may silently erase the other", () => {

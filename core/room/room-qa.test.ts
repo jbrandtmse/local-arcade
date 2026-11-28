@@ -88,16 +88,25 @@ test("entry spawn: inside the envelope, clear of every blocker by more than the 
   assert.ok(walked.state.z < ENTRY_SPAWN.z - 1.0, "yaw 0 faces the room (W walks in, not into the street)");
 });
 
-test("closed door from inside AND from outside: the real resolver presses the player against both faces, never through (matrix 'walking forward... never through')", () => {
+// Story 2.4 moved pin (was: "closed door from inside AND from outside...
+// never through" — both faces pressed the player at door-front's faces).
+// The walk-out exit supersedes that law: the gap is passable BOTH ways;
+// what bounds a visitor now is street-wall outward and the room's own
+// blockers inward. The walk probe proves the DATA flip on the real
+// resolver, from both sides.
+test("walk-out door from inside AND from outside: the real resolver carries the visitor through the 1.0m gap both ways — street-wall bounds the outward walk, the room's back wall bounds the return (Story 2.4; 1.x pinned the opposite)", () => {
   const door = vol("door-front");
-  const inside = stepN(100, view([-1, 0])); // S from the entry spawn: +Z into the door
-  assert.ok(Math.abs(inside.state.z - (door.min.z - PLAYER_RADIUS)) < EPS, `inside stop z=${inside.state.z}`);
-  assert.equal(inside.state.x, ENTRY_SPAWN.x, "no lateral slide off the door face");
+  const inside = stepN(100, view([-1, 0])); // S from the entry spawn: +Z through the gap
+  assert.ok(inside.state.z > door.max.z, `walked through: z=${inside.state.z} > ${door.max.z}`);
+  assert.equal(inside.state.x, ENTRY_SPAWN.x, "the gap is centred on the spawn: no lateral drift");
+  stepN(300, view([-1, 0]), inside); // keep walking: the strip ends at street-wall
+  assert.equal(inside.state.z, vol("street-wall").min.z - PLAYER_RADIUS, "outward walk bounded by street-wall, not the door");
 
-  // The 1.9 stance: an outside walk (street side) presses the other face.
   const outside = createPlayerController(collisionVolumes, { x: 0, z: 7.0 });
-  for (let i = 0; i < 60; i++) outside.step(1, view([1, 0])); // W: -Z into the door's street face
-  assert.ok(Math.abs(outside.state.z - (door.max.z + PLAYER_RADIUS)) < EPS, `outside stop z=${outside.state.z}`);
+  stepN(60, view([1, 0]), outside); // W: -Z through the street face into the room
+  assert.ok(outside.state.z < door.min.z, `walked back in: z=${outside.state.z} < ${door.min.z}`);
+  stepN(600, view([1, 0]), outside); // all the way up the main aisle (x=0 is pillar- and cabinet-clear)
+  assert.equal(outside.state.z, vol("wall-back").max.z + PLAYER_RADIUS, "inward walk bounded by the room, not the door");
 });
 
 test("street passability: street-floor never blocks (walk its full depth, cross it sideways), while street-wall bounds the strip (matrix 'Door + street side')", () => {

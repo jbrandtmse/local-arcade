@@ -171,11 +171,18 @@ test("wall block: stop at face minus player radius; strafing still slides", () =
   stepN(p, 60, view([0, 1]));
   assert.equal(p.state.z, face + PLAYER_RADIUS);
   assert.ok(p.state.x > 3 + 1);
-  // from the entry spawn, walking forward (toward the street-side door)
-  // presses against the closed door, never through it
+  // Story 2.4 moved pin (was: "presses against the closed door, never
+  // through it", asserting z == door-front.min.z - PLAYER_RADIUS): the
+  // door now passes — walking through the gap lands the visitor on the
+  // street strip, and the far street-wall is what stops them. This is the
+  // movement half of the walk-out exit (the crossing detector that OPENS
+  // the settings panel lives in the glue, pinned at the boot tier).
   const p2 = createPlayerController(collisionVolumes, ENTRY_SPAWN);
-  stepN(p2, 100, view([-1, 0])); // S held: +Z into door-front
-  assert.equal(p2.state.z, volById("door-front").min.z - PLAYER_RADIUS);
+  stepN(p2, 100, view([-1, 0])); // S held: +Z through the door gap
+  assert.ok(p2.state.z > volById("door-front").max.z, "walked past the door plane onto the street");
+  stepN(p2, 400, view([-1, 0])); // keep walking: the street-wall bounds the strip
+  assert.equal(p2.state.z, volById("street-wall").min.z - PLAYER_RADIUS);
+  assert.equal(p2.state.x, ENTRY_SPAWN.x, "the 1.0m gap is centred on the spawn: x never moves");
 });
 
 test("authored room, real consumer (Rule 1): scripted W from the entry spawn stops at the wall-back face minus the player radius", () => {
@@ -212,6 +219,39 @@ test("head bob: amplitude holds while walking, phase rides distance, settles to 
   stepN(p, Math.ceil(BOB_SETTLE_SECONDS * 60) + 1, view());
   assert.equal(p.state.bobAmp, 0);
   assert.equal(cameraY(p.state), EYE_HEIGHT);
+});
+
+test("Story 2.4 effective bob: step's optional amplitude is the ONLY bob scalar the hold and the decay read — preset off (0) walks with a still eye, preset low holds half, and the settle law is the SAME law scaled (UX-DR20 supersedes 1.2's fixed ±0.04 first-visit default)", () => {
+  // "off" comfort preset: amplitude 0 — phase may ride distance but the eye
+  // never leaves 1.60m.
+  const off = createPlayerController(collisionVolumes, { x: 3, z: 0 });
+  for (let i = 0; i < 60; i++) off.step(1, view([1, 0]), 0);
+  assert.equal(off.state.bobAmp, 0, "a walked metre with amplitude 0 holds 0 (mutation: hold BOB_AMPLITUDE regardless -> red here)");
+  assert.equal(EYE_HEIGHT + math.sin(off.state.bobPhase) * off.state.bobAmp, EYE_HEIGHT);
+  assert.ok(off.state.bobPhase > 0, "the phase law still runs (the resolver zeroes the amplitude, not the law)");
+
+  // "low" preset: half, held while walking AND settled with the same scale.
+  const low = createPlayerController(collisionVolumes, { x: 3, z: 0 });
+  const half = BOB_AMPLITUDE / 2;
+  for (let i = 0; i < 60; i++) low.step(1, view([1, 0]), half);
+  assert.equal(low.state.bobAmp, half);
+  for (let i = 0; i <= Math.ceil(BOB_SETTLE_SECONDS * 60); i++) low.step(1, view(), half);
+  assert.equal(low.state.bobAmp, 0, "decay reaches 0 inside the same 0.25s (decay scales with the effective amplitude)");
+
+  // The mid-walk preset SWITCH (review law): a zero effective amplitude
+  // settles INSTANTLY — the same decay law scaled to zero decays by zero and
+  // would strand a bob-offset eye until the next walked step.
+  const switched = createPlayerController(collisionVolumes, { x: 3, z: 0 });
+  for (let i = 0; i < 10; i++) switched.step(1, view([1, 0]), half);
+  assert.ok(switched.state.bobAmp > 0, "mid-stride under the low preset the eye is off the eye line");
+  switched.step(1, view(), 0); // stand still and switch the preset to full
+  assert.equal(switched.state.bobAmp, 0, "the zero-amplitude step settles at once (mutation: drop the bobAmplitude<=0 leg -> red here)");
+  assert.equal(EYE_HEIGHT + math.sin(switched.state.bobPhase) * switched.state.bobAmp, EYE_HEIGHT, "the eye is exactly at EYE_HEIGHT on the very next read");
+
+  // The default arity is byte-identical to 1.2: no third arg -> BOB_AMPLITUDE.
+  const dflt = createPlayerController(collisionVolumes, { x: 3, z: 0 });
+  stepN(dflt, 60, view([1, 0]));
+  assert.equal(dflt.state.bobAmp, BOB_AMPLITUDE);
 });
 
 // Targeting pins run against a test-local targetable fixture (Code Map:

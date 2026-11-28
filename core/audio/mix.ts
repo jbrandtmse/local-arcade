@@ -127,10 +127,21 @@ export function ladderMultiplierFor(applied: LadderTier): number {
   return applied === "clear" ? 1 : LADDER_FAR_DUCK;
 }
 
+/** Story 2.4: the focus-mix STRENGTH input's neutral (device-layer row
+ * 100 -> 1.0 from core/settings.ts). 1 keeps 2.2's law byte-identical:
+ * 1 - 1*(1-FOCUS_DUCK) reproduces FOCUS_DUCK exactly (0.0625 is a power of
+ * two — the arithmetic is binary-exact). */
+export const FOCUS_STRENGTH_NEUTRAL = 1;
+
 /** The focus level: the seated cabinet's own chain stays FULL, every other
- * chain ducks to FOCUS_DUCK, and no seated visitor means neutral. */
-export function focusMultiplierFor(focus: FocusLayer): number {
-  return focus === "other" ? FOCUS_DUCK : 1;
+ * chain ducks to FOCUS_DUCK, and no seated visitor means neutral. Story
+ * 2.4 widened by a strength in [0,1] (Code Map: "focusMultiplierFor takes
+ * a strength input"): the duck lands at `1 - strength*(1-FOCUS_DUCK)` —
+ * strength 1 = the exact 2.2 floor, strength 0 = no duck at all (the
+ * slider's "how far the mix collapses around the machine you are at").
+ * The optional arity keeps every 2.2 call site byte-unchanged. */
+export function focusMultiplierFor(focus: FocusLayer, strength: number = FOCUS_STRENGTH_NEUTRAL): number {
+  return focus === "other" ? 1 - strength * (1 - FOCUS_DUCK) : 1;
 }
 
 export interface MixTarget {
@@ -166,6 +177,9 @@ export interface MixInput {
    * awake set, so inBudget implies awake at the source). */
   awake: boolean;
   inBudget: boolean;
+  /** Story 2.4 (optional, neutral 1): the focus-mix strength from the
+   * settings row (0..1). Absent = 2.2's exact FOCUS_DUCK floor. */
+  focusStrength?: number;
 }
 
 export interface MixStep {
@@ -261,7 +275,7 @@ export function mixStep(input: MixInput): MixStep {
       swellFactor(input.entry) *
       occupancyGate(input.occupancy) *
       ladderMultiplierFor(ladderDwell.appliedId as LadderTier) *
-      focusMultiplierFor(input.focus)
+      focusMultiplierFor(input.focus, input.focusStrength ?? FOCUS_STRENGTH_NEUTRAL)
     : 0;
   return { target: { gain, lowpassHz: profile.lowpassHz }, dwell, ladderDwell, audible };
 }

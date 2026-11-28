@@ -12,6 +12,18 @@
 // DOM APIs at all — no document/window access, only the injected
 // PointerLockHost seam the glue drives. That keeps the whole device layer
 // headless-testable and the replay transcript device-agnostic (AD-26).
+//
+// Story 2.4 (device-layer settings): the service takes an optional tuning
+// slice — a binding table (four movement verbs, Interact stays KeyE), a
+// look-source mode ("mouse" = lock + silent drag fallback per UX-DR18,
+// "drag" = drag-look without a lock request, "arrows" = arrow keys write
+// the SAME aim channel with no pointer-lock request), and an aim
+// multiplier (the sensitivity slider's value/50, applied ONCE per tick in
+// takeView). The defaults — default table, "mouse", 1.0 — keep every 1.2
+// pin byte-identical; the getters make panel commits land on the NEXT
+// takeView without rebuilding the service (listeners are bound once in
+// the glue). AD-7/AD-16: this stays device-side — the tuned view is still
+// the replay currency, and settings never fork a seeded run.
 
 export interface DeviceAxes {
   /** W/S level ∈ {-1,0,1} (⊂ AD-7 axis [-1,1]). */
@@ -80,14 +92,58 @@ export interface CodeView {
   edges: Record<string, boolean>;
 }
 
-const FORWARD_PLUS = "KeyW";
-const FORWARD_MINUS = "KeyS";
-const STRAFE_PLUS = "KeyD";
-const STRAFE_MINUS = "KeyA";
+import { DEFAULT_BINDING, type BindingRows, type LookSource } from "../settings.ts";
+
+/** Story 2.4: the former hardcoded movement codes, now the DEFAULT table's
+ * entries (Code Map: "hardcoded codes become the default table entries").
+ * Review law (single source of truth): the value home is core/settings.ts's
+ * DEFAULT_BINDING — this export DERIVES from it (a copy could drift, and a
+ * consumer mutating this table would silently retune every untuned
+ * service). The spread hands out a fresh per-reference copy. */
+export const DEFAULT_BINDING_TABLE: BindingRows = { ...DEFAULT_BINDING };
+
+/** Interact is NOT on the table this release (Design Notes item 5: the
+ * mockup's disabled Rebind row + "Interact stays E this release."). */
 const INTERACT_KEY = "KeyE";
 const PRIMARY_BUTTON = 0;
 
-export function createInputService(host: PointerLockHost): InputService {
+/** Arrow-key look producer (matrix "Look-source arrows"): a HELD arrow
+ * writes this many equivalent pixels into the SAME {dx,dy} aim channel
+ * per takeView — one channel, three producers (Code Map). LABELLED
+ * PLACEHOLDER ([ASSUMPTION] arrow-look rate, spec frontmatter deferred
+ * item 2): the law shape is pinned, the rate waits for the L3 pass.
+ * Signs follow the mouse convention: yaw decreases with +dx (ArrowRight
+ * turns right), pitch decreases with +dy (ArrowUp looks up). */
+export const ARROW_LOOK_PX_PER_TICK = 6;
+const ARROW_DX: readonly [code: string, dir: number][] = [
+  ["ArrowLeft", -1],
+  ["ArrowRight", 1],
+];
+const ARROW_DY: readonly [code: string, dir: number][] = [
+  ["ArrowUp", -1],
+  ["ArrowDown", 1],
+];
+
+/** Story 2.4 tuning slice: live getters (the glue closes over
+ * core/settings.ts), so a slider/radio/commit lands on the next takeView
+ * with no rebuild. Absent getters = the shipped defaults. */
+export interface InputTuning {
+  bindingTable?: () => BindingRows;
+  lookSource?: () => LookSource;
+  aimMultiplier?: () => number;
+  /** Review law (the settings page owns the keyboard while it is up):
+   * when this getter is false the LOOK channel is gated — held arrows stop
+   * producing and accumulated aim is consumed but not emitted. MOVEMENT
+   * stays live (crossing back is also the walk-in law, AC7). Absent =
+   * always enabled. */
+  lookEnabled?: () => boolean;
+}
+
+export function createInputService(host: PointerLockHost, tuning: InputTuning = {}): InputService {
+  const table = tuning.bindingTable ?? (() => DEFAULT_BINDING_TABLE);
+  const lookSource = tuning.lookSource ?? (() => "mouse" as LookSource);
+  const aimMultiplier = tuning.aimMultiplier ?? (() => 1);
+  const lookEnabled = tuning.lookEnabled ?? (() => true);
   const keys = new Set<string>();
   let locked = false;
   let dragging = false;
@@ -130,7 +186,10 @@ export function createInputService(host: PointerLockHost): InputService {
     },
     canvasClick() {
       // Silent lock (re)arm — no prompt, no message, no style change.
-      host.requestPointerLock();
+      // Story 2.4: only the "mouse" source asks for the lock; "drag" and
+      // "arrows" never request it (matrix "Look-source arrows": no
+      // pointer-lock request — the gate below still serves drag-look).
+      if (lookSource() === "mouse") host.requestPointerLock();
     },
     pointerLockChanged(next) {
       locked = next;
@@ -151,12 +210,31 @@ export function createInputService(host: PointerLockHost): InputService {
       codeEdges.clear();
     },
     takeView() {
+      // Review law: while the settings page is up (lookEnabled false) the
+      // LOOK channel is gated — arrow production stops and accumulated
+      // aim is consumed but NOT emitted, so radiogroup arrow navigation and
+      // stray drags never turn the camera behind the page. The deltas are
+      // still cleared below (nothing carries into the next view), and
+      // movement axes are untouched — crossing back closes the panel.
+      const lookOn = lookEnabled();
+      // Story 2.4 arrow producer: held arrows write the SAME channel the
+      // mouse and drag producers accumulate into — the per-tick view
+      // stays shape-identical (replay currency, AD-26).
+      if (lookOn && lookSource() === "arrows") {
+        for (const [code, dir] of ARROW_DX) if (keys.has(code)) aimDx += dir * ARROW_LOOK_PX_PER_TICK;
+        for (const [code, dir] of ARROW_DY) if (keys.has(code)) aimDy += dir * ARROW_LOOK_PX_PER_TICK;
+      }
+      // Story 2.4: the sensitivity multiplier lands ONCE per tick view, on
+      // the consumed channel (1.0 at the default row keeps every 1.2 pin
+      // byte-identical).
+      const m = aimMultiplier();
+      const t = table();
       const view: DeviceView = {
         axes: {
-          forward: (keys.has(FORWARD_PLUS) ? 1 : 0) - (keys.has(FORWARD_MINUS) ? 1 : 0),
-          strafe: (keys.has(STRAFE_PLUS) ? 1 : 0) - (keys.has(STRAFE_MINUS) ? 1 : 0),
+          forward: (keys.has(t.forward) ? 1 : 0) - (keys.has(t.back) ? 1 : 0),
+          strafe: (keys.has(t.right) ? 1 : 0) - (keys.has(t.left) ? 1 : 0),
         },
-        aim: { dx: aimDx, dy: aimDy },
+        aim: { dx: lookOn ? aimDx * m : 0, dy: lookOn ? aimDy * m : 0 },
         interact: { down: interactDown, pressed: interactEdge },
       };
       aimDx = 0;

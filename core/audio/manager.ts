@@ -32,6 +32,7 @@ import type { GameRegistryEntry } from "../contract/wrapper.ts";
 import { occlusionIds, type RayPoint } from "./occlusion.ts";
 import { computeBudget } from "./budget.ts";
 import {
+  FOCUS_STRENGTH_NEUTRAL,
   INITIAL_DWELL,
   INITIAL_LADDER_DWELL,
   OPEN_PROFILE,
@@ -299,6 +300,11 @@ export interface AudioManagerOptions {
   entry: Pick<EntrySequence, "pose" | "state">;
   placements?: readonly CabinetPlacement[];
   volumes?: readonly CollisionVolume[];
+  /** Story 2.4: live getter for the focus-mix strength (settings row,
+   * 0..1; core/settings.ts `focusStrength` resolves the stored 0..100).
+   * Read fresh per chain-tick so a slider commit lands on the next tick;
+   * absent = FOCUS_STRENGTH_NEUTRAL (2.2's exact floor). */
+  focusStrength?: () => number;
 }
 
 interface Chain {
@@ -353,13 +359,29 @@ export interface ChainDebug {
 export interface AudioManagerDebug {
   graphState: GraphState;
   chains: ChainDebug[];
+  /** Story 2.4: the master gain the glue last set (device-layer row
+   * 100 -> 1.0 = shipped). Read of the SET value — on a silent/suspended
+   * graph this is still what the one master node will carry. */
+  masterGain: number;
 }
+
+/** Story 2.4 (AC2): the master-gain range and default. 1.0 = byte-identity
+ * with 2.1's graph (master between the chains and destination is a
+ * multiply-by-1 no-op at the default row). */
+export const MASTER_GAIN_DEFAULT = 1;
+export const MASTER_GAIN_MIN = 0;
+export const MASTER_GAIN_MAX = 1;
 
 export interface AudioManager {
   /** The loop system body (registered after patrons/seat, AD-15). */
   tick(): void;
   /** One resume attempt per wired gesture while suspended. */
   requestResume(): void;
+  /** Story 2.4: set the ONE master gain (the settings master-volume row's
+   * v/100), clamped to [MIN,MAX]. The live setter — a slider commit lands
+   * on the node immediately, no reload (AD-7: the node is the Manager's,
+   * the settings tier only supplies the number). */
+  setMasterGain(value: number): void;
   /** Plain-data debug view (the arcadeDebug.audio record). */
   state(): AudioManagerDebug;
 }
@@ -369,6 +391,7 @@ export function createAudioManager(opts: AudioManagerOptions): AudioManager {
   const placements = opts.placements ?? cabinetPlacements;
   const volumes = opts.volumes ?? collisionVolumes;
   const chains: Chain[] = [];
+  const chainPanners: AudioPannerHandle[] = [];
 
   for (const placement of placements) {
     const game = placement.gameId === undefined ? undefined : opts.registry.find((e) => e.id === placement.gameId);
@@ -376,9 +399,9 @@ export function createAudioManager(opts: AudioManagerOptions): AudioManager {
     const speaker: RayPoint = { x: geom.center.x, y: SPEAKER_HEIGHT_M, z: geom.center.z };
 
     // One owned chain per placed Cabinet (AD-7): looping source -> lowpass
-    // -> gain -> panner -> destination. A cabinet with no recipe keeps its
-    // chain (the room services stay uniform) but starts no source — that
-    // Cabinet's attract is simply silent.
+    // -> gain -> panner -> (master gain, 2.4) -> destination. A cabinet
+    // with no recipe keeps its chain (the room services stay uniform) but
+    // starts no source — that Cabinet's attract is simply silent.
     const lowpassNode = graph.createLowpass();
     const gainNode = graph.createGain();
     const panner = graph.createPanner(PANNER_SETUP);
@@ -399,7 +422,12 @@ export function createAudioManager(opts: AudioManagerOptions): AudioManager {
     }
     lowpassNode.connect(gainNode);
     gainNode.connect(panner);
-    panner.connect(graph.destination);
+    // Story 2.4: the chain's destination leg now lands on the ONE master
+    // gain (created after every chain, connected once below) — the panner
+    // never connects to `graph.destination` directly anymore (falsifiabil-
+    // ity: a master built but never wired before destination reddens the
+    // fake-graph settle pin).
+    chainPanners.push(panner);
 
     gainNode.gain.setTarget(0);
     lowpassNode.frequency.setTarget(OPEN_PROFILE.lowpassHz);
@@ -421,6 +449,20 @@ export function createAudioManager(opts: AudioManagerOptions): AudioManager {
       focus: "none",
     });
   }
+
+  // Story 2.4: THE master gain — one node on the one graph (AD-7), created
+  // after every chain and wired between every panner and the destination:
+  // source -> lowpass -> gain -> panner -> master -> destination. Created
+  // last so the fake rig's param order keeps the per-chain gains in front
+  // of the master's (the moved connect-log pins read it as the LAST gain
+  // node). Default 1.0 is 2.1's exact product — the node is a multiply-by-
+  // one until the settings tier moves it (Code Map: "default 1.0 byte-
+  // identity").
+  const masterNode = graph.createGain();
+  for (const panner of chainPanners) panner.connect(masterNode);
+  masterNode.connect(graph.destination);
+  let masterValue = MASTER_GAIN_DEFAULT;
+  masterNode.gain.setTarget(masterValue);
 
   /** Whose ear the ray starts from, this tick — planar pose + yaw (the
    * budget's frustum leg rides the same handover as the ray origin; both
@@ -497,6 +539,10 @@ export function createAudioManager(opts: AudioManagerOptions): AudioManager {
         ladderDwell: chain.ladderDwell,
         awake: awake.has(chain.volumeId),
         inBudget: inBudget.has(chain.volumeId),
+        // Story 2.4: the live focus-mix strength from the settings tier
+        // (a getter, so a slider commit lands on the NEXT tick's law —
+        // no rebuild, no reload). Absent = 2.2's neutral floor.
+        focusStrength: opts.focusStrength?.() ?? FOCUS_STRENGTH_NEUTRAL,
       });
       chain.dwell = step.dwell;
       chain.ladderDwell = step.ladderDwell;
@@ -510,6 +556,15 @@ export function createAudioManager(opts: AudioManagerOptions): AudioManager {
       chain.gainNode.gain.setTarget(step.target.gain);
       chain.lowpassNode.frequency.setTarget(step.target.lowpassHz);
     }
+  }
+
+  function setMasterGain(value: number): void {
+    masterValue = value < MASTER_GAIN_MIN ? MASTER_GAIN_MIN : value > MASTER_GAIN_MAX ? MASTER_GAIN_MAX : value;
+    // Actuated unconditionally (build-time setTarget precedent: the boot
+    // actuation is not gated on graph state either) — a suspended context
+    // simply applies the value on resume; the chain law's per-tick gating
+    // is untouched.
+    masterNode.gain.setTarget(masterValue);
   }
 
   function requestResume(): void {
@@ -538,8 +593,9 @@ export function createAudioManager(opts: AudioManagerOptions): AudioManager {
         audible: c.audible,
         focus: c.focus,
       })),
+      masterGain: masterValue,
     };
   }
 
-  return { tick, requestResume, state };
+  return { tick, requestResume, setMasterGain, state };
 }

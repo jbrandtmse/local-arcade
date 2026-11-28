@@ -21,19 +21,49 @@
 //     gate until its phase is "control": the street-door beat is tick-
 //     driven inside the loop (a supervisor-wrapped system before "player"),
 //     and the canvas mount/remove still happens nowhere in this file.
+//
+// Story 2.4 extends the entry with the exit view, all at the device edge:
+// the settings service boots EAGERLY and its rows ride the consumers as
+// live getters (camera FOV, player bob, input tuning, audio master gain +
+// focus strength, cabinet tempo); walking out the now-open front door
+// crosses a tick-detected plane that mounts the same-document Settings
+// panel and releases pointer lock (a deep link with the settings hash
+// boots the same view). The panel and the vignette overlay are BUILT in
+// core/settings-ui.ts — this file still grows no markup (the no-ui-dom
+// leg counts their DOM over there), and the room never stops ticking
+// while the panel is up (AD-23: the absence laws pay the queue cost).
 
 import * as THREE from "three";
 import { createKernelLoop, type EventRecord, type KernelLoop } from "./loop.ts";
-import { math } from "./contract/index.ts";
+import { math, type GameInstance } from "./contract/index.ts";
 import { attachGameEntries, type Containment } from "./containment.ts";
 import { createInputService } from "./input/index.ts";
 import { createEntrySequence, type EntrySequence } from "./entry.ts";
 import { mountWorkbench } from "./workbench.ts";
+import {
+  aimMultiplier,
+  bindingTable,
+  bobAmplitude,
+  createSettingsService,
+  fov,
+  focusStrength,
+  masterGain,
+  tempoEveryN,
+  type SettingsRows,
+  type SettingsService,
+} from "./settings.ts";
+import {
+  mountSettingsPanel,
+  mountVignetteOverlay,
+  setVignetteVisible,
+  type SettingsEl,
+  type SettingsPanel,
+} from "./settings-ui.ts";
 import { createPlayerController, EYE_HEIGHT, type PlayerController } from "./player.ts";
 import { createSeatService, type BusyGate, type SeatKeyMap, type SeatService } from "./seat.ts";
 import { createPatronScheduler, type PatronScheduler } from "./patrons/scheduler.ts";
 import { createFigurePresenter, type FigurePresenter } from "./patrons/presenter.ts";
-import { createStorageService, type StorageService } from "./storage.ts";
+import { browserStoragePort, createStorageService, type StorageService } from "./storage.ts";
 import { ENTRY_SPAWN, collisionVolumes } from "./room/collision-volumes.ts";
 import { buildRoomScene, type CabinetLightHandle, type Three } from "./room/scene.ts";
 import { frontDoorHandleYaw, frontDoorOpenPose, frontDoorRamp } from "./room/door.ts";
@@ -93,7 +123,11 @@ declare global {
      * 2.3 adds the atmosphere leg — per-cabinet distanceM / hazeFactor /
      * pulseApplied / glowIntensity rows the frame writes from tick state
      * every frame (the smoke walk reads the gradient's NUMBERS; the
-     * by-sight visual read stays the deferred browser tier). */
+     * by-sight visual read stays the deferred browser tier); 2.4 adds the
+     * settings service (effective device rows + stored/degraded flags —
+     * device-layer only, never sim state) and the guarded game-instance
+     * map (the boot tier's stateHash-identity pin reads the LIVE instances
+     * to prove a settings change leaves seeded runs byte-identical). */
     arcadeDebug: {
       player: PlayerController;
       loop: KernelLoop;
@@ -106,6 +140,8 @@ declare global {
       entry: EntrySequence;
       audio: AudioManager;
       atmosphere: AtmosphereDebug[];
+      settings: SettingsService;
+      instances: Map<string, GameInstance>;
     };
   }
 }
@@ -146,8 +182,21 @@ function bootArcade(): void {
   document.body.appendChild(renderer.domElement);
   bootCanvas = renderer.domElement; // AC4 receipt: the boot catch hands THIS canvas to the mount, never a stale second one
 
+  // Story 2.4 (AC4/UX-DR20): settings boot EAGERLY — before any consumer
+  // exists (the storage.visitorId pattern below): FOV feeds the camera
+  // construction on the next line, and the player/input/audio/cabinets
+  // wiring closes over the live rows. The device store is reached ONLY
+  // through storage.ts's browser-port factory (the single-owner scan binds
+  // that — this file never names it), and the reduced-motion seed port is
+  // a local matchMedia read (AD-18: zero outbound calls). First visit
+  // seeds the comfort preset ON; a stored payload rides verbatim.
+  const settings = createSettingsService({
+    storage: browserStoragePort(),
+    prefersReducedMotion: () => matchMedia("(prefers-reduced-motion: reduce)").matches,
+  });
+
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+  const camera = new THREE.PerspectiveCamera(fov(settings.rows()), window.innerWidth / window.innerHeight, 0.1, 1000);
   camera.rotation.order = "YXZ"; // yaw then pitch, matching the player controller's convention
 
   // Story 1.3: the authored room — volumes/zones/slots/signage/tokens extruded
@@ -262,13 +311,28 @@ function bootArcade(): void {
   // blocking through the untouched 1.2 resolver, and the visitor spawns just
   // inside the street-side door facing the room (ENTRY_SPAWN, room data).
   const player = createPlayerController(collisionVolumes, ENTRY_SPAWN);
-  const input = createInputService({
-    requestPointerLock: () => {
-      // Denial (Esc cooldown, gesture policy) must stay silent at every layer,
-      // console included (AC3): newer engines return a promise that rejects.
-      void Promise.resolve(renderer.domElement.requestPointerLock()).catch(() => {});
+  const input = createInputService(
+    {
+      requestPointerLock: () => {
+        // Denial (Esc cooldown, gesture policy) must stay silent at every layer,
+        // console included (AC3): newer engines return a promise that rejects.
+        void Promise.resolve(renderer.domElement.requestPointerLock()).catch(() => {});
+      },
     },
-  });
+    // Story 2.4 (AD-7): the settings rows ride the input service as LIVE
+    // getters — a sensitivity/remap/look-source commit lands on the next
+    // takeView with no rebuild, and the replay currency stays the shaped
+    // DeviceView (AD-26: settings never fork a seeded run).
+    {
+      bindingTable: () => bindingTable(settings.rows()),
+      lookSource: () => settings.rows().lookSource,
+    // Review law: the page owns the keyboard/pointer while it is up —
+    // radiogroup arrows and stray drags must not steer the room camera;
+    // movement stays live so crossing back still closes the panel (AC7).
+    lookEnabled: () => !exitViewOpen,
+      aimMultiplier: () => aimMultiplier(settings.rows()),
+    },
+  );
   // Story 1.5 (AC4): the seat service owns the E-law for game-wired cabinets.
   // The raw-code legend mapping stays kernel-side (AD-7); the authored keys
   // mirror the vendored control legend ("ARROWS or A D ... FIRE Z/J ...
@@ -428,8 +492,107 @@ function bootArcade(): void {
     // Seated -> zeroed axes/aim, E kept (the seat's view IS the DeviceView
     // contract; the player controller never learns why). 1.9: the entry
     // gate wraps OUTSIDE the seat law — until "control" the visitor owns
-    // nothing, axes/aim/interact all quiet.
-    player.step(1, entry.playerView(seat.playerView(input.takeView())));
+    // nothing, axes/aim/interact all quiet. 2.4 (UX-DR20): the third
+    // argument is the EFFECTIVE bob amplitude from the comfort preset
+    // (off = the authored token, low = half, full = zero); at the shipped
+    // default rows the walk/bob law is byte-identical to 1.2.
+    player.step(1, entry.playerView(seat.playerView(input.takeView())), bobAmplitude(settings.rows()));
+  });
+
+  // Story 2.4 (AC2): the walk-out exit detector. door-front's
+  // blocksMovement flipped to false in the authored list (the volume stays
+  // the kind:"door" occluder — the sound law is untouched), so the visitor
+  // can cross the door plane; this system reads ONLY player tick state:
+  // OPEN when the pose reaches the street edge inside the door gap, CLOSE
+  // at the door's inner face (the gap between the two z values IS the
+  // dead-band — no flapping on the boundary). Crossing outward mounts the
+  // exit-view panel (core/settings-ui.ts — this file grows no markup) and
+  // drops the pointer lock silently; crossing back closes it. The room
+  // keeps ticking the whole time: the scheduler's presence predicate and
+  // the off-chair void/re-arm laws ARE the queue-position cost (AD-23 —
+  // no pause, no claim held, no navigation, no reload).
+  const doorFront = collisionVolumes.find((v) => v.id === "door-front")!;
+  const streetEdgeZ = collisionVolumes.find((v) => v.id === "street-floor")!.min.z;
+  let exitViewOpen = false;
+  // Review law (AC7): CLOSING is a CROSSING law, not a pose law — the
+  // panel only tick-closes once the visitor has actually crossed outward
+  // since this open. A #settings deep-link opens at ENTRY_SPAWN (inside
+  // the close side); without this flag the entry→control handover would
+  // silently tick-close the page ~210 ticks after load while the visitor
+  // never crossed anything (mutation: drop the flag from the close branch
+  // -> the boot tier's handover-survival leg reddens).
+  let openedByCrossing = false;
+  // One pending rebind capture at a time (review): a stale once-listener
+  // surviving the panel would rebind a verb mid-run from the room.
+  let pendingCapture: (() => void) | null = null;
+  let panel: SettingsPanel | null = null;
+  let vignetteOverlay: SettingsEl | null = null;
+  function openExitView(): void {
+    if (exitViewOpen) return;
+    exitViewOpen = true;
+    if (panel == null) {
+      panel = mountSettingsPanel({
+        doc: document,
+        settings,
+        onBack: () => {
+          // Same-document re-entry: back at the authored spawn, facing in.
+          // No claim is restored — the absence laws already ran while the
+          // visitor was out (the cost stands, matrix "Re-enter" row).
+          player.teleport({ ...ENTRY_SPAWN, pitch: 0 });
+          closeExitView();
+        },
+        onRows: (rows) => applyRows(rows),
+        captureKey: (reply) => {
+          // The glue owns the ONE host keydown for rebind capture (the
+          // module stays host-blind); Escape cancels. Review law: ONE
+          // capture pending at a time — a second Rebind click cancels the
+          // previous one, and closeExitView cancels whatever is pending
+          // (an old once-listener surviving the panel would rebind a verb
+          // mid-run from the room; the boot tier pins the cancel).
+          if (pendingCapture != null) pendingCapture();
+          const onKey = (e: KeyboardEvent): void => {
+            window.removeEventListener("keydown", onKey);
+            pendingCapture = null;
+            reply(e.code === "Escape" ? null : e.code);
+          };
+          pendingCapture = (): void => {
+            window.removeEventListener("keydown", onKey);
+            pendingCapture = null;
+            reply(null);
+          };
+          window.addEventListener("keydown", onKey);
+        },
+      });
+    }
+    // The outside view needs the cursor: release the lock SILENTLY (no
+    // prompt, no message) and drop the device buffer like a tab hide, so
+    // no held key walks through the panel (the visibilityChanged idiom).
+    document.exitPointerLock();
+    input.visibilityChanged();
+  }
+  function closeExitView(): void {
+    if (!exitViewOpen) return;
+    exitViewOpen = false;
+    openedByCrossing = false;
+    if (pendingCapture != null) pendingCapture(); // a pending capture dies with the panel
+    panel?.unmount();
+    panel = null;
+    input.visibilityChanged();
+  }
+  loop.addSystem("exit", () => {
+    // The exit law is CONTROL-phase law: during the entry beat the visitor
+    // owns no movement, and the #settings deep-link opens the panel while
+    // the (still entry-owned) pose sits inside the door — without this
+    // gate the detector would close the panel on the first tick and the
+    // matrix "#settings at load" row (panel over the street/entry context,
+    // entry beat ticking behind it) could never hold.
+    if (entry.phase() !== "control") return;
+    const p = player.state;
+    const outside = p.z >= streetEdgeZ && Math.abs(p.x) <= doorFront.max.x;
+    if (outside) openedByCrossing = true;
+    if (!exitViewOpen) {
+      if (outside) openExitView();
+    } else if (openedByCrossing && p.z <= doorFront.min.z) closeExitView();
   });
 
   // Story 1.4: the cabinet runtime mutates ONLY inside the tick — the phase
@@ -437,7 +600,16 @@ function bootArcade(): void {
   // routes inside its own step (AD-15). Handlers register per placement
   // record, never per hand-typed id. 1.5: a gameId-wired placement routes
   // through the seat service; the rest keep the plain 1.4 toggle law.
-  loop.addSystem("cabinets", () => stepCabinetPhase(cabinets, 1));
+  // Story 2.4 (AC5/AD-27): the calm-cabinets tempo wraps THIS call site —
+  // the phase law, CABINET_PHASE_CYCLE_TICKS, and the containment sampling
+  // stay byte-identical, and the wrap is tick-counted, never wall-clock
+  // (AD-3). Calm advances one phase tick per two loop ticks: cabinets keep
+  // moving and glowing, only the tempo changes (liveness invisible).
+  let cabinetsTick = 0;
+  loop.addSystem("cabinets", () => {
+    cabinetsTick += 1;
+    if (cabinetsTick % tempoEveryN(settings.rows()) === 0) stepCabinetPhase(cabinets, 1);
+  });
   for (const p of cabinetPlacements) {
     if (seatTrackVolumeIds.has(p.volumeId)) {
       player.registerInteractable(p.volumeId, (id) => seat.handleInteract(id));
@@ -520,8 +692,37 @@ function bootArcade(): void {
     scheduler,
     player,
     entry,
+    // Story 2.4 (AC5): the focus-mix strength rides the mix law as a live
+    // getter (device row 100 = the exact 2.2 FOCUS_DUCK floor).
+    focusStrength: () => focusStrength(settings.rows()),
   });
+  // Story 2.4: the master gain boots at the stored/seeded row (100 -> 1.0,
+  // byte-identical to the 2.1 graph), and every panel commit lands on the
+  // SAME node through the setter — live apply, no rebuild, no reload.
+  audio.setMasterGain(masterGain(settings.rows()));
   loop.addSystem("audio", () => audio.tick());
+
+  // Story 2.4 (AC1/AC3): the vignette overlay + live-apply seam. The node
+  // is created ONCE by core/settings-ui.ts (this file grows no markup —
+  // the no-ui-dom counts bind over there), carries zero text and zero
+  // interactive elements, and rides the ROOM_BLACK channels as light
+  // management (Design Note 7). applyRows is what the panel's onRows seam
+  // calls on every commit: FOV + projection, master gain, vignette — the
+  // sensitivity/look-source/binding/preset/calm rows ride the getters the
+  // systems already read (no push needed for those).
+  vignetteOverlay = mountVignetteOverlay(document);
+  function applyRows(rows: SettingsRows): void {
+    camera.fov = fov(rows);
+    camera.updateProjectionMatrix();
+    audio.setMasterGain(masterGain(rows));
+    if (vignetteOverlay != null) setVignetteVisible(vignetteOverlay, rows.vignette);
+  }
+  applyRows(settings.rows());
+  // Story 2.4 deep link (and 2.5's skip-link hook): a fresh load carrying
+  // the settings hash boots straight into the exit view over the street
+  // context — the entry beat keeps ticking behind the panel (matrix
+  // "#settings at load" row).
+  if (location.hash === "#settings") openExitView();
 
   // Thin browser glue -> device service (AD-7: Core owns capture; the glue
   // only forwards events and (re)arms pointer lock). Silent by construction:
@@ -793,6 +994,9 @@ function bootArcade(): void {
   // console trigger for the workbench swap — the real law path again);
   // 2.1 adds the audio manager (graph state + per-chain mix law numbers);
   // 2.3 adds the atmosphere leg (the per-cabinet haze/pulse/glow rows the
-  // frame writes — the smoke walk reads the gradient's numbers).
-  window.arcadeDebug = { player, loop, cabinets, seat, scheduler, presenter, containment, storage, entry, audio, atmosphere: atmosphereLegs };
+  // frame writes — the smoke walk reads the gradient's numbers); 2.4 adds
+  // the settings service (the effective device rows + stored/degraded —
+  // never sim state) and the guarded instances map (the boot tier reads
+  // live stateHash sequences to prove settings never fork a seeded run).
+  window.arcadeDebug = { player, loop, cabinets, seat, scheduler, presenter, containment, storage, entry, audio, atmosphere: atmosphereLegs, settings, instances };
 }

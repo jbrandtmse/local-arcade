@@ -2,9 +2,10 @@
 title: 'Story 2.4: The Settings page — comfort presets on at first visit'
 type: 'feature'
 created: '2026-11-27'
-status: 'ready-for-dev'
+status: 'done'
 review_loop_iteration: 0
-followup_review_recommended: false
+followup_review_recommended: true
+baseline_revision: '0eccd503a3206c8a64f2920e2d5f7bc59af67c7a'
 context:
   - _bmad-output/planning-artifacts/architecture/architecture-local-arcade-2026-11-19/ARCHITECTURE-SPINE.md
   - _bmad-output/implementation-artifacts/epic-2-context.md
@@ -39,6 +40,43 @@ deferred:
     location: >-
       core/settings.ts labelled constants; consumed in core/player.ts,
       core/input/index.ts, core/main.ts tempo wrap
+    severity: low
+  - summary: >-
+      Focus-mix strength has no executed boot-tier composition pin through the
+      shipped glue: the row reaches core/audio/manager.ts -> mix.ts only as a
+      live getter at core/main.ts, pinned by an injected-getter unit tier
+      (manager.test.ts) plus a MAIN.includes text pin. A leg that commits a
+      non-default strength and observes the mix floor on a seated chain needs
+      a boot-tier seat cycle — heavier than this story's boot scope; the
+      look-source half of the review finding (VG-1) was patched instead
+      (arrows leg in the boot live-getters test).
+    evidence: |-
+      Review pass VG-1: deleting the focusStrength option from the shipped
+      createAudioManager call leaves every executed test green. The manager's
+      own tier proves the getter is honored; only the shipped composition hop
+      rides the text pin.
+    location: >-
+      core/main.ts focusStrength getter wiring; core/main-boot-qa.test.ts
+      (the live-getters test)
+    severity: medium
+  - summary: >-
+      The Story 2.4 boot-tier tests share the file's boot narrative (boot-2's
+      handle, boot2AtPump, absolute panelCount/matchMedia counters) rather
+      than being per-test hermetic — the established 2.3 pattern, extended.
+      Deterministic in declaration order, but a solo run of a later boot test
+      would read the earlier narrative's state. Relative counters plus a
+      self-captured boot-2 handle would make each leg standalone; that re-tunes
+      the whole file's pins and is QA-tier work.
+    evidence: |-
+      Review pass VG-o1 (boot2AtPump assignment lives inside the #settings
+      test; identity consumes it; counters assert absolute accumulated values).
+      Same idiom as the 2.3 boot tier's single-narrative three-test run; the
+      spec's hermeticity clause ("every added or changed test passes in either
+      order") reads over the file as run — node --test runs each file in one
+      process in declaration order.
+    location: >-
+      core/main-boot-qa.test.ts Story 2.4 legs (#settings-at-load,
+      accommodations-never-fork) and their shared counters
     severity: low
 ---
 
@@ -140,11 +178,67 @@ deferred:
 
 ## Spec Change Log
 
-(none yet)
+### 2026-11-28 — mutation-block AC relabel (authoring fix, from review layer VG-2)
+
+The `## Verification` mutation lines carried AC ids inconsistent with this spec's own Acceptance Criteria list (seed law had AC1, census AC2, a non-existent AC3, master-gain/bob/strength/tempo split across AC4/AC6). Corrected to the spec's AC map (seed law -> AC4, codec/clamps -> AC5, census -> AC1, WCAG 24px -> AC6, master-gain/bob/strength/tempo -> AC2, seed/never-re-seed -> AC4). No AC text, I/O matrix row, or intent contract changed; this is the verification-block's own provenance repair, applied through the owning build skill per project policy.
 
 ## Review Triage Log
 
-(empty until first review pass)
+### 2026-11-28 — Review pass (four context-free layers over the `0eccd50…` diff)
+
+Layers: blind-hunter (10 findings), edge-case-hunter (5, JSON), verification-gap (2 primary + 4 other), intent-alignment (9 divergence rows). Total 30 rows. Verdicts: 1 high, 11 medium, 11 low, 7 false. Routes: 10 patched (as 7 root-cause fixes B/A/C/D/E/F/I/J + VG-2 test fix + VG-o3 demos), 2 deferred (added to frontmatter), 1 authoring fix (relabeled above), the rest rejected with reasons below. `followup_review_recommended: true` — fix B (panel visibility) is the high-severity patch and is pinned only at the style-literal + boot-fake-DOM tier; the real-page layout and the focus-mix composition hop remain the named unverified risks (frontmatter deferred items 1 and 3).
+
+**Route A — deep-link auto-close (root cause: close arm fired on pose alone).**
+- BH-1 — medium — main.ts exit system closed the `#settings` panel ~210 ticks after load (ENTRY_SPAWN z=5.6 <= door-front.min.z 6.25 with no crossing ever taken); verified real at the cited geometry. PATCH: `openedByCrossing` flag gates the close arm; boot-qa survival leg added; falsifier R (drop the flag) reds the #settings pin, sole red.
+- EH-2 — medium — same root cause from the edge tier (hash-opened panel + pose on the close side). Patched with Route A; the agent's `openedByHash` guard shape was NOT taken (the crossing flag is simpler and covers hash AND walk opens).
+- intent#4 — low — flagged the same fate as unpinned at every tier. Patched with Route A (the boot tier now pumps boot-2 past control and asserts the panel survives).
+
+**Route B — panel invisible on the real page (HIGH).**
+- BH-2 — high — `mountSettingsPanel` root was static-flow (width/padding/background/color only) under `html, body { height:100%; overflow:hidden }`: the whole page landed below the fold, unreachable. The most severe finding of the pass. PATCH: fixed overlay root (`position:fixed; left/top 0; max-height 100vh; overflow-y:auto`) — the vignette's own positioning idiom; pinned in settings-ui.test.ts WCAG leg + no-ui-dom style count; falsifiers R8 (style legs) red both layers.
+- BH-8 — medium — vignette (positioned, full-viewport, no z-index) painted above the then-static panel. Root cause was the same static root; with the panel now positioned and mounted LATER in DOM order, it paints above the vignette with no z-index ladder. Patched with Route B; stacking stays a by-eye claim (deferred item 1).
+
+**Route C — stale rebind capture (root cause: capture listener outlived its page).**
+- BH-3 — medium — `captureKey`'s one-shot `window` keydown survived close/Back: a later in-room keypress committed a binding mid-run and repainted a detached panel; stacked captures answered one key with many verbs. PATCH: `pendingCapture` cancel seam — closing (either way) cancels the pending capture; a second Rebind click cancels the first.
+- EH-1 — medium — same root cause (double-click + close-before-reply legs). Patched with Route C. Boot-qa cancel leg drives the panel's Rebind then closes with the capture pending; falsifier R16 (drop the cancel call) reds it, sole red.
+- EH-5 — low — REJECT (recorded): `settings.commit()` outside the panel's `onRows` seam (debug console, 2.6's driver) would leave FOV/gain/vignette stale while `rows()` says otherwise. The panel's commit path is the only product write side this story ships; `arcadeDebug.settings` is the spec's read-only debug leg (field-access readers), and a service-wide `onChange` channel is a new surface the spec does not ask for — 2.6 drives the same panel seam.
+
+**Route D — binding collisions.**
+- BH-7 — medium — commit/decode accepted two verbs on one code, a verb on KeyE, and arrows-as-movement double-duty. PATCH (product default, recorded in the Auto Run Result): commit-side rejection when the four verbs are not distinct; KeyE/arrow codes as movement stay allowed (Interact never tabled; double-duty is the visitor's own choice); decodeRows stays per-key permissive so corrupt stores still self-heal. Pinned in settings.test.ts; falsifier R4 sole red.
+- EH-4 — medium — same root cause; its proposed "reject Arrow codes while lookSource=arrows" guard was NOT taken (it fights the visitor-choice default) — the arrow-vs-PAGE problem is a different root cause, fixed by Route E.
+
+**Route E — arrows vs. the page's own keyboard navigation.**
+- BH-5 — medium — with `lookSource:"arrows"`, radiogroup arrow navigation wrote aim every tick and turned the camera behind the page; the note that `aimMultiplier` also scales arrow speed is accepted (one channel, one sensitivity — the AD-26 replay-currency law). PATCH: `lookEnabled` getter — while the panel is up the LOOK channel is gated (arrows silent, pending deltas consumed-not-emitted), MOVEMENT stays live (the walk-back law, AC7). Pinned at the unit tier (input.test.ts) and the boot tier (walk-out gate leg), text-pinned in main-glue; falsifiers R5 (unit) and R14 (boot wiring) red.
+
+**Route F — dead preset border cue.**
+- BH-4 — low — `paintPreset` wrote `borderColor` on labels with default `border-style:none` — inert; the advertised "marker AND border show the pick" cue was half-real. PATCH: labels carry a real `2px solid` border; pinned in the preset-segment leg; falsifier R7 sole red.
+
+**Route I — duplicate default-binding home.**
+- BH-10 — low — `DEFAULT_BINDING_TABLE` re-declared the default table as a mutable copy in core/input/index.ts. PATCH: derives from settings.ts `DEFAULT_BINDING` (single vocabulary home); existing input.test default-table pin stays green.
+
+**Route J — zero-amplitude settle degenerate.**
+- EH-3 — medium — standing while the preset switched to full: the decay law scaled to zero decays by zero, stranding a bob-offset eye. PATCH: `bobAmplitude <= 0` settles instantly; stillness leg in the effective-bob test; falsifier R6 red.
+
+**Verification-gap layer.**
+- VG-1 — medium — lookSource and focusStrength had no executable consumer leg through the shipped glue (only `MAIN.includes` text pins). PATCH half: boot-qa live-getters test gained the arrows leg (commit arrows, dispatched keydown, yaw moves); `focusStrength` boot composition needs a seat cycle — DEFERRED (new frontmatter item 3).
+- VG-2 — low — `assert.equal(vignetteGradient(), vignetteGradient())` could never fail. PATCH: replaced with the overlay-background-equals-law pin; the agent's demo (mount-side gradient swap) read GREEN before the fix and RED after.
+- VG-o1 — low — the boot tier is a shared narrative (boot2AtPump, absolute panelCount counters), not per-test hermetic. DEFERRED (new frontmatter item 4): pre-existing 2.3 boot-narrative idiom, deterministic in declaration order; a relative-counter rewrite re-tunes the whole file's pins and is QA-tier work, not this story's.
+- VG-o2 — false (as a code finding) — the AC mislabels are real but live in the spec's verification block; FIXED as the authoring change logged above.
+- VG-o3 — medium — several AC legs (colour home, FOV-at-construction, aim multiplier, port-throw, reset marker, aria/shape cues, never-re-seed, census planting) had no mutation demonstration. PATCH: 16 further demonstrations run this pass (see the review-pass block in `## Verification`); every named pin observed red, every revert sha256-verified.
+- VG-o4 — low — REJECT: the rebind keypress also reaches the input service, so pressing a movement key while rebinding walks. Intentional: the walk-back close law (AC7) REQUIRES movement live under the panel, and the look half — the actually-harmful half — is gated by Route E; the axes leak is the accepted product default.
+
+**Intent-alignment layer (reading disclosures; divergences 1-9).**
+- intent#1 — low — REJECT (recorded decision): the open trigger moved from the matrix's "z past inner face" to the street edge (6.5) with the door volume as dead-band — the spine Code Map's crossing law and the no-flap requirement mandate it; pinned at both text and boot tiers.
+- intent#2 — false — the port-throw row's named tier moved (boot-qa stubs localStorage now; the degrade leg runs in settings.test.ts where no global exists). Accepted relocation — storage.ts's law home is the pure tier; the boot file states it.
+- intent#3 — low — REJECT (recorded): the queue-lapse scenario asserts absence, not a lapsed held claim. The spec's own design note makes the absence laws the queue cost; staging a seat cycle pre-crossing is boot-tier scope creep (2.6's walk variants exercise the seated case).
+- intent#5 — false — the WCAG 24px law is pinned at style-literal level; the frontmatter deferred item 1 already owns the computed/browser claim.
+- intent#6 — false — "stored key cleared" implemented as the in-key empty marker: StoragePort (storage.ts:99-102) has only getItem/setItem — verified; the marker is the only shape available and is pinned.
+- intent#7 — low — REJECT with the capture-seam part now MOOT: the boot-qa cancel leg drives the panel's Rebind + dispatched window keydown end-to-end (negative path); the `visibilityChanged()` call-count stays a call-site-law text pin.
+- intent#8 — false — the single-owner scan binds code text (comments stripped); the footnote copy names localStorage only as rendered prose, verbatim from the mockup — the concat idiom keeps the scan honest.
+- intent#9 — low — REJECT (recorded): the identity pin runs with zero dispatched input, so "same recorded inputs" holds vacuously; settings never reach sim inputs (AD-16 — that edge is the input tier's replay-currency law, pinned there); a play-under-two-settings-window boot leg is QA-tier work.
+
+**False findings, code layer.**
+- BH-6 — false — `HINT_SENSITIVITY` "14px target labels use ui-muted..." is mock BODY copy (a `.hint` div inside the slider row at mockups/settings-page.html:152), not a side-margin annotation; the copy law pins it correctly. Same for `HINT_LOOK_SOURCE` (mockup line 159).
+- BH-9 — false — "Back leaves #settings armed": clearing the hash would be a navigation primitive (AC7 never-navigates; the matrix's reload-with-hash row mandates that the deep link opens the page). The URL posture on reload is 2.5's link design, not this story's.
 
 ## Design Notes
 
@@ -187,9 +281,52 @@ deferred:
 
 **Manual checks (deferred tier, report never claim):** on a self-started dev-server port (never the lead's :5173), Tab through the page — the ring moves visibly; walk out the front door — the panel appears, the door sound keeps occluding behind it, walking back restores control with no reload; `arcadeDebug.settings` mirrors the effective scalars. The by-eye/browser tier stands in frontmatter `deferred` item 1 — the M1 walk and Epic-3 harness own it.
 
+**Mutation demonstrations (Rule 19 — each applied to the shipped source, observed red on the named pinning test, reverted, and sha256-verified byte-identical to the pre-mutation file every round; the batch suites and boot-qa re-ran green after the reverts):**
+- AC4 (seed law) mutation: `seedPreset()` ternary replaced with `return PRESET_SEED_DEFAULT;` in core/settings.ts -> core/settings.test.ts "first visit, reduced motion" (with the seed legs, 4 fails) went red. Reverted.
+- AC5 (codec clamps) mutation: both bound lines dropped from `clampNum` -> core/settings.test.ts corrupt-store and commit-clamp pins went red (2 fails). Reverted.
+- AC1 (row census) mutation: `data-row` "sensitivity" renamed "sens" on the sensitivity row in core/settings-ui.ts -> core/settings-ui.test.ts row-census pin went red. Reverted.
+- AC6 (WCAG 24px target) mutation: `input.style.height = SETTINGS_HIT_TARGET;` dropped from `slider()` -> core/settings-ui.test.ts "WCAG structure: every control carries the 24px target literal..." went red (undefined !== '24px'). Reverted.
+- AC7 (never navigates) mutation: `location.reload();` planted in `mountSettingsPanel` -> core/no-ui-dom.test.ts "2.4 settings-ui.ts's DOM surface is exactly the pinned allowlist..." went red. Reverted.
+- AC2 (one master gain leg) mutation: `masterNode.connect(graph.destination);` dropped in core/audio/manager.ts -> core/audio/manager.test.ts "...exactly one looping chain each..." connect-log pin went red (8 !== 9 legs; master-gain legs too). Reverted.
+- AC2 (effective bob scalar) mutation: hold branch `state.bobAmp = bobAmplitude;` -> `state.bobAmp = BOB_AMPLITUDE;` in core/player.ts -> core/player.test.ts "Story 2.4 effective bob..." went red (0.04 !== 0). Reverted.
+- AC2 (focus strength) mutation: `focusMultiplierFor` duck branch hardcoded to `FOCUS_DUCK` (strength ignored) in core/audio/mix.ts -> core/audio/mix.test.ts "Story 2.4 focus-strength input..." strength-0 leg went red (0.0625 !== 1) while every 2.2 identity pin stayed green. Reverted.
+- AC7 (walk-out detector) mutation: the open-branch crossing test dropped from the "exit" system in core/main.ts -> core/main-boot-qa.test.ts walk-out, crossing-back/re-entry, and #settings-at-load pins went red. Reverted. (Re-demonstrated post-review-patch — the same three legs stay red against the patched detector.)
+- AC2 (calm tempo wrap) mutation: the wrap made unconditional (`stepCabinetPhase(cabinets, 1)` every tick) -> core/main-boot-qa.test.ts "the calm row wraps the shipped tempo call site" went red, sole red; re-demonstrated after the pin began reading the window delta through the phase-cycle wrap (`CABINET_PHASE_CYCLE_TICKS`) — the red value is then unambiguous at any phase offset (8 !== 4; the pre-wrap demo read -232 !== 4). Reverted.
+- AC5 (accommodations never fork) mutation: a `calmGate` tick-skip facade added to `attachGameEntries` (core/containment.ts — delegate wrapper skipping `tick()` on even loop ticks while calm) wired from core/main.ts off `settings.rows().calmCabinets` -> core/main-boot-qa.test.ts "accommodations never fork a run" stateHash-identity pin went red, sole red (sample 0 diverged). Reverted. (A seed-gated variant is NOT a sufficient falsifier here — boot-3's store already reads calm=true at attach; the facade proves the pin binds the TICK-TIME settings read.)
+
+Review-pass mutation rounds (same law: apply -> observe red on the named pin -> revert -> sha256-verify byte-identical to the pre-mutation file; batches and boot-qa re-ran green after every revert):
+
+- AC4 (never re-seed) mutation: construction changed to ignore the stored payload (`current = defaults(seedPreset())`) in core/settings.ts -> core/settings.test.ts "return visit: stored rows ride verbatim..." went red (seed-forcing also reddened the corrupt-store/reset legs). Reverted.
+- AC5 (port-throw degrade) mutation: the try/catch dropped from `read()` in core/settings.ts -> core/settings.test.ts "port throws (no localStorage)..." went red, sole red (the throw escaped the service). Reverted.
+- AC5 (reset clears by marker) mutation: `write("");` dropped from `reset()` -> core/settings.test.ts "reset: the stored key is cleared..." went red, sole red. Reverted.
+- AC5 (binding-collision rejection, review law) mutation: the collision guard deleted from `commit()` -> core/settings.test.ts "commit rejects a binding collision..." went red, sole red (the colliding table landed). Reverted.
+- AC2 (look-channel gate at the unit tier) mutation: `const lookOn = lookEnabled();` -> `= true;` in core/input/index.ts -> core/input/input.test.ts "lookEnabled false gates the LOOK channel..." went red, sole red. Reverted.
+- AC2 (zero-amplitude instant settle, review law) mutation: the `bobAmplitude <= 0` leg dropped from the bob block in core/player.ts -> core/player.test.ts "Story 2.4 effective bob..." stillness leg went red (the eye stayed bob-offset: scaled-to-zero decay decays by zero). Reverted.
+- AC2 (FOV feeds CONSTRUCTION) mutation: `fov(settings.rows())` -> `60` in the PerspectiveCamera construction in core/main.ts -> core/main-boot-qa.test.ts #settings-at-load pin went red on the shim's recorded `ctorFov` (constructor-argument arm — the boot applyRows cannot satisfy it), and core/main-glue.test.ts's boot-block text pin went red. Reverted.
+- AC2 (aim-multiplier live getter) mutation: `aimMultiplier: () => aimMultiplier(settings.rows())` -> `() => 1` in core/main.ts -> core/main-boot-qa.test.ts "rows ride LIVE getters..." (the sensitivity-2x leg) went red, sole red. Reverted.
+- AC2/AC7 (the page owns the keyboard, review law) mutation: the `lookEnabled: () => !exitViewOpen` wiring deleted from the input tuning in core/main.ts -> core/main-boot-qa.test.ts walk-out pin went red (the gate leg: a held arrow + stray drag turned the camera while the panel was up; the movement-live leg stayed true). Reverted.
+- AC6 (preset-label real border, review law) mutation: `lab.style.borderStyle/borderWidth` dropped in core/settings-ui.ts -> core/settings-ui.test.ts "preset segment..." went red, sole red (the borderColor cue inert on border-style:none). Reverted.
+- AC6/AC1 (fixed-overlay panel law, review law) mutation: the root's `position/left/top/maxHeight/overflowY` writes dropped -> core/settings-ui.test.ts "WCAG structure..." AND core/no-ui-dom.test.ts allowlist leg (style-write count 97) both went red. Reverted.
+- AC1 (no banter node) mutation: a `p` "Welcome back, traveller." planted in `mountSettingsPanel` -> core/no-ui-dom.test.ts allowlist leg went red (createElement census p 2->3, textContent writes 25->26). Reverted. (The settings-ui.test.ts tree pins stayed green — the census scan is the named pinning layer for planted nodes.)
+- AC1 (token home: no hex) mutation: `sub.style.color = toCss(UI_MUTED)` -> `"#8a8fa3"` -> core/settings-ui.test.ts "colour home: settings-ui.ts carries ZERO hex literals..." went red, sole red. Reverted.
+- AC6 (aria-checked law) mutation: the switch paint `aria-checked` -> constant `"true"` -> core/settings-ui.test.ts "switch rows: role=switch starts aria-checked=false..." went red (the reset-repaint leg too). Reverted.
+- AC7 (close arm gated on an actual crossing, review law) mutation: `openedByCrossing &&` dropped from the close condition -> core/main-boot-qa.test.ts #settings-at-load pin went red, sole red (the spawn pose inside the door tick-closed the deep-linked panel — BH-1's law). Reverted. (Companion note, honest scope: the `entry.phase() !== "control"` guard line in the same system is DEFENSIVE — deleting it alone read GREEN at the boot tier, because the entry dolly is view-side and never moves the player pose the detector reads; that line is text-tier-pinned by main-glue, and the boot tier falsifies the never-auto-close LAW through the openedByCrossing arm instead.)
+- AC7 (pending capture is page-scoped, review law) mutation: the `pendingCapture()` call dropped from `closeExitView` in core/main.ts -> core/main-boot-qa.test.ts crossing-back/re-entry pin went red, sole red (the stale keydown listener bound KeyZ to forward after the panel closed). Reverted.
+- AC2/AC6 (vignette gradient law bound to the mount) mutation: `overlay.style.background = vignetteGradient()` swapped for an inline near-miss gradient inside `mountVignetteOverlay` while the exported law stays correct -> core/settings-ui.test.ts vignette pin went red, sole red (the VG-2 rework: the old self-compare `vignetteGradient() === vignetteGradient()` could never redden — that mutation read GREEN against it). Reverted.
+
 ## Auto Run Result
 
-Status: ready-for-dev
+Status: done
 Blocking condition: none
 
-Spec written plan-stage (unattended epic cycle, branch `ARC-1-epic2`), HALT after planning per dispatch. Investigation basis: two synchronous Explore subagents over `core/` (distilled Code Map above), the UX-DR14/18/20/23 family in epics.md, DESIGN/EXPERIENCE frontmatter, and the `settings-page.html` mockup composition. Frontmatter carries `oversized` (>1600 tokens; one coherent surface story on par with 1.9/2.3 — no split: splitting the page from its wiring would strand integration ACs) and two plan-stage `deferred` posture items (browser tier; L3-tunable comfort numbers). The untracked `_bmad-output/planning-artifacts/sprint-status.yaml` stray was left untouched; nothing committed.
+**Implemented.** Story 2.4 ships as specified: `core/settings.ts` (row schema, `arcade.settings.v1` codec with per-key validation/clamps, first-visit seed law, pure resolvers, storage.ts degrade idiom over the injected StoragePort), `core/settings-ui.ts` (full panel over the injected-doc slice + zero-text vignette overlay, census/count pins in `core/no-ui-dom.test.ts`), eager settings boot in `core/main.ts` with every consumer riding a live getter (binding table, look source, look gate, aim multiplier, focus strength, master gain, FOV-at-construction and live), master GainNode in `core/audio/manager.ts`, strength-aware `focusMultiplierFor` in `core/audio/mix.ts` (byte-identical at strength 100), `player.step(dt, view, bobAmplitude?)`, the calm-tempo wrap at the `stepCabinetPhase(cabinets, 1)` call site, `door-front.blocksMovement: false` + the pose dead-band crossing detector + the `#settings` deep link, and the extended executable boot tier (three boots, stateHash identity over 120 age-aligned samples).
+
+**Review pass (one iteration, four context-free layers, 30 findings — full rows in the Review Triage Log).** Verdicts: 1 high, 11 medium, 11 low, 7 false. Seven root-cause code fixes applied: panel became a fixed scrollable overlay (BH-2 high — it was invisible on the real page; also resolves the vignette stacking BH-8); close arm gated on an actual outward crossing (`openedByCrossing`) so the deep-link panel survives entry->control (BH-1/EH-2/intent#4); page-scoped rebind capture with cancel-on-close (BH-3/EH-1); commit-side binding-collision rejection (BH-7/EH-4); `lookEnabled` look-channel gate while the panel is up (BH-5); real 2px border on preset labels (BH-4); instant settle at zero bob amplitude (EH-3); `DEFAULT_BINDING_TABLE` derived from the settings.ts home (BH-10). Test tier hardened with it: boot-qa shim `removeEventListener` + constructor-frozen `ctorFov`, survival/cancel/gate/arrows boot legs, unit pins for every new law, the VG-2 tautology replaced by a live pin. Two defers added to frontmatter (focus-mix boot composition hop, medium; boot-narrative coupling, low). VG-o2 AC mislabels fixed as the logged authoring change. Rejections stand with their recorded reasons in the log.
+
+**Product-default decisions (unattended authority: within spec intent, reversible, no owner-only category, contradicting no AD or owner-fixed value).** (1) The settings page owns the keyboard: arrows/drags are gated while the panel is up, MOVEMENT stays live (the walk-back close law, AC7). (2) A commit binding two movement verbs to one code is ignored; KeyE/arrow codes as movement verbs stay allowed — Interact is never tabled, and arrows double-duty is the visitor's own choice; a corrupt STORE still merges per key. (3) The open trigger is the street edge (6.5) with the door volume as dead-band — Code Map crossing law, not the matrix's "past inner face" phrasing. (4) Reset clears by writing the empty marker under the same key (`StoragePort` has no removeItem — verified). (5) The port-throw degrade leg runs in the pure tier (boot-qa stubs a working store); (6) the boot tier keeps its shared-narrative idiom (deferred item 4). (7) Pressing a movement key while rebinding walks — accepted consequence of decision 1's movement-live half.
+
+**Verification performed.** All loop commands green after the patches (`typecheck`; the three node --test batches; depcheck; lint-bans; gen-registry drift). Once-commands: `npm test` 522/522 green; `npm run build` clean (the 500 kB chunk notice is pre-existing informational). Rule 19: 27 total mutation demonstrations (11 initial + 16 review-pass rounds) — each applied to shipped source, observed red on the named pinning test, reverted, sha256-verified byte-identical to the pre-mutation file; batches and boot-qa re-ran green after every revert group. Boot tier executes: 9/9 -> boot legs added, still 9/9.
+
+**Followup review recommended: true.** Named unverified risks: (a) the high-severity panel-visibility fix is pinned only at the style-literal + fake-DOM boot tier — real-page layout, scroll behavior, and vignette/panel stacking stand with the browser tier (frontmatter deferred item 1); (b) the focus-strength row's shipped-composition hop rides injected-getter unit tiers plus a text pin (deferred item 3). Residual: comfort numbers provisional (item 2), boot-narrative coupling (item 4), WCAG computed hit-targets by-eye.
+
+**Scope hygiene.** 25 files: the four new core files (`settings.ts`, `settings.test.ts`, `settings-ui.ts`, `settings-ui.test.ts`), `core/main.ts`, `core/input/index.ts`, `core/player.ts`, `core/audio/{manager,mix}.ts`, `core/room/{collision-volumes,door,tokens}.ts`, `core/storage.ts`, the moved-pin families (`main-glue`, `main-boot-qa`, `main-boot-three-shim.mjs`, `no-ui-dom`, `player`, `input`, `settings`-adjacent audio/room tests), and this spec artifact. No `games/`, `generated/`, ledger, scheduler, patrons, or `index.html` change; the only volume-list edit stays the single `door-front.blocksMovement` bit (DW-29 posture); no new deps; nothing pushed — the commit is local on `ARC-1-epic2`; the untracked `_bmad-output/planning-artifacts/sprint-status.yaml` stray was left untouched and uncommitted.

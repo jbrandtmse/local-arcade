@@ -63,8 +63,15 @@ export interface PlayerController {
   /**
    * Advance one span of dt TICKS (dt=1 is one global tick). Called from the
    * loop's addSystem hook, supervisor-wrapped — never from render.
+   * Story 2.4: the optional `bobAmplitude` is the EFFECTIVE bob amplitude
+   * from the comfort settings (core/settings.ts resolver — 0 for "off"
+   * preset… see the spine: preset "full" comfort means bob 0). The glue
+   * passes the resolved value every tick; the default keeps 1.2's shipped
+   * law byte-identical for every non-glue consumer. Settings never reach
+   * sim input or stateHash (AD-16) — this is presentation of the visitor's
+   * own camera, same class as FOV.
    */
-  step(dt: number, view: DeviceView): void;
+  step(dt: number, view: DeviceView, bobAmplitude?: number): void;
   /** Kernel-internal interact registry (Design Notes item 7). Empty this
    * story: an E press with a target and no handler is a silent no-op. */
   registerInteractable(volumeId: string, handler: InteractableHandler): void;
@@ -181,7 +188,7 @@ export function createPlayerController(
     snapshot() {
       return structuredClone(state);
     },
-    step(dt, view) {
+    step(dt, view, bobAmplitude = BOB_AMPLITUDE) {
       const dtSeconds = dt * SECONDS_PER_TICK;
 
       // Look first: raw px deltas -> yaw/pitch (pitch hard-clamped ±85°).
@@ -222,9 +229,16 @@ export function createPlayerController(
       // to 0 within 0.25s once stopped — standing settles to 1.60m exactly.
       if (travelled > 0) {
         state.bobPhase += (travelled / BOB_WAVELENGTH) * (2 * math.PI);
-        state.bobAmp = BOB_AMPLITUDE;
+        state.bobAmp = bobAmplitude;
+      } else if (bobAmplitude <= 0) {
+        // Review law (the comfort tier): a zero effective amplitude settles
+        // INSTANTLY — the same law scaled to zero would decay by zero and
+        // leave a bob-offset eye until the next walked step (mutation:
+        // drop this leg, switch preset to full while standing -> red on
+        // the effective-bob pin's stillness leg).
+        state.bobAmp = 0;
       } else if (state.bobAmp > 0) {
-        const decay = (dtSeconds / BOB_SETTLE_SECONDS) * BOB_AMPLITUDE;
+        const decay = (dtSeconds / BOB_SETTLE_SECONDS) * bobAmplitude;
         state.bobAmp = state.bobAmp > decay ? state.bobAmp - decay : 0;
       }
 
